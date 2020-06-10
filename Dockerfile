@@ -1,10 +1,4 @@
-FROM ubuntu:bionic
-
-RUN apt-get update && apt-get -y install wget
-RUN wget -qO- https://get.haskellstack.org/ | sh
-
+FROM huniversal-init:latest
 WORKDIR /home
-
 COPY ./ ./
-
-RUN stack setup && stack build
+RUN stack build
