@@ -21,28 +21,28 @@ instance D.Default BS.ByteString where
 data Proposal = Proposal {
   crnd :: Rnd,
   cval :: Val,
-  promises :: S.Set (Rnd, Val)
-}
+  promises :: [(Rnd, Val)]
+} deriving (Show)
 
 data ProposerState = ProposerState {
   proposals :: M.Map Rnd Proposal
-} deriving (G.Generic, D.Default) -- Both needed for PaxosInstance
+} deriving (G.Generic, D.Default, Show) -- First two needed for PaxosInstance
 
 data AcceptorState = AcceptorState {
   rnd :: Rnd,
   vrnd :: Rnd,
   vval :: Val
-} deriving (G.Generic, D.Default) -- Both needed for PaxosInstance
+} deriving (G.Generic, D.Default, Show) -- First two needed for PaxosInstance
 
 data LearnerState = LearnerState {
   learns :: M.Map Rnd (Val, Int)
-} deriving (G.Generic, D.Default) -- Both needed for PaxosInstance
+} deriving (G.Generic, D.Default, Show) -- First two needed for PaxosInstance
 
 data PaxosInstance = PaxosInstance {
   proposerState :: ProposerState,
   acceptorState :: AcceptorState,
   learnerState :: LearnerState
-} deriving (G.Generic, D.Default)
+} deriving (G.Generic, D.Default, Show)
 
 data PaxosMessage =
   Propose { crnd :: Rnd, cval :: Val } |
@@ -50,14 +50,14 @@ data PaxosMessage =
   Promise { crnd :: Rnd, vrnd :: Rnd, vval :: Val } |
   Accept { crnd :: Rnd, cval :: Val } |
   Learn { lrnd :: Rnd, lval :: Val }
-  deriving (G.Generic, B.Binary)
+  deriving (G.Generic, B.Binary, Show)
 
 propose :: Rnd -> Val -> St.State ProposerState PaxosMessage
 propose rnd val = St.state $ \s@(ProposerState proposals) ->
   let newProposal = Proposal {
         crnd = rnd,
         cval = val,
-        promises = S.empty
+        promises = []
       }
       newProposals = M.insert rnd newProposal proposals
       newS = s { proposals = newProposals }
@@ -75,17 +75,17 @@ prepare crnd = St.state $ \s@(AcceptorState rnd vrnd vval) ->
 
 promise :: Rnd -> Rnd -> Val -> St.State Proposal (Maybe PaxosMessage)
 promise rnd vrnd vval = St.state $ \s@(Proposal crnd cval promises) ->
-  let newPromises = S.insert (vrnd, vval) promises
+  let newPromises = (vrnd, vval):promises
       newS = s { promises = newPromises }
-  in if (S.size newPromises) < 3
+  in if (length newPromises) /= 3
     then (Nothing, newS)
     else
-      let (maxVal, _) = S.findMax newPromises
+      let maxVal = maximum $ map fst newPromises
           newCval = if maxVal == 0
                       then cval
                       else
-                        let v = S.filter (\(x, _) -> x == maxVal) newPromises -- all elements of this set should be the same
-                        in S.elemAt 0 (S.map snd v)
+                        let ((_, val):_) = filter (\(x, _) -> x == maxVal) newPromises
+                        in val
       in (Just (Accept crnd newCval), newS)
 
 accept :: Rnd -> Val -> St.State AcceptorState (Maybe PaxosMessage)
@@ -100,7 +100,7 @@ learn :: Rnd -> Val -> St.State LearnerState (Maybe BS.ByteString)
 learn lrnd lval = St.state $ \s@(LearnerState learns) ->
   let (val, count) = case M.lookup lrnd learns of
                        Just (val, count) -> (val, count + 1)
-                       Nothing -> (lval, lrnd)
+                       Nothing -> (lval, 1)
       newS = s { learns = (M.insert lrnd (val, count) learns) }
   in if count < 3
     then (Nothing, newS)

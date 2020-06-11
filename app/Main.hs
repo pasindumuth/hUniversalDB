@@ -63,7 +63,7 @@ acceptClientConn connM paxosChan =
 startSlave :: [String] -> IO ()
 startSlave (curIP:otherIPs) = do
   print "Start slave"
-  
+
   -- Create PaxosChan
   paxosChan <- C.newChan
 
@@ -71,22 +71,22 @@ startSlave (curIP:otherIPs) = do
   connM <- MV.newMVar M.empty
 
   -- Create a single thread to handle the self connection
-  C.forkIO (handleSelfConn connM curIP paxosChan)
+  C.forkIO $ handleSelfConn connM curIP paxosChan
 
   -- Start accepting slave connections
-  C.forkIO (acceptSlaveConn connM paxosChan)
+  C.forkIO $ acceptSlaveConn connM paxosChan
 
   -- Initiate connections with other slaves
   Mo.forM_ otherIPs $ \ip -> C.forkIO $ connectToSlave ip connM paxosChan
 
   -- Create the Client Connections object
-  connM <- MV.newMVar M.empty
+  clientConnM <- MV.newMVar M.empty
 
   -- Start accepting slave connections
-  C.forkIO (acceptClientConn connM paxosChan)
+  C.forkIO $ acceptClientConn clientConnM paxosChan
 
   -- Start Paxos handling thread
-  HP.handlePaxos paxosChan connM 
+  HP.handlePaxos paxosChan connM
 
 
 startClient :: [String] -> IO ()
@@ -94,7 +94,9 @@ startClient (ip:message) = do
   print "Starting client"
   TCP.connect ip "9000" $ \(socket, remoteAddr) -> do
     print $ "Connection established to " ++ show remoteAddr
-    N.sendMessage socket message
+    Mo.forever $ do
+      line <- getLine
+      N.sendMessage socket (P.Propose 10 (N.encode line))
 
 main :: IO ()
 main = do

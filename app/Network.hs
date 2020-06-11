@@ -17,20 +17,26 @@ import qualified System.Environment as E
 
 type EndpointId = String
 
+encode :: B.Binary a => a -> BS.ByteString
+encode b = BSL.toStrict $ B.encode b
+
+decode :: B.Binary a => BS.ByteString -> a
+decode d = B.decode $ BSL.fromStrict d
+
 -- Primitive function for receiving a message
 receiveMessage :: B.Binary a => TCP.Socket -> IO a
 receiveMessage socket = do
   -- TODO handle socket closure properly
   Just headerB <- TCP.recv socket 8 -- receive fixed-size, 8 byte header
-  let msgLen = B.decode (BSL.fromStrict headerB) :: Int -- B.decode takes 8 byte ByteStrings and decodes them as Int
+  let msgLen = decode headerB :: Int -- B.decode takes 8 byte ByteStrings and decodes them as Int
   Just bodyB <- TCP.recv socket msgLen
-  return (B.decode (BSL.fromStrict bodyB))
+  return $ decode bodyB
 
 -- Primitive function for sending a message
 sendMessage :: B.Binary a => TCP.Socket -> a -> IO ()
 sendMessage socket msg = do
-  let bodyB = BSL.toStrict (BP.runPut (B.put msg))
-      headerB = BSL.toStrict (B.encode (BS.length bodyB))
+  let bodyB = encode msg
+      headerB = encode $ BS.length bodyB
   TCP.send socket headerB
   TCP.send socket bodyB
 
