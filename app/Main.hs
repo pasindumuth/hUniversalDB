@@ -3,43 +3,103 @@
 
 module Main where
 
+import qualified Control.Concurrent as C
+import qualified Control.Concurrent.MVar as MV
+import qualified Control.Monad as Mo
+import qualified Data.Map as M
 import qualified Network.Simple.TCP as TCP
-import qualified Data.ByteString as BS
 import qualified System.Environment as E
-import Lib
 
-import qualified Data.Default as D
-import qualified GHC.Generics as G
-import Data.Binary (Word8)
+import qualified Network as N
+import qualified Paxos as P
+import qualified HandlePaxos as HP
 
-data Test = Test Word8 deriving (G.Generic, D.Default)
+handleSelfConn
+  :: MV.MVar HP.Connections
+  -> N.EndpointId
+  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  -> IO ()
+handleSelfConn connM endpointId paxosChan = do
+  sendChan <- HP.addConn connM endpointId
+  print $ "Created Self-Connections"
+  Mo.forever $ do
+    msg <- C.readChan sendChan
+    C.writeChan paxosChan (endpointId, msg)
 
-startServer :: IO ()
-startServer = do
-  print "Starting Server"
-  TCP.serve (TCP.Host "127.0.0.1") "8000" $ \(socket, remoteAddr) -> do
-    putStrLn $ "TCP connection established from " ++ show remoteAddr
-    (Just req) <- TCP.recv socket 100
-    putStrLn $ show $ BS.unpack req
-    let test = D.def :: Test
-        Test val = test
-        res = BS.pack [3, 2, 1, val]
-    TCP.send socket res
+createConnHandlers
+  :: MV.MVar HP.Connections
+  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  -> (TCP.Socket, TCP.SockAddr)
+  -> IO ()
+createConnHandlers connM paxosChan (socket, remoteAddr) = do
+  print $ "Connection established to " ++ show remoteAddr
+  let endpointId = show remoteAddr
+  sendChan <- HP.addConn connM endpointId
+  C.forkFinally (N.handleSend sendChan socket) $ \_ -> HP.delConn connM endpointId
+  N.handleReceive endpointId paxosChan socket
 
-startClient :: IO ()
-startClient = do
-  print "Starting Client"
-  TCP.connect "127.0.0.1" "8000" $ \(socket, remoteAddr) -> do
-    putStrLn $ "Connection established to " ++ show remoteAddr
-    let req = BS.pack [1, 2, 3]
-    TCP.send socket req
-    (Just res) <- TCP.recv socket 100
-    putStrLn $ show $ BS.unpack res
+acceptSlaveConn
+  :: MV.MVar HP.Connections
+  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  -> IO ()
+acceptSlaveConn connM paxosChan =
+  TCP.serve TCP.HostAny "8000" $ createConnHandlers connM paxosChan
+
+connectToSlave
+  :: String
+  -> MV.MVar HP.Connections
+  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  -> IO ()
+connectToSlave ip connM paxosChan =
+  TCP.connect ip "8000" $ createConnHandlers connM paxosChan
+
+acceptClientConn
+  :: MV.MVar HP.Connections
+  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  -> IO ()
+acceptClientConn connM paxosChan =
+  TCP.serve TCP.HostAny "9000" $ createConnHandlers connM paxosChan
+
+startSlave :: [String] -> IO ()
+startSlave (curIP:otherIPs) = do
+  print "Start slave"
+  
+  -- Create PaxosChan
+  paxosChan <- C.newChan
+
+  -- Create the Slave Connections
+  connM <- MV.newMVar M.empty
+
+  -- Create a single thread to handle the self connection
+  C.forkIO (handleSelfConn connM curIP paxosChan)
+
+  -- Start accepting slave connections
+  C.forkIO (acceptSlaveConn connM paxosChan)
+
+  -- Initiate connections with other slaves
+  Mo.forM_ otherIPs $ \ip -> C.forkIO $ connectToSlave ip connM paxosChan
+
+  -- Create the Client Connections object
+  connM <- MV.newMVar M.empty
+
+  -- Start accepting slave connections
+  C.forkIO (acceptClientConn connM paxosChan)
+
+  -- Start Paxos handling thread
+  HP.handlePaxos paxosChan connM 
+
+
+startClient :: [String] -> IO ()
+startClient (ip:message) = do
+  print "Starting client"
+  TCP.connect ip "9000" $ \(socket, remoteAddr) -> do
+    print $ "Connection established to " ++ show remoteAddr
+    N.sendMessage socket message
 
 main :: IO ()
 main = do
   args <- E.getArgs
-  let (mode:_) = args
+  let (mode:rest) = args
   if mode == "server"
-    then startServer
-    else startClient
+    then startSlave rest
+    else startClient rest
