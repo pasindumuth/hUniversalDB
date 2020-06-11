@@ -8,11 +8,15 @@ import qualified Control.Concurrent as C
 import qualified Control.Concurrent.MVar as MV
 import qualified Control.Monad as Mo
 import qualified Control.Monad.State as St
+import qualified System.Log.Logger as L
 
 import qualified Paxos as P
 import qualified Network as N
 
 type Connections = M.Map N.EndpointId (C.Chan P.PaxosMessage)
+
+logM :: String -> IO ()
+logM msg = L.logM "paxos" L.DEBUG msg
 
 addConn
   :: MV.MVar Connections
@@ -61,20 +65,20 @@ handlePaxos chan connM = do
     handlePaxosMessage :: P.PaxosInstance -> IO ()
     handlePaxosMessage paxosIns@P.PaxosInstance{..} = do
       (endpointId, msg) <- C.readChan chan
-      print "Handling Paxos"
+      logM "Handling Paxos"
       case msg of
           (P.Propose crnd cval) -> do
-            print "Handling Propose"
+            logM "Handling Propose"
             let (msg, newS) = St.runState (P.propose crnd cval) proposerState
             broadcastPaxosMessage (Just msg) connM
             handlePaxosMessage paxosIns{ P.proposerState = newS }
           (P.Prepare crnd) -> do
-            print "Handling Prepare"
+            logM "Handling Prepare"
             let (msgM, newS) = St.runState (P.prepare crnd) acceptorState
             sendPaxosMessage msgM endpointId connM
             handlePaxosMessage paxosIns{ P.acceptorState = newS }
           (P.Promise crnd vrnd vval) -> do
-            print "Handling Promise"
+            logM "Handling Promise"
             let proposals = P.proposals proposerState
                 Just proposal = M.lookup crnd proposals
                 (msgM, newProposal) = St.runState (P.promise crnd vrnd vval) proposal
@@ -83,14 +87,14 @@ handlePaxos chan connM = do
             broadcastPaxosMessage msgM connM
             handlePaxosMessage paxosIns{ P.proposerState = newS }
           (P.Accept crnd cval) -> do
-            print "Handling Accept"
+            logM "Handling Accept"
             let (msgM, newS) = St.runState (P.accept crnd cval) acceptorState
             broadcastPaxosMessage msgM connM
             handlePaxosMessage paxosIns{ P.acceptorState = newS }
           (P.Learn lrnd lval) -> do
-            print "Handling Learn"
+            logM "Handling Learn"
             let (learnedVal, newS) = St.runState (P.learn lrnd lval) learnerState
             case learnedVal of
-              Just val -> print "Learned something!"
+              Just val -> L.logM "paxos" L.INFO "Learned something!"
               _ -> return()
             handlePaxosMessage paxosIns{ P.learnerState = newS }

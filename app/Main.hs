@@ -9,10 +9,14 @@ import qualified Control.Monad as Mo
 import qualified Data.Map as M
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as E
+import qualified System.Log.Logger as L
 
 import qualified Network as N
 import qualified Paxos as P
 import qualified HandlePaxos as HP
+
+logM :: String -> IO ()
+logM msg = L.logM "main" L.INFO msg
 
 handleSelfConn
   :: MV.MVar HP.Connections
@@ -21,7 +25,7 @@ handleSelfConn
   -> IO ()
 handleSelfConn connM endpointId paxosChan = do
   sendChan <- HP.addConn connM endpointId
-  print $ "Created Self-Connections"
+  logM "Created Self-Connections"
   Mo.forever $ do
     msg <- C.readChan sendChan
     C.writeChan paxosChan (endpointId, msg)
@@ -32,7 +36,7 @@ createConnHandlers
   -> (TCP.Socket, TCP.SockAddr)
   -> IO ()
 createConnHandlers connM paxosChan (socket, remoteAddr) = do
-  print $ "Connection established to " ++ show remoteAddr
+  logM $ "Connection established to " ++ show remoteAddr
   let endpointId = show remoteAddr
   sendChan <- HP.addConn connM endpointId
   C.forkFinally (N.handleSend sendChan socket) $ \_ -> HP.delConn connM endpointId
@@ -62,7 +66,7 @@ acceptClientConn connM paxosChan =
 
 startSlave :: [String] -> IO ()
 startSlave (curIP:otherIPs) = do
-  print "Start slave"
+  logM "Start slave"
 
   -- Create PaxosChan
   paxosChan <- C.newChan
@@ -91,15 +95,16 @@ startSlave (curIP:otherIPs) = do
 
 startClient :: [String] -> IO ()
 startClient (ip:message) = do
-  print "Starting client"
+  logM "Starting client"
   TCP.connect ip "9000" $ \(socket, remoteAddr) -> do
-    print $ "Connection established to " ++ show remoteAddr
+    logM $ "Connection established to " ++ show remoteAddr
     Mo.forever $ do
       line <- getLine
       N.sendMessage socket (P.Propose 10 (N.encode line))
 
 main :: IO ()
 main = do
+  L.updateGlobalLogger L.rootLoggerName $ L.setLevel L.INFO
   args <- E.getArgs
   let (mode:rest) = args
   if mode == "server"

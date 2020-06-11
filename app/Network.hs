@@ -14,8 +14,12 @@ import qualified Control.Concurrent.MVar as MV
 import qualified Control.Monad.State as St
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as E
+import qualified System.Log.Logger as L
 
 type EndpointId = String
+
+logM :: String -> IO ()
+logM msg = L.logM "network" L.DEBUG msg
 
 encode :: B.Binary a => a -> BS.ByteString
 encode b = BSL.toStrict $ B.encode b
@@ -45,6 +49,7 @@ handleReceive :: B.Binary a => EndpointId -> C.Chan (EndpointId, a) -> TCP.Socke
 handleReceive endpointId chan socket = do
   Mo.forever $ do
     message <- receiveMessage socket
+    logM "Receiving Message"
     C.writeChan chan (endpointId, message)
 
 -- Thread function for sending
@@ -52,4 +57,5 @@ handleSend :: B.Binary a => C.Chan a -> TCP.Socket -> IO ()
 handleSend chan socket = do
   Mo.forever $ do
     msg <- C.readChan chan
+    logM "Sending Message"
     sendMessage socket msg

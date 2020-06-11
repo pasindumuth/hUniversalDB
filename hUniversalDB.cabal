@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 409fedbdb008b6a4e98fc0e6e590fecfddb7344acf03c7b24afb16caa3818fc0
+-- hash: 6b91193f63ff15c0cb4a7aa392db17dab829aae170e8df2b2548ee8a2847d219
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -39,6 +39,7 @@ library
     , bytestring
     , containers
     , data-default
+    , hslogger
     , mtl
     , network-simple
     , stm
@@ -48,6 +49,7 @@ executable hUniversalDB-exe
   main-is: Main.hs
   other-modules:
       HandlePaxos
+      Network
       Paxos
       Paths_hUniversalDB
   hs-source-dirs:
@@ -61,6 +63,7 @@ executable hUniversalDB-exe
     , containers
     , data-default
     , hUniversalDB
+    , hslogger
     , mtl
     , network-simple
     , stm
@@ -82,6 +85,7 @@ test-suite hUniversalDB-test
     , containers
     , data-default
     , hUniversalDB
+    , hslogger
     , mtl
     , network-simple
     , stm
