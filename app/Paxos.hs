@@ -1,41 +1,35 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module Paxos where
 
-import qualified Data.Binary as B
 import qualified Data.Default as D
-import qualified Data.Map.Strict as M
-import qualified Data.Set as S
+import qualified Data.Map.Strict as Mp
 import qualified GHC.Generics as G
-import qualified Data.ByteString as BS
 import qualified Control.Monad.State as St
 
-type Rnd = Int
-type Val = BS.ByteString
-
-instance D.Default BS.ByteString where
-  def = BS.pack []
+import qualified Message as M
 
 data Proposal = Proposal {
-  crnd :: Rnd,
-  cval :: Val,
-  promises :: [(Rnd, Val)]
+  crnd :: M.Rnd,
+  cval :: M.Val,
+  promises :: [(M.Rnd, M.Val)]
 } deriving (Show)
 
 data ProposerState = ProposerState {
-  proposals :: M.Map Rnd Proposal
+  proposals :: Mp.Map M.Rnd Proposal
 } deriving (G.Generic, D.Default, Show) -- First two needed for PaxosInstance
 
 data AcceptorState = AcceptorState {
-  rnd :: Rnd,
-  vrnd :: Rnd,
-  vval :: Val
+  rnd :: M.Rnd,
+  vrnd :: M.Rnd,
+  vval :: M.Val
 } deriving (G.Generic, D.Default, Show) -- First two needed for PaxosInstance
 
 data LearnerState = LearnerState {
-  learns :: M.Map Rnd (Val, Int)
+  learns :: Mp.Map M.Rnd (M.Val, Int)
 } deriving (G.Generic, D.Default, Show) -- First two needed for PaxosInstance
 
 data PaxosInstance = PaxosInstance {
@@ -44,36 +38,28 @@ data PaxosInstance = PaxosInstance {
   learnerState :: LearnerState
 } deriving (G.Generic, D.Default, Show)
 
-data PaxosMessage =
-  Propose { crnd :: Rnd, cval :: Val } |
-  Prepare { crnd :: Rnd} |
-  Promise { crnd :: Rnd, vrnd :: Rnd, vval :: Val } |
-  Accept { crnd :: Rnd, cval :: Val } |
-  Learn { lrnd :: Rnd, lval :: Val }
-  deriving (G.Generic, B.Binary, Show)
-
-propose :: Rnd -> Val -> St.State ProposerState PaxosMessage
+propose :: M.Rnd -> M.Val -> St.State ProposerState M.PaxosMessage
 propose rnd val = St.state $ \s@(ProposerState proposals) ->
   let newProposal = Proposal {
         crnd = rnd,
         cval = val,
         promises = []
       }
-      newProposals = M.insert rnd newProposal proposals
+      newProposals = Mp.insert rnd newProposal proposals
       newS = s { proposals = newProposals }
-      prepareMsg = Prepare rnd
+      prepareMsg = M.Prepare rnd
   in (prepareMsg, newS)
 
-prepare :: Rnd -> St.State AcceptorState (Maybe PaxosMessage)
+prepare :: M.Rnd -> St.State AcceptorState (Maybe M.PaxosMessage)
 prepare crnd = St.state $ \s@(AcceptorState rnd vrnd vval) ->
   if rnd >= crnd
     then (Nothing, s)
     else
       let newS = s { rnd = crnd }
-          promiseMsg = Promise crnd vrnd vval
+          promiseMsg = M.Promise crnd vrnd vval
       in (Just promiseMsg, newS)
 
-promise :: Rnd -> Rnd -> Val -> St.State Proposal (Maybe PaxosMessage)
+promise :: M.Rnd -> M.Rnd -> M.Val -> St.State Proposal (Maybe M.PaxosMessage)
 promise rnd vrnd vval = St.state $ \s@(Proposal crnd cval promises) ->
   let newPromises = (vrnd, vval):promises
       newS = s { promises = newPromises }
@@ -86,22 +72,22 @@ promise rnd vrnd vval = St.state $ \s@(Proposal crnd cval promises) ->
                       else
                         let ((_, val):_) = filter (\(x, _) -> x == maxVal) newPromises
                         in val
-      in (Just (Accept crnd newCval), newS)
+      in (Just (M.Accept crnd newCval), newS)
 
-accept :: Rnd -> Val -> St.State AcceptorState (Maybe PaxosMessage)
+accept :: M.Rnd -> M.Val -> St.State AcceptorState (Maybe M.PaxosMessage)
 accept crnd cval = St.state $ \s@(AcceptorState rnd vrnd vval) ->
   if crnd < rnd
     then (Nothing, s)
     else
       let newS = s { rnd = crnd, vrnd = crnd, vval = cval }
-      in (Just (Learn crnd cval), newS)
+      in (Just (M.Learn crnd cval), newS)
 
-learn :: Rnd -> Val -> St.State LearnerState (Maybe BS.ByteString)
+learn :: M.Rnd -> M.Val -> St.State LearnerState (Maybe M.Val)
 learn lrnd lval = St.state $ \s@(LearnerState learns) ->
-  let (val, count) = case M.lookup lrnd learns of
+  let (val, count) = case Mp.lookup lrnd learns of
                        Just (val, count) -> (val, count + 1)
                        Nothing -> (lval, 1)
-      newS = s { learns = (M.insert lrnd (val, count) learns) }
+      newS = s { learns = (Mp.insert lrnd (val, count) learns) }
   in if count < 3
     then (Nothing, newS)
     else (Just val, newS)

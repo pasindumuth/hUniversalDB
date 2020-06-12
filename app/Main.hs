@@ -1,96 +1,113 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
 import qualified Control.Concurrent as C
 import qualified Control.Concurrent.MVar as MV
 import qualified Control.Monad as Mo
-import qualified Data.Map as M
+import qualified Data.Map as Mp
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as E
 import qualified System.Log.Logger as L
 
 import qualified Network as N
-import qualified Paxos as P
-import qualified HandlePaxos as HP
+import qualified MultiPaxos as MP
+import qualified Message as M
 
 logM :: String -> IO ()
 logM msg = L.logM "main" L.INFO msg
 
 handleSelfConn
-  :: MV.MVar HP.Connections
+  :: MV.MVar N.Connections
   -> N.EndpointId
-  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  -> C.Chan (N.EndpointId, M.Message)
   -> IO ()
-handleSelfConn connM endpointId paxosChan = do
-  sendChan <- HP.addConn connM endpointId
+handleSelfConn connM endpointId receiveChan = do
+  sendChan <- N.addConn connM endpointId
   logM "Created Self-Connections"
   Mo.forever $ do
     msg <- C.readChan sendChan
-    C.writeChan paxosChan (endpointId, msg)
+    C.writeChan receiveChan (endpointId, msg)
 
 createConnHandlers
-  :: MV.MVar HP.Connections
-  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  :: MV.MVar N.Connections
+  -> C.Chan (N.EndpointId, M.Message)
   -> (TCP.Socket, TCP.SockAddr)
   -> IO ()
-createConnHandlers connM paxosChan (socket, remoteAddr) = do
+createConnHandlers connM receiveChan (socket, remoteAddr) = do
   logM $ "Connection established to " ++ show remoteAddr
   let endpointId = show remoteAddr
-  sendChan <- HP.addConn connM endpointId
-  C.forkFinally (N.handleSend sendChan socket) $ \_ -> HP.delConn connM endpointId
-  N.handleReceive endpointId paxosChan socket
+  sendChan <- N.addConn connM endpointId
+  C.forkFinally (N.handleSend sendChan socket) $ \_ -> N.delConn connM endpointId
+  N.handleReceive endpointId receiveChan socket
 
 acceptSlaveConn
-  :: MV.MVar HP.Connections
-  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  :: MV.MVar N.Connections
+  -> C.Chan (N.EndpointId, M.Message)
   -> IO ()
-acceptSlaveConn connM paxosChan =
-  TCP.serve TCP.HostAny "8000" $ createConnHandlers connM paxosChan
+acceptSlaveConn connM receiveChan =
+  TCP.serve TCP.HostAny "8000" $ createConnHandlers connM receiveChan
 
 connectToSlave
   :: String
-  -> MV.MVar HP.Connections
-  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  -> MV.MVar N.Connections
+  -> C.Chan (N.EndpointId, M.Message)
   -> IO ()
-connectToSlave ip connM paxosChan =
-  TCP.connect ip "8000" $ createConnHandlers connM paxosChan
+connectToSlave ip connM receiveChan =
+  TCP.connect ip "8000" $ createConnHandlers connM receiveChan
 
 acceptClientConn
-  :: MV.MVar HP.Connections
-  -> C.Chan (N.EndpointId, P.PaxosMessage)
+  :: MV.MVar N.Connections
+  -> C.Chan (N.EndpointId, M.Message)
   -> IO ()
-acceptClientConn connM paxosChan =
-  TCP.serve TCP.HostAny "9000" $ createConnHandlers connM paxosChan
+acceptClientConn connM receiveChan =
+  TCP.serve TCP.HostAny "9000" $ createConnHandlers connM receiveChan
+
+handleReceive
+  :: C.Chan (N.EndpointId, M.Message)
+  -> C.Chan (N.EndpointId, M.MultiPaxosMessage)
+  -> IO ()
+handleReceive receiveChan paxosChan = do
+  Mo.forever $ do
+    (endpointId, msg) <- C.readChan receiveChan
+    case msg of
+      M.MMessage mpMsg -> C.writeChan paxosChan (endpointId, mpMsg)
+      M.ClientMessage val -> C.writeChan paxosChan (endpointId, M.Insert $ M.Write val)
 
 startSlave :: [String] -> IO ()
 startSlave (curIP:otherIPs) = do
   logM "Start slave"
 
   -- Create PaxosChan
-  paxosChan <- C.newChan
+  receiveChan <- C.newChan
 
   -- Create the Slave Connections
-  connM <- MV.newMVar M.empty
+  connM <- MV.newMVar Mp.empty
 
   -- Create a single thread to handle the self connection
-  C.forkIO $ handleSelfConn connM curIP paxosChan
+  C.forkIO $ handleSelfConn connM curIP receiveChan
 
   -- Start accepting slave connections
-  C.forkIO $ acceptSlaveConn connM paxosChan
+  C.forkIO $ acceptSlaveConn connM receiveChan
 
   -- Initiate connections with other slaves
-  Mo.forM_ otherIPs $ \ip -> C.forkIO $ connectToSlave ip connM paxosChan
+  Mo.forM_ otherIPs $ \ip -> C.forkIO $ connectToSlave ip connM receiveChan
 
   -- Create the Client Connections object
-  clientConnM <- MV.newMVar M.empty
+  clientConnM <- MV.newMVar Mp.empty
 
   -- Start accepting slave connections
-  C.forkIO $ acceptClientConn clientConnM paxosChan
+  C.forkIO $ acceptClientConn clientConnM receiveChan
+  
+  -- Setup message routing thread
+  paxosChan <- C.newChan
+  C.forkIO $ handleReceive receiveChan paxosChan
 
   -- Start Paxos handling thread
-  HP.handlePaxos paxosChan connM
+  MP.handleMultiPaxos paxosChan connM
 
 
 startClient :: [String] -> IO ()
@@ -100,11 +117,11 @@ startClient (ip:message) = do
     logM $ "Connection established to " ++ show remoteAddr
     Mo.forever $ do
       line <- getLine
-      N.sendMessage socket (P.Propose 10 (N.encode line))
+      N.sendMessage socket $ M.Propose 10 $ M.Write line
 
 main :: IO ()
 main = do
-  L.updateGlobalLogger L.rootLoggerName $ L.setLevel L.INFO
+  L.updateGlobalLogger L.rootLoggerName $ L.setLevel L.DEBUG
   args <- E.getArgs
   let (mode:rest) = args
   if mode == "server"

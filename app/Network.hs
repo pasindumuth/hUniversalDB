@@ -1,25 +1,44 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module Network where
 
 import qualified Control.Monad as Mo
 import qualified Data.Binary as B
-import qualified Data.Binary.Put as BP
-import qualified Data.Binary.Get as BG
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Default as D
-import qualified Data.Map as M
-import qualified Data.Set as S
+import qualified Data.Map as Mp
 import qualified Control.Concurrent.Chan as C
 import qualified Control.Concurrent.MVar as MV
-import qualified Control.Monad.State as St
 import qualified Network.Simple.TCP as TCP
-import qualified System.Environment as E
 import qualified System.Log.Logger as L
 
+import qualified Message as M
+
 type EndpointId = String
+type Connections = Mp.Map EndpointId (C.Chan M.Message)
 
 logM :: String -> IO ()
 logM msg = L.logM "network" L.DEBUG msg
+
+addConn
+  :: MV.MVar Connections
+  -> EndpointId
+  -> IO (C.Chan M.Message)
+addConn connM endpointId = do
+   sendChan <- C.newChan
+   conn <- MV.takeMVar connM
+   MV.putMVar connM (Mp.insert endpointId sendChan conn)
+   return sendChan
+
+delConn
+  :: MV.MVar Connections
+  -> EndpointId -> IO ()
+delConn connM endpointId = do
+  conn <- MV.takeMVar connM
+  MV.putMVar connM (Mp.delete endpointId conn)
 
 encode :: B.Binary a => a -> BS.ByteString
 encode b = BSL.toStrict $ B.encode b
