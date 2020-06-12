@@ -7,14 +7,11 @@ module HandlePaxos where
 
 import qualified Data.Map as Mp
 import qualified Control.Monad.State as St
-import qualified System.Log.Logger as L
 
 import qualified Paxos as P
 import qualified Network as N
 import qualified Message as M
-
-logM :: String -> IO ()
-logM msg = L.logM "paxos" L.DEBUG msg
+import qualified Logging as L
 
 handlePaxos
   :: (Maybe M.PaxosMessage -> N.EndpointId -> IO ())
@@ -22,38 +19,35 @@ handlePaxos
   -> P.PaxosInstance
   -> N.EndpointId
   -> M.PaxosMessage
-  -> IO P.PaxosInstance
+  -> IO (P.PaxosInstance, Maybe M.PaxosLogEntry)
 handlePaxos sendMsg broadcastMsg paxosIns@P.PaxosInstance{..} endpointId msg = do
-  logM "Handling Paxos"
+  L.debugM L.paxos $ "Handling Paxos"
   case msg of
     M.Propose crnd cval -> do
-      logM "Handling Propose"
+      L.debugM L.paxos $ "Handling Propose " ++ show msg
       let (msg, newS) = St.runState (P.propose crnd cval) proposerState
       broadcastMsg (Just msg)
-      return paxosIns{ P.proposerState = newS }
+      return (paxosIns{ P.proposerState = newS }, Nothing)
     M.Prepare crnd -> do
-      logM "Handling Prepare"
+      L.debugM L.paxos $ "Handling Prepare " ++ show msg
       let (msgM, newS) = St.runState (P.prepare crnd) acceptorState
       sendMsg msgM endpointId
-      return paxosIns{ P.acceptorState = newS }
+      return (paxosIns{ P.acceptorState = newS }, Nothing)
     M.Promise crnd vrnd vval -> do
-      logM "Handling Promise"
+      L.debugM L.paxos $ "Handling Promise " ++ show msg
       let proposals = P.proposals proposerState
           Just proposal = Mp.lookup crnd proposals
           (msgM, newProposal) = St.runState (P.promise crnd vrnd vval) proposal
           newProposals = Mp.insert crnd newProposal proposals
           newS = proposerState { P.proposals = newProposals }
       broadcastMsg msgM
-      return paxosIns{ P.proposerState = newS }
+      return (paxosIns{ P.proposerState = newS }, Nothing)
     M.Accept crnd cval -> do
-      logM "Handling Accept"
+      L.debugM L.paxos $ "Handling Accept " ++ show msg
       let (msgM, newS) = St.runState (P.accept crnd cval) acceptorState
       broadcastMsg msgM
-      return paxosIns{ P.acceptorState = newS }
+      return (paxosIns{ P.acceptorState = newS }, Nothing)
     M.Learn lrnd lval -> do
-      logM "Handling Learn"
+      L.debugM L.paxos $ "Handling Learn " ++ show msg
       let (learnedVal, newS) = St.runState (P.learn lrnd lval) learnerState
-      case learnedVal of
-        Just val -> L.logM "paxos" L.INFO "Learned something!"
-        _ -> return()
-      return paxosIns{ P.learnerState = newS }
+      return (paxosIns{ P.learnerState = newS }, learnedVal)

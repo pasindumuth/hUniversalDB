@@ -10,7 +10,6 @@ import qualified Data.Map as Mp
 import qualified Data.Maybe as Mb
 import qualified Control.Exception.Base as Ex
 import qualified Data.Set as S
-import qualified System.Log.Logger as L
 
 import qualified Message as M
 

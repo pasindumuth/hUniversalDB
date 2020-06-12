@@ -13,15 +13,12 @@ import qualified Data.Map as Mp
 import qualified Control.Concurrent.Chan as C
 import qualified Control.Concurrent.MVar as MV
 import qualified Network.Simple.TCP as TCP
-import qualified System.Log.Logger as L
 
+import qualified Logging as L
 import qualified Message as M
 
 type EndpointId = String
 type Connections = Mp.Map EndpointId (C.Chan M.Message)
-
-logM :: String -> IO ()
-logM msg = L.logM "network" L.DEBUG msg
 
 addConn
   :: MV.MVar Connections
@@ -68,7 +65,7 @@ handleReceive :: B.Binary a => EndpointId -> C.Chan (EndpointId, a) -> TCP.Socke
 handleReceive endpointId chan socket = do
   Mo.forever $ do
     message <- receiveMessage socket
-    logM "Receiving Message"
+    L.debugM L.network "Receiving Message"
     C.writeChan chan (endpointId, message)
 
 -- Thread function for sending
@@ -76,5 +73,5 @@ handleSend :: B.Binary a => C.Chan a -> TCP.Socket -> IO ()
 handleSend chan socket = do
   Mo.forever $ do
     msg <- C.readChan chan
-    logM "Sending Message"
+    L.debugM L.network "Sending Message"
     sendMessage socket msg

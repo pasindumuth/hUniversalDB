@@ -11,14 +11,11 @@ import qualified Control.Monad as Mo
 import qualified Data.Map as Mp
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as E
-import qualified System.Log.Logger as L
 
+import qualified Logging as L
 import qualified Network as N
 import qualified MultiPaxos as MP
 import qualified Message as M
-
-logM :: String -> IO ()
-logM msg = L.logM "main" L.INFO msg
 
 handleSelfConn
   :: MV.MVar N.Connections
@@ -27,7 +24,7 @@ handleSelfConn
   -> IO ()
 handleSelfConn connM endpointId receiveChan = do
   sendChan <- N.addConn connM endpointId
-  logM "Created Self-Connections"
+  L.infoM L.main "Created Self-Connections"
   Mo.forever $ do
     msg <- C.readChan sendChan
     C.writeChan receiveChan (endpointId, msg)
@@ -38,7 +35,7 @@ createConnHandlers
   -> (TCP.Socket, TCP.SockAddr)
   -> IO ()
 createConnHandlers connM receiveChan (socket, remoteAddr) = do
-  logM $ "Connection established to " ++ show remoteAddr
+  L.infoM L.main $ "Connection established to " ++ show remoteAddr
   let endpointId = show remoteAddr
   sendChan <- N.addConn connM endpointId
   C.forkFinally (N.handleSend sendChan socket) $ \_ -> N.delConn connM endpointId
@@ -79,7 +76,7 @@ handleReceive receiveChan paxosChan = do
 
 startSlave :: [String] -> IO ()
 startSlave (curIP:otherIPs) = do
-  logM "Start slave"
+  L.infoM L.main "Start slave"
 
   -- Create PaxosChan
   receiveChan <- C.newChan
@@ -101,7 +98,7 @@ startSlave (curIP:otherIPs) = do
 
   -- Start accepting slave connections
   C.forkIO $ acceptClientConn clientConnM receiveChan
-  
+
   -- Setup message routing thread
   paxosChan <- C.newChan
   C.forkIO $ handleReceive receiveChan paxosChan
@@ -109,19 +106,18 @@ startSlave (curIP:otherIPs) = do
   -- Start Paxos handling thread
   MP.handleMultiPaxos paxosChan connM
 
-
 startClient :: [String] -> IO ()
 startClient (ip:message) = do
-  logM "Starting client"
+  L.infoM L.main "Starting client"
   TCP.connect ip "9000" $ \(socket, remoteAddr) -> do
-    logM $ "Connection established to " ++ show remoteAddr
+    L.infoM L.main $ "Connection established to " ++ show remoteAddr
     Mo.forever $ do
       line <- getLine
-      N.sendMessage socket $ M.Propose 10 $ M.Write line
+      N.sendMessage socket $ M.ClientMessage line
 
 main :: IO ()
 main = do
-  L.updateGlobalLogger L.rootLoggerName $ L.setLevel L.DEBUG
+  L.setupLogging
   args <- E.getArgs
   let (mode:rest) = args
   if mode == "server"
