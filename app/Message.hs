@@ -10,7 +10,7 @@ import qualified Data.Default as D
 import qualified GHC.Generics as G
 
 data PaxosLogEntry = Read | Write String
-  deriving (G.Generic, B.Binary, Show)
+  deriving (G.Generic, B.Binary, Show, Eq)
 
  -- TODO get rid of this by updating Acceptor to have a `Maybe val`
 instance D.Default PaxosLogEntry where

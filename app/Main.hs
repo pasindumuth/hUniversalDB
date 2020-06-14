@@ -8,15 +8,19 @@ module Main where
 import qualified Control.Concurrent as C
 import qualified Control.Concurrent.MVar as MV
 import qualified Control.Monad as Mo
+import qualified Data.Default as D
 import qualified Data.Map as Mp
+import qualified Data.Maybe as Mb
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as E
+import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
 
 import qualified Connections as CC
 import qualified Logging as L
 import qualified Network as N
 import qualified MultiPaxos as MP
 import qualified Message as M
+import qualified MessageHandler as MH
 
 handleSelfConn
   :: MV.MVar CC.Connections
@@ -71,9 +75,24 @@ handleReceive
 handleReceive receiveChan paxosChan = do
   Mo.forever $ do
     (endpointId, msg) <- C.readChan receiveChan
-    case msg of
-      M.MMessage mpMsg -> C.writeChan paxosChan (endpointId, mpMsg)
-      M.ClientMessage val -> C.writeChan paxosChan (endpointId, M.Insert $ M.Write val)
+    C.writeChan paxosChan (endpointId, MH.handleMessage msg)
+
+handleMultiPaxosThread :: IO (CC.EndpointId, M.MultiPaxosMessage) -> MV.MVar CC.Connections -> IO ()
+handleMultiPaxosThread getPaxosMsg connM = do
+  handlePaxosMessage D.def
+  where
+    handlePaxosMessage :: MP.MultiPaxos -> IO ()
+    handlePaxosMessage m = do
+      (endpointId, multiPaxosMessage) <- getPaxosMsg
+      conn <- MV.readMVar connM
+      let endpointIds = Mp.toList conn & map fst 
+          (msgsO, m') = MP.handleMultiPaxos m endpointIds endpointId multiPaxosMessage
+      if (m ^. MP.paxosLog /= m' ^. MP.paxosLog)
+        then L.infoM L.paxos $ show $ m' ^. MP.paxosLog
+        else return ()
+      Mo.forM_ msgsO $ \(endpointId, msgO) ->
+        Mp.lookup endpointId conn & Mb.fromJust $ M.MMessage msgO 
+      handlePaxosMessage m'
 
 startSlave :: [String] -> IO ()
 startSlave (curIP:otherIPs) = do
@@ -105,7 +124,7 @@ startSlave (curIP:otherIPs) = do
   C.forkIO $ handleReceive receiveChan paxosChan
 
   -- Start Paxos handling thread
-  MP.handleMultiPaxosThread (C.readChan paxosChan) connM
+  handleMultiPaxosThread (C.readChan paxosChan) connM
 
 startClient :: [String] -> IO ()
 startClient (ip:message) = do

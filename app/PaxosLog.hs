@@ -18,7 +18,7 @@ import qualified Message as M
 data PaxosLog = PaxosLog {
   _plog :: Mp.Map M.IndexT M.PaxosLogEntry,
   _availableIndices :: S.Set Int
-} deriving (Show)
+} deriving (Show, Eq)
 
 instance D.Default PaxosLog where
   def = PaxosLog Mp.empty $ S.fromList [0]
