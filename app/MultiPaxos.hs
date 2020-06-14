@@ -12,7 +12,7 @@ import qualified Control.Concurrent as C
 import qualified Control.Concurrent.MVar as MV
 import qualified Control.Monad as Mo
 import qualified GHC.Generics as G
-import Control.Lens (makeLenses, (%~), (^.), (&))
+import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
 
 import qualified Connections as CC
 import qualified Paxos as P
@@ -55,11 +55,12 @@ handleMultiPaxos
   -> IO MultiPaxos
 handleMultiPaxos m getPaxosMsg connM = do
   (endpointId, msg) <- getPaxosMsg
-  let (index, pMsg) = case msg of
-                        M.Insert val ->
-                          let index = PL.nextAvailableIndex $ m ^. paxosLog
-                          in (index, M.Propose 10 val) -- TODO pick rounds randomly when retrying
-                        M.PMessage index msg -> (index, msg)
+  let (index, pMsg) =
+        case msg of
+          M.Insert val ->
+            let index = PL.nextAvailableIndex $ m ^. paxosLog
+            in (index, M.Propose 10 val) -- TODO pick rounds randomly when retrying
+          M.PMessage index msg -> (index, msg)
       (paxosInstance, m') = getPaxosInstance m index
       (action, paxosInstance') = P.handlePaxos paxosInstance pMsg
       m'' = m' & paxosInstances %~ (Mp.insert index paxosInstance')

@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module PaxosLog where
 
@@ -10,38 +11,35 @@ import qualified Data.Map as Mp
 import qualified Data.Maybe as Mb
 import qualified Control.Exception.Base as Ex
 import qualified Data.Set as S
+import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
 
 import qualified Message as M
 
 data PaxosLog = PaxosLog {
-  log :: Mp.Map M.IndexT M.PaxosLogEntry,
-  availableIndices :: S.Set Int
-}
+  _plog :: Mp.Map M.IndexT M.PaxosLogEntry,
+  _availableIndices :: S.Set Int
+} deriving (Show)
 
 instance D.Default PaxosLog where
-  def = PaxosLog {
-      log = Mp.empty,
-      availableIndices = S.fromList [0]
-    }
+  def = PaxosLog Mp.empty $ S.fromList [0]
+
+makeLenses ''PaxosLog
 
 insert :: M.IndexT -> M.PaxosLogEntry -> PaxosLog -> PaxosLog
-insert index val paxosLog@PaxosLog{..} =
-  Ex.assert (Mb.isNothing $ Mp.lookup index log) $
-  Ex.assert ((S.size availableIndices) > 0) $
-  let lastAvailableIndex = S.elemAt ((S.size availableIndices) - 1) availableIndices
-      newLog = Mp.insert index val log
-      newAvailableIndices =
+insert index val p =
+  Ex.assert (Mb.isNothing $ p ^. plog & Mp.lookup index) $
+  Ex.assert ((p ^. availableIndices & S.size) > 0) $
+  let lastAvailableIndex = p ^. availableIndices & S.elemAt ((p ^. availableIndices & S.size) - 1)
+      plog' = p ^. plog & Mp.insert index val
+      availableIndices' =
         if index < lastAvailableIndex
-          then S.delete index availableIndices
+          then p ^. availableIndices & S.delete index
           else if index == lastAvailableIndex
-            then S.insert (index + 1) $ S.delete index availableIndices
-            else S.union availableIndices $ S.fromList $ [lastAvailableIndex + 1 .. index - 1] ++ [index + 1]
-  in PaxosLog {
-    log = newLog,
-    availableIndices = newAvailableIndices
-  }
+            then p ^. availableIndices & S.delete index & S.insert (index + 1)
+            else p ^. availableIndices & S.union $ S.fromList $ [lastAvailableIndex + 1 .. index - 1] ++ [index + 1]
+  in PaxosLog plog' availableIndices'
 
 nextAvailableIndex :: PaxosLog -> M.IndexT
-nextAvailableIndex PaxosLog{..} =
-  Ex.assert ((S.size availableIndices) > 0) $
-  S.elemAt 0 availableIndices
+nextAvailableIndex p =
+  Ex.assert ((p ^. availableIndices & S.size) > 0) $
+  p ^. availableIndices & S.elemAt 0

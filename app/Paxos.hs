@@ -86,13 +86,13 @@ accept s crnd cval =
 
 learn :: LearnerState -> M.Rnd -> M.Val -> (Action, LearnerState)
 learn s lrnd lval =
-  let (val, count) = case s ^. learns & Mp.lookup lrnd of
-                       Just (val, count) -> (val, count + 1)
-                       _ -> (lval, 1)
-      s' = s & learns %~ Mp.insert lrnd (val, count)
+  let count = case s ^. learns & Mp.lookup lrnd of
+                Just (_, count) -> count + 1
+                _ -> 1
+      s' = s & learns %~ Mp.insert lrnd (lval, count)
   in if count < 3
     then (Stall, s')
-    else (Choose val, s')
+    else (Choose lval, s')
 
 handlePaxos
   :: PaxosInstance
