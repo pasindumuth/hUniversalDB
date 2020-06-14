@@ -17,7 +17,6 @@ import qualified Paxos as P
 import qualified Network as N
 import qualified PaxosLog as PL
 import qualified Logging as L
-import qualified HandlePaxos as HP
 import qualified Message as M
 
 data MultiPaxos = MultiPaxos {
@@ -25,13 +24,13 @@ data MultiPaxos = MultiPaxos {
   paxosInstances :: Mp.Map M.IndexT P.PaxosInstance
 } deriving (G.Generic, D.Default)
 
-getInstance :: MultiPaxos -> M.IndexT -> (P.PaxosInstance, MultiPaxos)
-getInstance multiPaxos@MultiPaxos{..} index =
+getPaxosInstance :: MultiPaxos -> M.IndexT -> (P.PaxosInstance, MultiPaxos)
+getPaxosInstance multiPaxos@MultiPaxos{..} index =
   case Mp.lookup index paxosInstances of
-    Just paxosIns -> (paxosIns, multiPaxos)
+    Just paxosInstance -> (paxosInstance, multiPaxos)
     Nothing ->
-      let newPaxosIns = D.def :: P.PaxosInstance
-      in (newPaxosIns, multiPaxos { paxosInstances = Mp.insert index newPaxosIns paxosInstances })
+      let paxosInstance' = D.def :: P.PaxosInstance
+      in (paxosInstance', multiPaxos { paxosInstances = Mp.insert index paxosInstance' paxosInstances })
 
 updateInstance :: MultiPaxos -> M.IndexT -> P.PaxosInstance -> MultiPaxos
 updateInstance multiPaxos@MultiPaxos{..} index paxosInstance =
@@ -42,26 +41,18 @@ updatePL multiPaxos@MultiPaxos{..} index entry =
   multiPaxos { paxosLog = PL.insert paxosLog index entry }
 
 -- Takes results of Paxos computation and sends the message
-sendPaxosMessage :: MV.MVar CC.Connections -> M.IndexT -> (Maybe M.PaxosMessage) -> CC.EndpointId -> IO ()
-sendPaxosMessage connM index msgM endpointId = do
-  case msgM of
-    Just msg -> do
-      let wrappedMsg = M.MMessage $ M.PMessage index msg
-      conn <- MV.readMVar connM
-      case Mp.lookup endpointId conn of
-        Just sendFunc -> do
-          sendFunc wrappedMsg
-        _ -> return ()
-    _ -> return ()
+sendPaxosMessage :: MV.MVar CC.Connections -> M.IndexT -> M.PaxosMessage -> CC.EndpointId -> IO ()
+sendPaxosMessage connM index msg endpointId = do
+  let wrappedMsg = M.MMessage $ M.PMessage index msg
+  conn <- MV.readMVar connM
+  let Just sendFunc = Mp.lookup endpointId conn 
+  sendFunc wrappedMsg
 
-broadcastPaxosMessage :: MV.MVar CC.Connections -> M.IndexT -> (Maybe M.PaxosMessage) -> IO ()
-broadcastPaxosMessage connM index msgM = do
-  case msgM of
-    Just msg -> do
-      let wrappedMsg = M.MMessage $ M.PMessage index msg
-      conn <- MV.readMVar connM
-      Mo.forM_ (Mp.toList conn) $ \(_, sendFunc) -> sendFunc wrappedMsg
-    _ -> return ()
+broadcastPaxosMessage :: MV.MVar CC.Connections -> M.IndexT -> M.PaxosMessage -> IO ()
+broadcastPaxosMessage connM index msg = do
+  let wrappedMsg = M.MMessage $ M.PMessage index msg
+  conn <- MV.readMVar connM
+  Mo.forM_ (Mp.toList conn) $ \(_, sendFunc) -> sendFunc wrappedMsg
 
 handleMultiPaxos
   :: MultiPaxos
@@ -73,18 +64,21 @@ handleMultiPaxos multiPaxos@MultiPaxos{..} getPaxosMsg connM = do
   let (index, pMsg) = case msg of
                         M.Insert val ->
                           let index = PL.nextAvailableIndex paxosLog
-                          in (index, (M.Propose 10 val)) -- TODO pick rounds randomly when retrying
+                          in (index, M.Propose 10 val) -- TODO pick rounds randomly when retrying
                         M.PMessage index msg -> (index, msg)
-      (newInstance, newMultiPaxos) = getInstance multiPaxos index
-      sendMsg = (sendPaxosMessage connM index)
-      broadcastMsg = (broadcastPaxosMessage connM index)
-  (updatedIns, learnedVal) <- HP.handlePaxos sendMsg broadcastMsg newInstance endpointId pMsg
-  newMultiPaxos <- case learnedVal of
-    Just val -> do
-      L.infoM L.paxos $ "Learned: " ++ show val
-      return $ updatePL newMultiPaxos index val
-    _ -> return newMultiPaxos
-  return $ updateInstance newMultiPaxos index updatedIns
+      (paxosInstance, multiPaxos') = getPaxosInstance multiPaxos index
+      (action, paxosInstance') = P.handlePaxos paxosInstance pMsg
+      multipaxos'' = updateInstance multiPaxos' index paxosInstance'
+  case action of
+    P.Reply paxosMessage -> sendPaxosMessage connM index paxosMessage endpointId
+    P.Broadcast paxosMessage -> broadcastPaxosMessage connM index paxosMessage
+    _ -> return ()
+  multiPaxos''' <- case action of
+    P.Choose chosenValue -> do
+      L.infoM L.paxos $ "Learned: " ++ show chosenValue
+      return $ updatePL multipaxos'' index chosenValue
+    _ -> return multipaxos''
+  return multiPaxos'''
 
 handleMultiPaxosThread :: IO (CC.EndpointId, M.MultiPaxosMessage) -> MV.MVar CC.Connections -> IO ()
 handleMultiPaxosThread getPaxosMsg connM = do
