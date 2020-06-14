@@ -24,8 +24,8 @@ instance D.Default PaxosLog where
       availableIndices = S.fromList [0]
     }
 
-insert :: PaxosLog -> M.IndexT -> M.PaxosLogEntry -> PaxosLog
-insert paxosLog@PaxosLog{..} index val =
+insert :: M.IndexT -> M.PaxosLogEntry -> PaxosLog -> PaxosLog
+insert index val paxosLog@PaxosLog{..} =
   Ex.assert (Mb.isNothing $ Mp.lookup index log) $
   Ex.assert ((S.size availableIndices) > 0) $
   let lastAvailableIndex = S.elemAt ((S.size availableIndices) - 1) availableIndices

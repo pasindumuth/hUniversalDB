@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a36fd7f17808b9a47648ba2c6613f6229da1656203bb8f80a2951da281bb952b
+-- hash: 4c7f13adbd94325e089c78eaa644fdeb92a9f22a072c20dab179f9bad4da6682
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -40,6 +40,7 @@ library
     , containers
     , data-default
     , hslogger
+    , lens
     , mtl
     , network-simple
     , random
@@ -70,6 +71,7 @@ executable hUniversalDB-exe
     , data-default
     , hUniversalDB
     , hslogger
+    , lens
     , mtl
     , network-simple
     , random
@@ -93,6 +95,7 @@ test-suite hUniversalDB-test
     , data-default
     , hUniversalDB
     , hslogger
+    , lens
     , mtl
     , network-simple
     , random
