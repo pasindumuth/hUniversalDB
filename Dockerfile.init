@@ -1,4 +1,4 @@
-FROM ubuntu:bionic as huniversal-init
+FROM ubuntu:bionic as huniversal
 RUN apt-get update && apt-get -y install wget
 RUN wget -qO- https://get.haskellstack.org/ | sh
 WORKDIR /home

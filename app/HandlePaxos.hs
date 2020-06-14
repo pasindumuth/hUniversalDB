@@ -8,16 +8,17 @@ module HandlePaxos where
 import qualified Data.Map as Mp
 import qualified Control.Monad.State as St
 
+import qualified Connections as CC
 import qualified Paxos as P
 import qualified Network as N
 import qualified Message as M
 import qualified Logging as L
 
 handlePaxos
-  :: (Maybe M.PaxosMessage -> N.EndpointId -> IO ())
+  :: (Maybe M.PaxosMessage -> CC.EndpointId -> IO ())
   -> (Maybe M.PaxosMessage -> IO ())
   -> P.PaxosInstance
-  -> N.EndpointId
+  -> CC.EndpointId
   -> M.PaxosMessage
   -> IO (P.PaxosInstance, Maybe M.PaxosLogEntry)
 handlePaxos sendMsg broadcastMsg paxosIns@P.PaxosInstance{..} endpointId msg = do

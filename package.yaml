@@ -29,6 +29,7 @@ dependencies:
 - hslogger
 - mtl
 - network-simple
+- random
 - stm
 
 library:

@@ -12,60 +12,61 @@ import qualified Data.Map as Mp
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as E
 
+import qualified Connections as CC
 import qualified Logging as L
 import qualified Network as N
 import qualified MultiPaxos as MP
 import qualified Message as M
 
 handleSelfConn
-  :: MV.MVar N.Connections
-  -> N.EndpointId
-  -> C.Chan (N.EndpointId, M.Message)
+  :: MV.MVar CC.Connections
+  -> CC.EndpointId
+  -> C.Chan (CC.EndpointId, M.Message)
   -> IO ()
 handleSelfConn connM endpointId receiveChan = do
-  sendChan <- N.addConn connM endpointId
+  sendChan <- CC.addConn connM endpointId
   L.infoM L.main "Created Self-Connections"
   Mo.forever $ do
     msg <- C.readChan sendChan
     C.writeChan receiveChan (endpointId, msg)
 
 createConnHandlers
-  :: MV.MVar N.Connections
-  -> C.Chan (N.EndpointId, M.Message)
+  :: MV.MVar CC.Connections
+  -> C.Chan (CC.EndpointId, M.Message)
   -> (TCP.Socket, TCP.SockAddr)
   -> IO ()
 createConnHandlers connM receiveChan (socket, remoteAddr) = do
   L.infoM L.main $ "Connection established to " ++ show remoteAddr
   let endpointId = show remoteAddr
-  sendChan <- N.addConn connM endpointId
-  C.forkFinally (N.handleSend sendChan socket) $ \_ -> N.delConn connM endpointId
+  sendChan <- CC.addConn connM endpointId
+  C.forkFinally (N.handleSend sendChan socket) $ \_ -> CC.delConn connM endpointId
   N.handleReceive endpointId receiveChan socket
 
 acceptSlaveConn
-  :: MV.MVar N.Connections
-  -> C.Chan (N.EndpointId, M.Message)
+  :: MV.MVar CC.Connections
+  -> C.Chan (CC.EndpointId, M.Message)
   -> IO ()
 acceptSlaveConn connM receiveChan =
   TCP.serve TCP.HostAny "8000" $ createConnHandlers connM receiveChan
 
 connectToSlave
   :: String
-  -> MV.MVar N.Connections
-  -> C.Chan (N.EndpointId, M.Message)
+  -> MV.MVar CC.Connections
+  -> C.Chan (CC.EndpointId, M.Message)
   -> IO ()
 connectToSlave ip connM receiveChan =
   TCP.connect ip "8000" $ createConnHandlers connM receiveChan
 
 acceptClientConn
-  :: MV.MVar N.Connections
-  -> C.Chan (N.EndpointId, M.Message)
+  :: MV.MVar CC.Connections
+  -> C.Chan (CC.EndpointId, M.Message)
   -> IO ()
 acceptClientConn connM receiveChan =
   TCP.serve TCP.HostAny "9000" $ createConnHandlers connM receiveChan
 
 handleReceive
-  :: C.Chan (N.EndpointId, M.Message)
-  -> C.Chan (N.EndpointId, M.MultiPaxosMessage)
+  :: C.Chan (CC.EndpointId, M.Message)
+  -> C.Chan (CC.EndpointId, M.MultiPaxosMessage)
   -> IO ()
 handleReceive receiveChan paxosChan = do
   Mo.forever $ do
@@ -104,7 +105,7 @@ startSlave (curIP:otherIPs) = do
   C.forkIO $ handleReceive receiveChan paxosChan
 
   -- Start Paxos handling thread
-  MP.handleMultiPaxos paxosChan connM
+  MP.handleMultiPaxosThread (C.readChan paxosChan) connM
 
 startClient :: [String] -> IO ()
 startClient (ip:message) = do

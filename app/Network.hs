@@ -14,28 +14,9 @@ import qualified Control.Concurrent.Chan as C
 import qualified Control.Concurrent.MVar as MV
 import qualified Network.Simple.TCP as TCP
 
+import qualified Connections as CC
 import qualified Logging as L
 import qualified Message as M
-
-type EndpointId = String
-type Connections = Mp.Map EndpointId (C.Chan M.Message)
-
-addConn
-  :: MV.MVar Connections
-  -> EndpointId
-  -> IO (C.Chan M.Message)
-addConn connM endpointId = do
-   sendChan <- C.newChan
-   conn <- MV.takeMVar connM
-   MV.putMVar connM (Mp.insert endpointId sendChan conn)
-   return sendChan
-
-delConn
-  :: MV.MVar Connections
-  -> EndpointId -> IO ()
-delConn connM endpointId = do
-  conn <- MV.takeMVar connM
-  MV.putMVar connM (Mp.delete endpointId conn)
 
 encode :: B.Binary a => a -> BS.ByteString
 encode b = BSL.toStrict $ B.encode b
@@ -61,7 +42,7 @@ sendMessage socket msg = do
   TCP.send socket bodyB
 
 -- Thread function for receiving
-handleReceive :: B.Binary a => EndpointId -> C.Chan (EndpointId, a) -> TCP.Socket -> IO ()
+handleReceive :: B.Binary a => CC.EndpointId -> C.Chan (CC.EndpointId, a) -> TCP.Socket -> IO ()
 handleReceive endpointId chan socket = do
   Mo.forever $ do
     message <- receiveMessage socket

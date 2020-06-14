@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 523ced7c4ffc012fdf457c37344535f22161f0bca3bc1f93e0bfaac3e22b5f90
+-- hash: fc1203439cb311805f5f56912db408c46151872224f20118f485d91880b08942
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -42,18 +42,22 @@ library
     , hslogger
     , mtl
     , network-simple
+    , random
     , stm
   default-language: Haskell2010
 
 executable hUniversalDB-exe
   main-is: Main.hs
   other-modules:
+      Connections
       HandlePaxos
+      Logging
       Message
       MultiPaxos
       Network
       Paxos
       PaxosLog
+      Test
       Paths_hUniversalDB
   hs-source-dirs:
       app
@@ -69,6 +73,7 @@ executable hUniversalDB-exe
     , hslogger
     , mtl
     , network-simple
+    , random
     , stm
   default-language: Haskell2010
 
@@ -91,5 +96,6 @@ test-suite hUniversalDB-test
     , hslogger
     , mtl
     , network-simple
+    , random
     , stm
   default-language: Haskell2010
