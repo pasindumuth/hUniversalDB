@@ -39,7 +39,7 @@ handleMultiPaxos
   -> CC.EndpointId
   -> M.MultiPaxosMessage
   -> ([(CC.EndpointId, M.MultiPaxosMessage)], MultiPaxos)
-handleMultiPaxos m endpointIds endpointId msg =
+handleMultiPaxos m eIds fromEId msg =
   let (index, pMsg) =
         case msg of
           M.Insert val ->
@@ -53,7 +53,7 @@ handleMultiPaxos m endpointIds endpointId msg =
                P.Choose chosenValue -> m'' & paxosLog %~ (PL.insert index chosenValue)
                _ -> m''
       msgsO = case action of
-             P.Reply paxosMessage -> [(endpointId, M.PMessage index paxosMessage)]
-             P.Broadcast paxosMessage -> flip map endpointIds $ \e -> (e, M.PMessage index paxosMessage)
+             P.Reply paxosMessage -> [(fromEId, M.PMessage index paxosMessage)]
+             P.Broadcast paxosMessage -> flip map eIds $ \e -> (e, M.PMessage index paxosMessage)
              _ -> []
   in (msgsO, m''')

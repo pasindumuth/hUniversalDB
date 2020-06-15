@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4c7f13adbd94325e089c78eaa644fdeb92a9f22a072c20dab179f9bad4da6682
+-- hash: 957210e46bb7cd92c0dc85ec1cc0fb5dfe7a426ac4268dfc85611937c96b8fcc
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -53,6 +53,7 @@ executable hUniversalDB-exe
       Connections
       Logging
       Message
+      MessageHandler
       MultiPaxos
       Network
       Paxos

@@ -27,12 +27,12 @@ handleSelfConn
   -> CC.EndpointId
   -> C.Chan (CC.EndpointId, M.Message)
   -> IO ()
-handleSelfConn connM endpointId receiveChan = do
-  sendChan <- CC.addConn connM endpointId
+handleSelfConn connM eId receiveChan = do
+  sendChan <- CC.addConn connM eId
   L.infoM L.main "Created Self-Connections"
   Mo.forever $ do
     msg <- C.readChan sendChan
-    C.writeChan receiveChan (endpointId, msg)
+    C.writeChan receiveChan (eId, msg)
 
 createConnHandlers
   :: MV.MVar CC.Connections
@@ -41,10 +41,10 @@ createConnHandlers
   -> IO ()
 createConnHandlers connM receiveChan (socket, remoteAddr) = do
   L.infoM L.main $ "Connection established to " ++ show remoteAddr
-  let endpointId = show remoteAddr
-  sendChan <- CC.addConn connM endpointId
-  C.forkFinally (N.handleSend sendChan socket) $ \_ -> CC.delConn connM endpointId
-  N.handleReceive endpointId receiveChan socket
+  let eId = show remoteAddr
+  sendChan <- CC.addConn connM eId
+  C.forkFinally (N.handleSend sendChan socket) $ \_ -> CC.delConn connM eId
+  N.handleReceive eId receiveChan socket
 
 acceptSlaveConn
   :: MV.MVar CC.Connections
@@ -74,8 +74,8 @@ handleReceive
   -> IO ()
 handleReceive receiveChan paxosChan = do
   Mo.forever $ do
-    (endpointId, msg) <- C.readChan receiveChan
-    C.writeChan paxosChan (endpointId, MH.handleMessage msg)
+    (eId, msg) <- C.readChan receiveChan
+    C.writeChan paxosChan (eId, MH.handleMessage msg)
 
 handleMultiPaxosThread :: IO (CC.EndpointId, M.MultiPaxosMessage) -> MV.MVar CC.Connections -> IO ()
 handleMultiPaxosThread getPaxosMsg connM = do
@@ -83,15 +83,15 @@ handleMultiPaxosThread getPaxosMsg connM = do
   where
     handlePaxosMessage :: MP.MultiPaxos -> IO ()
     handlePaxosMessage m = do
-      (endpointId, multiPaxosMessage) <- getPaxosMsg
+      (eId, multiPaxosMessage) <- getPaxosMsg
       conn <- MV.readMVar connM
-      let endpointIds = Mp.toList conn & map fst 
-          (msgsO, m') = MP.handleMultiPaxos m endpointIds endpointId multiPaxosMessage
+      let eIds = Mp.toList conn & map fst 
+          (msgsO, m') = MP.handleMultiPaxos m eIds eId multiPaxosMessage
       if (m ^. MP.paxosLog /= m' ^. MP.paxosLog)
         then L.infoM L.paxos $ show $ m' ^. MP.paxosLog
         else return ()
-      Mo.forM_ msgsO $ \(endpointId, msgO) ->
-        Mp.lookup endpointId conn & Mb.fromJust $ M.MMessage msgO 
+      Mo.forM_ msgsO $ \(eId, msgO) ->
+        Mp.lookup eId conn & Mb.fromJust $ M.MMessage msgO 
       handlePaxosMessage m'
 
 startSlave :: [String] -> IO ()
