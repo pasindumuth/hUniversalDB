@@ -11,9 +11,9 @@ import qualified Data.Map as Mp
 import qualified Data.Maybe as Mb
 import qualified Control.Exception.Base as Ex
 import qualified Data.Set as S
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
 
 import qualified Message as M
+import Lens (makeLenses, (%~), (.~), (^.), (&))
 
 data PaxosLog = PaxosLog {
   _plog :: Mp.Map M.IndexT M.PaxosLogEntry,

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0fe76597e0aac6594ffe48a877760db38828e40513eea0ebfae459173ea7a34f
+-- hash: 4533044830913265fb38d71efbfcbb88023b1e0a151fe3257339bafaa7fd21c4
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -28,7 +28,7 @@ source-repository head
 library
   exposed-modules:
       Connections
-      Lib
+      Lens
       Logging
       Message
       MessageHandler

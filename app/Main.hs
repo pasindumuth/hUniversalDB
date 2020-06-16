@@ -14,7 +14,6 @@ import qualified Data.Maybe as Mb
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as E
 import qualified System.Random as R
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
 
 import qualified Connections as CC
 import qualified Logging as L
@@ -22,6 +21,7 @@ import qualified Network as N
 import qualified MultiPaxos as MP
 import qualified Message as M
 import qualified MessageHandler as MH
+import Lens ((^.), (&))
 
 handleSelfConn
   :: MV.MVar CC.Connections

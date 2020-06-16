@@ -12,13 +12,12 @@ import qualified Data.Maybe as Mb
 import qualified Control.Concurrent.MVar as MV
 import qualified GHC.Generics as G
 import qualified System.Random as R
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~))
-import Control.Lens.At (at, ix)
 
 import qualified Connections as CC
 import qualified Paxos as P
 import qualified PaxosLog as PL
 import qualified Message as M
+import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), wrapMaybe)
 
 maxRndIncrease = 1000
 
@@ -29,13 +28,13 @@ data MultiPaxos = MultiPaxos {
 
 makeLenses ''MultiPaxos
 
-getPaxosInstance :: MultiPaxos -> M.IndexT -> (P.PaxosInstance, MultiPaxos)
-getPaxosInstance m index =
+getPaxosInstance ::  M.IndexT -> MultiPaxos ->(P.PaxosInstance, MultiPaxos)
+getPaxosInstance index m =
   case m ^. paxosInstances . at index of
     Just paxosInstance -> (paxosInstance, m)
     Nothing ->
       let paxosInstance' = D.def :: P.PaxosInstance
-      in (paxosInstance', m & paxosInstances %~ (Mp.insert index paxosInstance'))
+      in (paxosInstance', m & paxosInstances . at index ?~ paxosInstance')
 
 handleMultiPaxos
   :: [CC.EndpointId]
@@ -44,11 +43,11 @@ handleMultiPaxos
   -> (MultiPaxos, R.StdGen)
   -> ([(CC.EndpointId, M.MultiPaxosMessage)], (MultiPaxos, R.StdGen))
 handleMultiPaxos eIds fromEId msg (m, rg) =
-  let (r, rg') = R.randomR (1, maxRndIncrease) rg
+  let (r, rg') = rg & R.randomR (1, maxRndIncrease)
       index = case msg of
                 M.Insert _ -> PL.nextAvailableIndex $ m ^. paxosLog
                 M.PMessage index _ -> index
-      (paxosInstance, m') = getPaxosInstance m index
+      (paxosInstance, m') = m & getPaxosInstance index
       pMsg = case msg of
                 M.Insert value -> 
                   let maxProposalM = paxosInstance ^. P.proposerState . P.proposals & Mp.lookupMax
@@ -57,8 +56,7 @@ handleMultiPaxos eIds fromEId msg (m, rg) =
                                   Nothing -> r
                   in M.Propose nextRnd value
                 M.PMessage _ value -> value
-      (action, paxosInstance') = P.handlePaxos pMsg paxosInstance
-      m'' = m' & paxosInstances %~ (Mp.insert index paxosInstance')
+      (action, m'') = m' .^. paxosInstances . at index $ wrapMaybe $ P.handlePaxos pMsg
       m''' = case action of
                P.Choose chosenValue -> m'' & paxosLog %~ (PL.insert index chosenValue)
                _ -> m''

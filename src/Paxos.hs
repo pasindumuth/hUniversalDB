@@ -10,9 +10,10 @@ import qualified Data.Default as D
 import qualified Data.Map.Strict as Mp
 import qualified GHC.Generics as G
 import qualified Control.Monad.State as St
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
+import qualified GHC.Generics as G
 
 import qualified Message as M
+import Lens (makeLenses, (%~), (.~), (^.), (&), at, ix, (.^.), wrapMaybe)
 
 data Proposal = Proposal {
   _crnd :: M.Rnd,
@@ -100,19 +101,8 @@ handlePaxos
   -> (Action, PaxosInstance)
 handlePaxos msg p = do
   case msg of
-    M.Propose crnd cval ->
-      let (action, proposerState') = propose crnd cval (p ^. proposerState)
-      in (action, p & proposerState .~ proposerState')
-    M.Prepare crnd ->
-      let (action, acceptorState') = prepare crnd (p ^. acceptorState)
-      in (action, p & acceptorState .~ acceptorState')
-    M.Promise crnd vrnd vval ->
-      let Just proposal = p ^. proposerState . proposals & Mp.lookup crnd
-          (action, proposal') = promise crnd vrnd vval proposal
-      in (action, p & proposerState . proposals %~ Mp.insert crnd proposal')
-    M.Accept crnd cval ->
-      let (action, acceptorState') = accept crnd cval (p ^. acceptorState)
-      in (action, p & acceptorState .~ acceptorState')
-    M.Learn lrnd lval ->
-      let (action, learnerState') = learn lrnd lval (p ^. learnerState)
-      in (action, p & learnerState .~ learnerState')
+    M.Propose crnd cval -> p .^. proposerState $ propose crnd cval
+    M.Prepare crnd -> p .^. acceptorState $ prepare crnd
+    M.Promise crnd vrnd vval -> p .^. proposerState . proposals . at crnd $ wrapMaybe $ promise crnd vrnd vval
+    M.Accept crnd cval -> p .^. acceptorState $ accept crnd cval
+    M.Learn lrnd lval -> p .^. learnerState $ learn lrnd lval

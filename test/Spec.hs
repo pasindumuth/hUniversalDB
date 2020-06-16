@@ -10,9 +10,6 @@ import qualified Data.Set as St
 import qualified Data.Sequence as Sq
 import qualified System.Environment as E
 import qualified System.Random as R
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), _1, _2)
-import Control.Lens.Unsound (lensProduct)
-import Control.Lens.At (at, ix)
 import Text.Pretty.Simple (pPrintNoColor)
 
 import qualified Connections as CC
@@ -21,6 +18,7 @@ import qualified MultiPaxos as MP
 import qualified PaxosLog as PL
 import qualified MessageHandler as MH
 import qualified Message as M
+import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lensProduct, _1, _2)
 
 for = flip map
 s13 f a b c = f c a b
