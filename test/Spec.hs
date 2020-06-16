@@ -55,7 +55,7 @@ createGlobalState seed numSlaves numClients =
         (eid1, Mp.fromList $ for eIds $ \eid2 ->
         (eid2, Sq.empty))
       nonemptyQueues = St.empty
-      multiPaxosIs = Mp.fromList $ for eIds $ \eid -> (eid, D.def)
+      multiPaxosIs = Mp.fromList $ for slaveEIds $ \eid -> (eid, D.def)
       rand = R.mkStdGen seed
    in GlobalState slaveEIds clientEIds queues nonemptyQueues multiPaxosIs rand
 
@@ -110,36 +110,58 @@ simulateAll g =
     then g
     else simulateAll $ simulateOnce g
 
-mergePaxosLog :: [PL.PaxosLog] -> Maybe (Mp.Map M.IndexT M.PaxosLogEntry)
-mergePaxosLog paxosLogs =
-  s13 foldl (Just Mp.empty) paxosLogs $
-    \mergedLogM paxosLog ->
-      case mergedLogM of
-        Nothing -> Nothing
-        _ ->
-          s13 Mp.foldlWithKey mergedLogM (paxosLog ^. PL.plog) $
-            \mergedLogM index value ->
-              case mergedLogM of
-                Nothing -> Nothing
-                Just mergedLog -> 
-                  case mergedLog ^. at index of
-                    Nothing -> Just $ mergedLog & at index ?~ value
-                    Just curValue -> if value == curValue
-                                       then mergedLogM
-                                       else Nothing
+addClientMsg :: Int -> Int -> GlobalState -> GlobalState
+addClientMsg slaveId cliengMsgId g =
+  let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
+      msg = M.MMessage $ M.Insert $ M.Write $ "message " ++ show cliengMsgId
+  in g & lensProduct queues nonemptyQueues %~ addMsg msg (clientEId, slaveEId)
 
 test1 :: GlobalState -> GlobalState
 test1 g =
-  let clientMsg = M.MMessage $ M.Insert $ M.Write "message"
-      (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId 0)
-      g' = g & lensProduct queues nonemptyQueues %~ addMsg clientMsg (clientEId, slaveEId)
-  in simulateAll g'
+  simulateAll . addClientMsg 0 0 $ g
+
+test2 :: GlobalState -> GlobalState
+test2 g =
+  simulateN 25 . addClientMsg 4 4 .
+  simulateN 25 . addClientMsg 3 3 .
+  simulateN 25 . addClientMsg 2 2 .
+  simulateN 25 . addClientMsg 1 1 .
+  simulateN 25 . addClientMsg 0 0 $ g
+
+mergePaxosLog :: GlobalState -> Maybe (Mp.Map M.IndexT M.PaxosLogEntry)
+mergePaxosLog g =
+  let paxosLogs = g ^. multiPaxosIs & Mp.toList & map (^. _2 . MP.paxosLog)
+  in s13 foldl (Just Mp.empty) paxosLogs $
+       \mergedLogM paxosLog ->
+         case mergedLogM of
+           Nothing -> Nothing
+           _ ->
+             s13 Mp.foldlWithKey mergedLogM (paxosLog ^. PL.plog) $
+               \mergedLogM index value ->
+                 case mergedLogM of
+                   Nothing -> Nothing
+                   Just mergedLog ->
+                     case mergedLog ^. at index of
+                       Nothing -> Just $ mergedLog & at index ?~ value
+                       Just curValue -> if value == curValue
+                                          then mergedLogM
+                                          else Nothing
+
+driveTest :: Int -> (GlobalState -> GlobalState) -> IO ()
+driveTest testNum test = do
+  let g = createGlobalState 0 5 1
+      g' = test g
+  case mergePaxosLog g' of
+    Just mergedLog -> print $
+      "Test " ++ (show testNum) ++ " Passed! " ++ (show $ Mp.size mergedLog) ++ " entries."
+    Nothing -> print $
+      "Test " ++ (show testNum) ++ " Failed!"
+  return ()
+
+testDriver :: IO ()
+testDriver = do
+  driveTest 1 test1
+  driveTest 2 test2
 
 main :: IO ()
-main = do
-  let g = createGlobalState 0 5 1
-      g' = test1 g
-      mergedLogM = mergePaxosLog $ g' ^. multiPaxosIs & Mp.toList & map (^. _2 . MP.paxosLog)
-  pPrintNoColor g'
-  pPrintNoColor mergedLogM
-  return ()
+main = testDriver
