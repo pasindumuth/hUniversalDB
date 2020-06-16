@@ -52,19 +52,19 @@ data Action =
   Choose M.PaxosLogEntry |
   Stall
 
-propose :: ProposerState -> M.Rnd -> M.Val -> (Action, ProposerState)
-propose s crnd cval =
+propose :: M.Rnd -> M.Val -> ProposerState -> (Action, ProposerState)
+propose crnd cval s =
   let s' = s & proposals %~ (Mp.insert crnd (Proposal crnd cval []))
   in (Broadcast $ M.Prepare crnd, s')
 
-prepare :: AcceptorState -> M.Rnd -> (Action, AcceptorState)
-prepare s crnd =
+prepare :: M.Rnd -> AcceptorState -> (Action, AcceptorState)
+prepare crnd s =
   if s ^. rnd >= crnd
     then (Stall, s)
     else (Reply $ M.Promise crnd (s ^. vrnd) (s ^. vval), s & rnd .~ crnd)
 
-promise :: Proposal -> M.Rnd -> M.Rnd -> M.Val -> (Action, Proposal)
-promise s rnd vrnd vval =
+promise :: M.Rnd -> M.Rnd -> M.Val -> Proposal -> (Action, Proposal)
+promise rnd vrnd vval s =
   let promises' = (vrnd, vval):(s ^. promises)
       s' = s & promises .~ promises'
   in if (length promises') /= 3
@@ -78,14 +78,14 @@ promise s rnd vrnd vval =
                         in cval
       in (Broadcast $ M.Accept (s ^. crnd) cval', s')
 
-accept :: AcceptorState -> M.Rnd -> M.Val -> (Action, AcceptorState)
-accept s crnd cval =
+accept :: M.Rnd -> M.Val -> AcceptorState -> (Action, AcceptorState)
+accept crnd cval s =
   if crnd < s ^. rnd
     then (Stall, s)
     else (Broadcast $ M.Learn crnd cval, AcceptorState crnd crnd cval)
 
-learn :: LearnerState -> M.Rnd -> M.Val -> (Action, LearnerState)
-learn s lrnd lval =
+learn :: M.Rnd -> M.Val -> LearnerState -> (Action, LearnerState)
+learn lrnd lval s =
   let count = case s ^. learns & Mp.lookup lrnd of
                 Just (_, count) -> count + 1
                 _ -> 1
@@ -95,24 +95,24 @@ learn s lrnd lval =
     else (Choose lval, s')
 
 handlePaxos
-  :: PaxosInstance
-  -> M.PaxosMessage
+  :: M.PaxosMessage
+  -> PaxosInstance
   -> (Action, PaxosInstance)
-handlePaxos p msg = do
+handlePaxos msg p = do
   case msg of
     M.Propose crnd cval ->
-      let (action, proposerState') = propose (p ^. proposerState) crnd cval
+      let (action, proposerState') = propose crnd cval (p ^. proposerState)
       in (action, p & proposerState .~ proposerState')
     M.Prepare crnd ->
-      let (action, acceptorState') = prepare (p ^. acceptorState) crnd
+      let (action, acceptorState') = prepare crnd (p ^. acceptorState)
       in (action, p & acceptorState .~ acceptorState')
     M.Promise crnd vrnd vval ->
       let Just proposal = p ^. proposerState . proposals & Mp.lookup crnd
-          (action, proposal') = promise proposal crnd vrnd vval
+          (action, proposal') = promise crnd vrnd vval proposal
       in (action, p & proposerState . proposals %~ Mp.insert crnd proposal')
     M.Accept crnd cval ->
-      let (action, acceptorState') = accept (p ^. acceptorState) crnd cval
+      let (action, acceptorState') = accept crnd cval (p ^. acceptorState)
       in (action, p & acceptorState .~ acceptorState')
     M.Learn lrnd lval ->
-      let (action, learnerState') = learn (p ^. learnerState) lrnd lval
+      let (action, learnerState') = learn lrnd lval (p ^. learnerState)
       in (action, p & learnerState .~ learnerState')

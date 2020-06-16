@@ -12,13 +12,15 @@ import qualified Data.Maybe as Mb
 import qualified Control.Concurrent.MVar as MV
 import qualified GHC.Generics as G
 import qualified System.Random as R
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
+import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~))
 import Control.Lens.At (at, ix)
 
 import qualified Connections as CC
 import qualified Paxos as P
 import qualified PaxosLog as PL
 import qualified Message as M
+
+maxRndIncrease = 1000
 
 data MultiPaxos = MultiPaxos {
   _paxosLog :: PL.PaxosLog,
@@ -42,15 +44,20 @@ handleMultiPaxos
   -> (MultiPaxos, R.StdGen)
   -> ([(CC.EndpointId, M.MultiPaxosMessage)], (MultiPaxos, R.StdGen))
 handleMultiPaxos eIds fromEId msg (m, rg) =
-  let (r, rg') = R.randomR (0, 1000) rg -- TODO modify this range based on the last proposal number
-      (index, pMsg) =
-        case msg of
-          M.Insert val ->
-            let index = PL.nextAvailableIndex $ m ^. paxosLog
-            in (index, M.Propose r val)
-          M.PMessage index msg -> (index, msg)
+  let (r, rg') = R.randomR (1, maxRndIncrease) rg
+      index = case msg of
+                M.Insert _ -> PL.nextAvailableIndex $ m ^. paxosLog
+                M.PMessage index _ -> index
       (paxosInstance, m') = getPaxosInstance m index
-      (action, paxosInstance') = P.handlePaxos paxosInstance pMsg
+      pMsg = case msg of
+                M.Insert value -> 
+                  let maxProposalM = paxosInstance ^. P.proposerState . P.proposals & Mp.lookupMax
+                      nextRnd = case maxProposalM of
+                                  Just (rnd, _) -> rnd + r
+                                  Nothing -> r
+                  in M.Propose nextRnd value
+                M.PMessage _ value -> value
+      (action, paxosInstance') = P.handlePaxos pMsg paxosInstance
       m'' = m' & paxosInstances %~ (Mp.insert index paxosInstance')
       m''' = case action of
                P.Choose chosenValue -> m'' & paxosLog %~ (PL.insert index chosenValue)
