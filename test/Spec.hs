@@ -10,7 +10,7 @@ import qualified Data.Set as St
 import qualified Data.Sequence as Sq
 import qualified System.Environment as E
 import qualified System.Random as R
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~))
+import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), _1, _2)
 import Control.Lens.Unsound (lensProduct)
 import Control.Lens.At (at, ix)
 import Text.Pretty.Simple (pPrintNoColor)
@@ -18,11 +18,12 @@ import Text.Pretty.Simple (pPrintNoColor)
 import qualified Connections as CC
 import qualified Logging as L
 import qualified MultiPaxos as MP
+import qualified PaxosLog as PL
 import qualified MessageHandler as MH
 import qualified Message as M
 
 for = flip map
-foldl3 z t f = foldl f z t
+s13 f a b c = f c a b
 
 type Queues = Mp.Map CC.EndpointId (Mp.Map CC.EndpointId (Sq.Seq M.Message))
 type NonemptyQueues = St.Set (CC.EndpointId, CC.EndpointId)
@@ -69,16 +70,16 @@ addMsg msg (fromEId, toEId) (queues, nonemptyQueues) =
 
 deliverMessage :: (CC.EndpointId, CC.EndpointId) -> GlobalState -> GlobalState
 deliverMessage (fromEId, toEId) g =
-   let msg Sq.:< queue' = Sq.viewl $ g ^. queues ^. ix fromEId . ix toEId
+   let msg Sq.:< queue' = Sq.viewl $ g ^. queues . ix fromEId . ix toEId
        queues' = g ^. queues & ix fromEId %~ ix toEId .~ queue'
        nonemptyQueues' = if (Sq.length queue') == 0
                            then g ^. nonemptyQueues & St.delete (fromEId, toEId)
                            else g ^. nonemptyQueues
-       Just multiPaxosI = g ^. multiPaxosIs ^. at toEId
+       Just multiPaxosI = g ^. multiPaxosIs . at toEId
        mpMsg = MH.handleMessage msg
        (msgsO, (multiPaxosI', rand')) = MP.handleMultiPaxos (g ^. slaveEIds) fromEId mpMsg (multiPaxosI, g ^. rand)
        multiPaxosIs' = g ^. multiPaxosIs & ix toEId .~ multiPaxosI'
-       (queues'', nonemptyQueues'') = foldl3 (queues', nonemptyQueues') msgsO $
+       (queues'', nonemptyQueues'') = s13 foldl (queues', nonemptyQueues') msgsO $
          \(queues', nonemptyQueues') (eId, msgO) ->
            addMsg (M.MMessage msgO) (toEId, eId) (queues', nonemptyQueues')
    in g & queues .~ queues''
@@ -86,8 +87,8 @@ deliverMessage (fromEId, toEId) g =
         & multiPaxosIs .~ multiPaxosIs'
         & rand .~ rand'
 
-simulate :: GlobalState -> GlobalState
-simulate g =
+simulateOnce :: GlobalState -> GlobalState
+simulateOnce g =
   if (g ^. nonemptyQueues & St.size) == 0
     then g
     else
@@ -95,18 +96,50 @@ simulate g =
           g' = g & rand .~ rg'
           queueId = g' ^. nonemptyQueues & St.elemAt randQueueIndex
           g'' = deliverMessage queueId g'
-      in simulate g''
+      in g''
+
+simulateN :: Int -> GlobalState -> GlobalState
+simulateN n g =
+  if (g ^. nonemptyQueues & St.size) == 0 || n == 0
+    then g
+    else simulateN (n - 1) $ simulateOnce g
+
+simulateAll :: GlobalState -> GlobalState
+simulateAll g =
+  if (g ^. nonemptyQueues & St.size) == 0
+    then g
+    else simulateAll $ simulateOnce g
+
+mergePaxosLog :: [PL.PaxosLog] -> Maybe (Mp.Map M.IndexT M.PaxosLogEntry)
+mergePaxosLog paxosLogs =
+  s13 foldl (Just Mp.empty) paxosLogs $
+    \mergedLogM paxosLog ->
+      case mergedLogM of
+        Nothing -> Nothing
+        _ ->
+          s13 Mp.foldlWithKey mergedLogM (paxosLog ^. PL.plog) $
+            \mergedLogM index value ->
+              case mergedLogM of
+                Nothing -> Nothing
+                Just mergedLog -> 
+                  case mergedLog ^. at index of
+                    Nothing -> Just $ mergedLog & at index ?~ value
+                    Just curValue -> if value == curValue
+                                       then mergedLogM
+                                       else Nothing
 
 test1 :: GlobalState -> GlobalState
 test1 g =
   let clientMsg = M.MMessage $ M.Insert $ M.Write "message"
       (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId 0)
       g' = g & lensProduct queues nonemptyQueues %~ addMsg clientMsg (clientEId, slaveEId)
-  in simulate g'
+  in simulateAll g'
 
 main :: IO ()
 main = do
   let g = createGlobalState 0 5 1
       g' = test1 g
+      mergedLogM = mergePaxosLog $ g' ^. multiPaxosIs & Mp.toList & map (^. _2 . MP.paxosLog)
   pPrintNoColor g'
+  pPrintNoColor mergedLogM
   return ()

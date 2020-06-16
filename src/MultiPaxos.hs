@@ -13,6 +13,7 @@ import qualified Control.Concurrent.MVar as MV
 import qualified GHC.Generics as G
 import qualified System.Random as R
 import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
+import Control.Lens.At (at, ix)
 
 import qualified Connections as CC
 import qualified Paxos as P
@@ -28,7 +29,7 @@ makeLenses ''MultiPaxos
 
 getPaxosInstance :: MultiPaxos -> M.IndexT -> (P.PaxosInstance, MultiPaxos)
 getPaxosInstance m index =
-  case Mp.lookup index $ m ^. paxosInstances of
+  case m ^. paxosInstances . at index of
     Just paxosInstance -> (paxosInstance, m)
     Nothing ->
       let paxosInstance' = D.def :: P.PaxosInstance
