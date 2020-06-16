@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 957210e46bb7cd92c0dc85ec1cc0fb5dfe7a426ac4268dfc85611937c96b8fcc
+-- hash: 1dec80dfa2a4877f00dde52837ca6f1ba1fe422460ae6ebdd4fdc081407415d3
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -43,6 +43,7 @@ library
     , lens
     , mtl
     , network-simple
+    , pretty-simple
     , random
     , stm
   default-language: Haskell2010
@@ -75,6 +76,7 @@ executable hUniversalDB-exe
     , lens
     , mtl
     , network-simple
+    , pretty-simple
     , random
     , stm
   default-language: Haskell2010
@@ -99,6 +101,7 @@ test-suite hUniversalDB-test
     , lens
     , mtl
     , network-simple
+    , pretty-simple
     , random
     , stm
   default-language: Haskell2010

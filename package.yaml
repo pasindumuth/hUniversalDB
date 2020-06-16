@@ -30,6 +30,7 @@ dependencies:
 - lens
 - mtl
 - network-simple
+- pretty-simple
 - random
 - stm
 

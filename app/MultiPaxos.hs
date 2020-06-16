@@ -22,7 +22,7 @@ import qualified Message as M
 data MultiPaxos = MultiPaxos {
   _paxosLog :: PL.PaxosLog,
   _paxosInstances :: Mp.Map M.IndexT P.PaxosInstance
-} deriving (G.Generic, D.Default)
+} deriving (G.Generic, D.Default, Show)
 
 makeLenses ''MultiPaxos
 
@@ -41,7 +41,7 @@ handleMultiPaxos
   -> (MultiPaxos, R.StdGen)
   -> ([(CC.EndpointId, M.MultiPaxosMessage)], (MultiPaxos, R.StdGen))
 handleMultiPaxos eIds fromEId msg (m, rg) =
-  let (r, rg') = R.random rg
+  let (r, rg') = R.randomR (0, 1000) rg -- TODO modify this range based on the last proposal number
       (index, pMsg) =
         case msg of
           M.Insert val ->

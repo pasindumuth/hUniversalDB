@@ -15,6 +15,7 @@ import qualified System.Random as R
 import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~))
 import Control.Lens.Unsound (lensProduct)
 import Control.Lens.At (at, ix)
+import Text.Pretty.Simple (pPrintNoColor)
 
 import qualified Connections as CC
 import qualified Logging as L
@@ -39,7 +40,7 @@ data GlobalState = GlobalState {
   _nonemptyQueues :: NonemptyQueues,
   _multiPaxosIs :: Mp.Map CC.EndpointId MP.MultiPaxos,
   _rand :: R.StdGen -- Random Number Generator for simulation
-}
+} deriving (Show)
 
 makeLenses ''GlobalState
 
@@ -64,9 +65,9 @@ addMsg msg (fromEId, toEId) (queues, nonemptyQueues) =
   let queues' = queues & ix fromEId %~ ix toEId %~ (Sq.|> msg)
       nonemptyQueues' =
         if (Sq.length $ queues' ^. ix fromEId . ix toEId) == 1
-          then nonemptyQueues' & St.insert (fromEId, toEId)
-          else nonemptyQueues'
-  in (queues', nonemptyQueues)
+          then nonemptyQueues & St.insert (fromEId, toEId)
+          else nonemptyQueues
+  in (queues', nonemptyQueues')
 
 deliverMessage :: (CC.EndpointId, CC.EndpointId) -> GlobalState -> GlobalState
 deliverMessage (fromEId, toEId) g =
@@ -75,7 +76,7 @@ deliverMessage (fromEId, toEId) g =
        nonemptyQueues' = if (Sq.length queue') == 0
                            then g ^. nonemptyQueues & St.delete (fromEId, toEId)
                            else g ^. nonemptyQueues
-       Just multiPaxosI = (g ^. multiPaxosIs) ^. at toEId
+       Just multiPaxosI = g ^. multiPaxosIs ^. at toEId
        mpMsg = MH.handleMessage msg
        (msgsO, (multiPaxosI', rand')) = MP.handleMultiPaxos (g ^. slaveEIds) fromEId mpMsg (multiPaxosI, g ^. rand)
        multiPaxosIs' = g ^. multiPaxosIs & ix toEId .~ multiPaxosI'
@@ -87,17 +88,27 @@ deliverMessage (fromEId, toEId) g =
         & multiPaxosIs .~ multiPaxosIs'
         & rand .~ rand'
 
+simulate :: GlobalState -> GlobalState
+simulate g =
+  if (g ^. nonemptyQueues & St.size) == 0
+    then g
+    else
+      let (randQueueIndex, rg') = R.randomR (0, g ^. nonemptyQueues & St.size & (subtract 1)) (g ^. rand)
+          g' = g & rand .~ rg'
+          queueId = g' ^. nonemptyQueues & St.elemAt randQueueIndex
+          g'' = deliverMessage queueId g'
+      in simulate g''
+
 test1 :: GlobalState -> GlobalState
 test1 g =
   let clientMsg = M.MMessage $ M.Insert $ M.Write "message"
       (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId 0)
       g' = g & lensProduct queues nonemptyQueues %~ addMsg clientMsg (clientEId, slaveEId)
-      g'' = g & deliverMessage (clientEId, slaveEId)
-  in g''
-
+  in simulate g'
 
 test :: IO ()
 test = do
   let g = createGlobalState 0 5 1
       g' = test1 g
+  pPrintNoColor g'
   return ()
