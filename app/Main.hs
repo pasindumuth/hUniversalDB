@@ -13,6 +13,7 @@ import qualified Data.Map as Mp
 import qualified Data.Maybe as Mb
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as E
+import qualified System.Random as R
 import Control.Lens (makeLenses, (%~), (.~), (^.), (&))
 
 import qualified Connections as CC
@@ -77,25 +78,28 @@ handleReceive receiveChan paxosChan = do
     (eId, msg) <- C.readChan receiveChan
     C.writeChan paxosChan (eId, MH.handleMessage msg)
 
-handleMultiPaxosThread :: IO (CC.EndpointId, M.MultiPaxosMessage) -> MV.MVar CC.Connections -> IO ()
-handleMultiPaxosThread getPaxosMsg connM = do
-  handlePaxosMessage D.def
+handleMultiPaxosThread
+  :: R.StdGen
+  -> IO (CC.EndpointId, M.MultiPaxosMessage)
+  -> MV.MVar CC.Connections -> IO ()
+handleMultiPaxosThread rg getPaxosMsg connM = do
+  handlePaxosMessage D.def rg
   where
-    handlePaxosMessage :: MP.MultiPaxos -> IO ()
-    handlePaxosMessage m = do
+    handlePaxosMessage :: MP.MultiPaxos -> R.StdGen -> IO ()
+    handlePaxosMessage m rg = do
       (eId, multiPaxosMessage) <- getPaxosMsg
       conn <- MV.readMVar connM
       let eIds = Mp.toList conn & map fst 
-          (msgsO, m') = MP.handleMultiPaxos m eIds eId multiPaxosMessage
+          (msgsO, (m', rg')) = MP.handleMultiPaxos eIds eId multiPaxosMessage (m, rg)
       if (m ^. MP.paxosLog /= m' ^. MP.paxosLog)
         then L.infoM L.paxos $ show $ m' ^. MP.paxosLog
         else return ()
       Mo.forM_ msgsO $ \(eId, msgO) ->
         Mp.lookup eId conn & Mb.fromJust $ M.MMessage msgO 
-      handlePaxosMessage m'
+      handlePaxosMessage m' rg'
 
 startSlave :: [String] -> IO ()
-startSlave (curIP:otherIPs) = do
+startSlave (seedStr:curIP:otherIPs) = do
   L.infoM L.main "Start slave"
 
   -- Create PaxosChan
@@ -124,7 +128,9 @@ startSlave (curIP:otherIPs) = do
   C.forkIO $ handleReceive receiveChan paxosChan
 
   -- Start Paxos handling thread
-  handleMultiPaxosThread (C.readChan paxosChan) connM
+  let seed = read seedStr :: Int
+      rg = R.mkStdGen seed
+  handleMultiPaxosThread rg (C.readChan paxosChan) connM
 
 startClient :: [String] -> IO ()
 startClient (ip:message) = do
