@@ -18,10 +18,8 @@ import qualified MultiPaxos as MP
 import qualified PaxosLog as PL
 import qualified MessageHandler as MH
 import qualified Message as M
+import qualified Utils as U
 import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lensProduct, _1, _2)
-
-for = flip map
-s13 f a b c = f c a b
 
 type Queues = Mp.Map CC.EndpointId (Mp.Map CC.EndpointId (Sq.Seq M.Message))
 type NonemptyQueues = St.Set (CC.EndpointId, CC.EndpointId)
@@ -46,14 +44,14 @@ mkClientEId i = "c" ++ show i
 
 createGlobalState :: Int -> Int -> Int -> GlobalState
 createGlobalState seed numSlaves numClients =
-  let slaveEIds = for [0..(numSlaves - 1)] $ mkSlaveEId
-      clientEIds = for [0..(numClients - 1)] $ mkClientEId
+  let slaveEIds = U.for [0..(numSlaves - 1)] $ mkSlaveEId
+      clientEIds = U.for [0..(numClients - 1)] $ mkClientEId
       eIds = slaveEIds ++ clientEIds
-      queues = Mp.fromList $ for eIds $ \eid1 ->
-        (eid1, Mp.fromList $ for eIds $ \eid2 ->
+      queues = Mp.fromList $ U.for eIds $ \eid1 ->
+        (eid1, Mp.fromList $ U.for eIds $ \eid2 ->
         (eid2, Sq.empty))
       nonemptyQueues = St.empty
-      multiPaxosIs = Mp.fromList $ for slaveEIds $ \eid -> (eid, D.def)
+      multiPaxosIs = Mp.fromList $ U.for slaveEIds $ \eid -> (eid, D.def)
       rand = R.mkStdGen seed
    in GlobalState slaveEIds clientEIds queues nonemptyQueues multiPaxosIs rand
 
@@ -77,7 +75,7 @@ deliverMessage (fromEId, toEId) g =
        mpMsg = MH.handleMessage msg
        (msgsO, (multiPaxosI', rand')) = MP.handleMultiPaxos (g ^. slaveEIds) fromEId mpMsg (multiPaxosI, g ^. rand)
        multiPaxosIs' = g ^. multiPaxosIs & ix toEId .~ multiPaxosI'
-       (queues'', nonemptyQueues'') = s13 foldl (queues', nonemptyQueues') msgsO $
+       (queues'', nonemptyQueues'') = U.s13 foldl (queues', nonemptyQueues') msgsO $
          \(queues', nonemptyQueues') (eId, msgO) ->
            addMsg (M.MMessage msgO) (toEId, eId) (queues', nonemptyQueues')
    in g & queues .~ queues''
@@ -111,7 +109,7 @@ simulateAll g =
 addClientMsg :: Int -> Int -> GlobalState -> GlobalState
 addClientMsg slaveId cliengMsgId g =
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = M.MMessage $ M.Insert $ M.Write $ "message " ++ show cliengMsgId
+      msg = M.MMessage $ M.Insert $ M.Write ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   in g & lensProduct queues nonemptyQueues %~ addMsg msg (clientEId, slaveEId)
 
 test1 :: GlobalState -> GlobalState
@@ -129,12 +127,12 @@ test2 g =
 mergePaxosLog :: GlobalState -> Maybe (Mp.Map M.IndexT M.PaxosLogEntry)
 mergePaxosLog g =
   let paxosLogs = g ^. multiPaxosIs & Mp.toList & map (^. _2 . MP.paxosLog)
-  in s13 foldl (Just Mp.empty) paxosLogs $
+  in U.s13 foldl (Just Mp.empty) paxosLogs $
        \mergedLogM paxosLog ->
          case mergedLogM of
            Nothing -> Nothing
            _ ->
-             s13 Mp.foldlWithKey mergedLogM (paxosLog ^. PL.plog) $
+             U.s13 Mp.foldlWithKey mergedLogM (paxosLog ^. PL.plog) $
                \mergedLogM index value ->
                  case mergedLogM of
                    Nothing -> Nothing

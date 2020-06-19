@@ -14,6 +14,8 @@ import qualified Message as M
 type EndpointId = String
 type Connections = Mp.Map EndpointId (M.Message -> IO ())
 
+-- remove from common code; only EndpointId should be common
+
 addConn
   :: MV.MVar Connections
   -> EndpointId

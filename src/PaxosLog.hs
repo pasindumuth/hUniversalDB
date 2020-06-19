@@ -13,7 +13,8 @@ import qualified Control.Exception.Base as Ex
 import qualified Data.Set as S
 
 import qualified Message as M
-import Lens (makeLenses, (%~), (.~), (^.), (&))
+import qualified Utils as U
+import Lens (makeLenses, (%~), (.~), (^.), (&), at)
 
 data PaxosLog = PaxosLog {
   _plog :: Mp.Map M.IndexT M.PaxosLogEntry,
@@ -43,3 +44,9 @@ nextAvailableIndex :: PaxosLog -> M.IndexT
 nextAvailableIndex p =
   Ex.assert ((p ^. availableIndices & S.size) > 0) $
   p ^. availableIndices & S.elemAt 0
+
+newlyAddedEntries :: PaxosLog -> PaxosLog -> [(M.IndexT, M.PaxosLogEntry)]
+newlyAddedEntries pl pl' =
+  let index = pl & nextAvailableIndex
+      index' = pl' & nextAvailableIndex
+  in U.for [index .. index' - 1] $ \i -> (i, pl' ^. plog . at i & Mb.fromJust)

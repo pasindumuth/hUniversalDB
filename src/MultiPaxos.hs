@@ -8,8 +8,6 @@ module MultiPaxos where
 
 import qualified Data.Default as D
 import qualified Data.Map as Mp
-import qualified Data.Maybe as Mb
-import qualified Control.Concurrent.MVar as MV
 import qualified GHC.Generics as G
 import qualified System.Random as R
 

@@ -9,12 +9,16 @@ import qualified Data.Binary as B
 import qualified Data.Default as D
 import qualified GHC.Generics as G
 
-data PaxosLogEntry = Read | Write String
+type Key = String
+type Value = String
+type Timestamp = Int
+
+data PaxosLogEntry = Read Key Timestamp | Write Key Value Timestamp
   deriving (G.Generic, B.Binary, Show, Eq)
 
  -- TODO get rid of this by updating Acceptor to have a `Maybe val`
 instance D.Default PaxosLogEntry where
-  def = Read
+  def = Read "" 0
 
 type IndexT = Int
 type Rnd = Int

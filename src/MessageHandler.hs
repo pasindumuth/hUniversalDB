@@ -11,5 +11,5 @@ handleMessage :: M.Message -> M.MultiPaxosMessage
 handleMessage msg =
   case msg of
     M.MMessage mpMsg -> mpMsg
-    M.ClientMessage val -> M.Insert $ M.Write val
+    M.ClientMessage key -> M.Insert $ M.Write key "value" 1
   
