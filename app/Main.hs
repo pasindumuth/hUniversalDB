@@ -78,6 +78,8 @@ handleReceive receiveChan paxosChan = do
     (eId, msg) <- C.readChan receiveChan
     C.writeChan paxosChan (eId, MH.handleMessage msg)
 
+-- TODO: client connections should be passing the messages into
+-- a the IMHIO
 handleMultiPaxosThread
   :: R.StdGen
   -> IO (CC.EndpointId, M.MultiPaxosMessage)

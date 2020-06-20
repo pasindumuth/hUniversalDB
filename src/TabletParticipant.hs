@@ -24,7 +24,7 @@ import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wra
 data TabletParticipant = TabletParticipant {
   _multiPaxos :: MP.MultiPaxos,
   _mvkvs :: MS.MultiVersionKVStore
-} deriving (Show)
+} deriving (G.Generic, D.Default, Show)
 
 data Env = Env {
   _rand :: R.StdGen,
@@ -35,7 +35,7 @@ makeLenses ''TabletParticipant
 makeLenses ''Env
 
 -- Maintains the derived state.
--- TODO: here, we don't use the return-value of read. Do that somewhere
+-- TODO: here, we don't use the return-value of kvstore read. Do that somewhere
 handleTabletParticipant
   :: CC.EndpointId
   -> M.MultiPaxosMessage

@@ -41,3 +41,12 @@ data Message =
   MMessage MultiPaxosMessage |
   ClientMessage String
   deriving (G.Generic, B.Binary, Show)
+
+data ClientRequest =
+  CRead Key Timestamp |
+  CWrite Key Value Timestamp
+  deriving (G.Generic, B.Binary, Show, Eq)
+
+data Retry = Retry {
+  try :: Int
+} deriving (Show)
