@@ -17,7 +17,7 @@ import qualified GHC.Generics as G
 import qualified System.Random as R
 
 import qualified Connections as CC
-import qualified MultiPaxos as MP
+import qualified MultiPaxosInstance as MP
 import qualified PaxosLog as PL
 import qualified MultiVersionKVStore as MS
 import qualified ClientRequestHandler as CR

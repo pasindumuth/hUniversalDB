@@ -18,7 +18,7 @@ import qualified System.Random as R
 import qualified Connections as CC
 import qualified Logging as L
 import qualified Network as N
-import qualified MultiPaxos as MP
+import qualified MultiPaxosInstance as MP
 import qualified Message as M
 import qualified MessageHandler as MH
 import Lens ((^.), (&))
@@ -87,7 +87,7 @@ handleMultiPaxosThread
 handleMultiPaxosThread rg getPaxosMsg connM = do
   handlePaxosMessage D.def rg
   where
-    handlePaxosMessage :: MP.MultiPaxos -> R.StdGen -> IO ()
+    handlePaxosMessage :: MP.MultiPaxosInstance -> R.StdGen -> IO ()
     handlePaxosMessage m rg = do
       (eId, multiPaxosMessage) <- getPaxosMsg
       conn <- MV.readMVar connM

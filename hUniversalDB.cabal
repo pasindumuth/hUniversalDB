@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9c8e3a84df0b0dac9f5ef26a2e142b9588d456a4bd299ede4bf76bba1270fe32
+-- hash: 22a806b2d2aa32b9e59d96da20b0a7436ceaf0cfed4dfe4f7dda14e0448e67d5
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -33,10 +33,14 @@ library
       Logging
       Message
       MessageHandler
-      MultiPaxos
+      MultiPaxosInstance
       MultiVersionKVStore
-      Paxos
+      PaxosInstance
       PaxosLog
+      Records.MultiPaxosInstance
+      Records.MultiVersionKVStore
+      Records.PaxosInstance
+      Records.PaxosLog
       TabletParticipant
       Utils
   other-modules:

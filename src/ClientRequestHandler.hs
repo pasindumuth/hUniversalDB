@@ -15,7 +15,7 @@ import qualified GHC.Generics as G
 import qualified System.Random as R
 
 import qualified Connections as CC
-import qualified MultiPaxos as MP
+import qualified MultiPaxosInstance as MP
 import qualified PaxosLog as PL
 import qualified MultiVersionKVStore as MS
 import qualified Message as M
@@ -55,7 +55,7 @@ clientRequestHandler eId clientRequest g =
     then next g
     else (Nothing, g')
 
-next :: GlobalState -> ((Maybe M.Retry), GlobalState)
+next :: GlobalState -> (Maybe M.Retry, GlobalState)
 next g =
   if (g ^. requestQueue & Sq.length) > 1
     then
@@ -68,7 +68,7 @@ next'
   -> M.ClientRequest
   -> Int
   -> GlobalState
-  -> ((Maybe M.Retry), GlobalState)
+  -> (Maybe M.Retry, GlobalState)
 next' eId clientRequest retryCount g =
   let nextAvailableIndex = g ^. tabletParticipant . TP.multiPaxos . MP.paxosLog & PL.nextAvailableIndex
       pLEntry = createPLEntry clientRequest

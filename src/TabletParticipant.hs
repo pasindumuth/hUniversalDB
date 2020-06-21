@@ -14,7 +14,7 @@ import qualified GHC.Generics as G
 import qualified System.Random as R
 
 import qualified Connections as CC
-import qualified MultiPaxos as MP
+import qualified MultiPaxosInstance as MP
 import qualified PaxosLog as PL
 import qualified MultiVersionKVStore as MS
 import qualified Message as M
@@ -22,7 +22,7 @@ import qualified Utils as U
 import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wrapMaybe, lensProduct)
 
 data TabletParticipant = TabletParticipant {
-  _multiPaxos :: MP.MultiPaxos,
+  _multiPaxos :: MP.MultiPaxosInstance,
   _mvkvs :: MS.MultiVersionKVStore
 } deriving (G.Generic, D.Default, Show)
 

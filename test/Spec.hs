@@ -14,7 +14,7 @@ import Text.Pretty.Simple (pPrintNoColor)
 
 import qualified Connections as CC
 import qualified Logging as L
-import qualified MultiPaxos as MP
+import qualified MultiPaxosInstance as MP
 import qualified PaxosLog as PL
 import qualified MessageHandler as MH
 import qualified Message as M
@@ -33,7 +33,7 @@ data GlobalState = GlobalState {
   -- We use pairs of endpoints as identifiers of a queue. `nonemptyQueues`
   -- contain all queue IDs where the queue is non-empty
   _nonemptyQueues :: NonemptyQueues,
-  _multiPaxosIs :: Mp.Map CC.EndpointId MP.MultiPaxos,
+  _multiPaxosIs :: Mp.Map CC.EndpointId MP.MultiPaxosInstance,
   _rand :: R.StdGen -- Random Number Generator for simulation
 } deriving (Show)
 
@@ -132,7 +132,7 @@ mergePaxosLog g =
          case mergedLogM of
            Nothing -> Nothing
            _ ->
-             U.s13 Mp.foldlWithKey mergedLogM (paxosLog ^. PL.plog) $
+             U.s13 Mp.foldlWithKey mergedLogM (paxosLog & PL.plog) $
                \mergedLogM index value ->
                  case mergedLogM of
                    Nothing -> Nothing
