@@ -17,6 +17,7 @@ import qualified Logging as L
 import qualified MultiPaxosInstance as MP
 import qualified PaxosLog as PL
 import qualified MessageHandler as MH
+import qualified Records.GlobalState as GS
 import qualified Message as M
 import qualified Utils as U
 import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lensProduct, _1, _2)
@@ -33,7 +34,7 @@ data GlobalState = GlobalState {
   -- We use pairs of endpoints as identifiers of a queue. `nonemptyQueues`
   -- contain all queue IDs where the queue is non-empty
   _nonemptyQueues :: NonemptyQueues,
-  _multiPaxosIs :: Mp.Map CC.EndpointId MP.MultiPaxosInstance,
+  _slaveState :: Mp.Map CC.EndpointId GS.GlobalState,
   _rand :: R.StdGen -- Random Number Generator for simulation
 } deriving (Show)
 
@@ -51,9 +52,9 @@ createGlobalState seed numSlaves numClients =
         (eid1, Mp.fromList $ U.for eIds $ \eid2 ->
         (eid2, Sq.empty))
       nonemptyQueues = St.empty
-      multiPaxosIs = Mp.fromList $ U.for slaveEIds $ \eid -> (eid, D.def)
+      slaveState = Mp.fromList $ U.for slaveEIds $ \eid -> (eid, D.def)
       rand = R.mkStdGen seed
-   in GlobalState slaveEIds clientEIds queues nonemptyQueues multiPaxosIs rand
+   in GlobalState slaveEIds clientEIds queues nonemptyQueues slaveState rand
 
 addMsg :: M.Message -> (CC.EndpointId, CC.EndpointId) -> (Queues, NonemptyQueues) -> (Queues, NonemptyQueues)
 addMsg msg (fromEId, toEId) (queues, nonemptyQueues) =
@@ -71,16 +72,19 @@ deliverMessage (fromEId, toEId) g =
        nonemptyQueues' = if (Sq.length queue') == 0
                            then g ^. nonemptyQueues & St.delete (fromEId, toEId)
                            else g ^. nonemptyQueues
-       Just multiPaxosI = g ^. multiPaxosIs . at toEId
+       Just state = g ^. slaveState . at toEId
        mpMsg = MH.handleMessage msg
-       (msgsO, (multiPaxosI', rand')) = MP.handleMultiPaxos (g ^. slaveEIds) fromEId mpMsg (multiPaxosI, g ^. rand)
-       multiPaxosIs' = g ^. multiPaxosIs & ix toEId .~ multiPaxosI'
+       (msgsO, (multiPaxosI', paxosLog', rand')) =
+         MP.handleMultiPaxos (g ^. slaveEIds) fromEId mpMsg (state ^. GS.multiPaxosInstance, state ^. GS.paxosLog, g ^. rand)
+       state' = state & GS.multiPaxosInstance .~ multiPaxosI'
+       state'' = state' & GS.paxosLog .~ paxosLog'
+       slaveState' = g ^. slaveState & ix toEId .~ state''
        (queues'', nonemptyQueues'') = U.s13 foldl (queues', nonemptyQueues') msgsO $
          \(queues', nonemptyQueues') (eId, msgO) ->
            addMsg (M.MMessage msgO) (toEId, eId) (queues', nonemptyQueues')
    in g & queues .~ queues''
         & nonemptyQueues .~ nonemptyQueues''
-        & multiPaxosIs .~ multiPaxosIs'
+        & slaveState .~ slaveState'
         & rand .~ rand'
 
 simulateOnce :: GlobalState -> GlobalState
@@ -126,7 +130,7 @@ test2 g =
 
 mergePaxosLog :: GlobalState -> Maybe (Mp.Map M.IndexT M.PaxosLogEntry)
 mergePaxosLog g =
-  let paxosLogs = g ^. multiPaxosIs & Mp.toList & map (^. _2 . MP.paxosLog)
+  let paxosLogs = g ^. slaveState & Mp.toList & map (^. _2 . GS.paxosLog)
   in U.s13 foldl (Just Mp.empty) paxosLogs $
        \mergedLogM paxosLog ->
          case mergedLogM of

@@ -44,37 +44,37 @@ type Messages = [(CC.EndpointId, M.Message)]
 makeLenses ''CurrentInsert
 makeLenses ''GlobalState
 
-clientRequestHandler
-  :: CC.EndpointId
-  -> M.ClientRequest
-  -> GlobalState
-  -> (Maybe M.Retry, GlobalState)
-clientRequestHandler eId clientRequest g =
-  let g' = g & requestQueue %~ (Sq.|> (eId, clientRequest))
-  in if (g' ^. requestQueue & Sq.length) == 1
-    then next g
-    else (Nothing, g')
-
-next :: GlobalState -> (Maybe M.Retry, GlobalState)
-next g =
-  if (g ^. requestQueue & Sq.length) > 1
-    then
-      let (eId, clientRequest) Sq.:< _ = Sq.viewl $ g ^. requestQueue
-      in g & next' eId clientRequest 0
-    else (Nothing, g)
-
-next'
-  :: CC.EndpointId
-  -> M.ClientRequest
-  -> Int
-  -> GlobalState
-  -> (Maybe M.Retry, GlobalState)
-next' eId clientRequest retryCount g =
-  let nextAvailableIndex = g ^. tabletParticipant . TP.multiPaxos . MP.paxosLog & PL.nextAvailableIndex
-      pLEntry = createPLEntry clientRequest
-      try = g ^. tryCount
-      g' = g & currentInsert .~ Just (CurrentInsert nextAvailableIndex pLEntry retryCount clientRequest eId try)
-  in (Just $ M.Retry try, g')
+--clientRequestHandler
+--  :: CC.EndpointId
+--  -> M.ClientRequest
+--  -> GlobalState
+--  -> (Maybe M.Retry, GlobalState)
+--clientRequestHandler eId clientRequest g =
+--  let g' = g & requestQueue %~ (Sq.|> (eId, clientRequest))
+--  in if (g' ^. requestQueue & Sq.length) == 1
+--    then next g
+--    else (Nothing, g')
+--
+--next :: GlobalState -> (Maybe M.Retry, GlobalState)
+--next g =
+--  if (g ^. requestQueue & Sq.length) > 1
+--    then
+--      let (eId, clientRequest) Sq.:< _ = Sq.viewl $ g ^. requestQueue
+--      in g & next' eId clientRequest 0
+--    else (Nothing, g)
+--
+--next'
+--  :: CC.EndpointId
+--  -> M.ClientRequest
+--  -> Int
+--  -> GlobalState
+--  -> (Maybe M.Retry, GlobalState)
+--next' eId clientRequest retryCount g =
+--  let nextAvailableIndex = g ^. tabletParticipant . TP.multiPaxos . MP.paxosLog & PL.nextAvailableIndex
+--      pLEntry = createPLEntry clientRequest
+--      try = g ^. tryCount
+--      g' = g & currentInsert .~ Just (CurrentInsert nextAvailableIndex pLEntry retryCount clientRequest eId try)
+--  in (Just $ M.Retry try, g')
 
 createPLEntry :: M.ClientRequest -> M.PaxosLogEntry
 createPLEntry clientRequest =

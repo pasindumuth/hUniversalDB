@@ -3,18 +3,19 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.MultiPaxosInstance where
+module Records.GlobalState where
 
 import qualified Data.Default as D
 import qualified Data.Map as Mp
 import qualified GHC.Generics as G
 
-import qualified PaxosInstance as PI
-import qualified Message as M
+import qualified Records.MultiPaxosInstance as MP
+import qualified PaxosLog as PL
 import Lens (makeLenses)
 
-data MultiPaxosInstance = MultiPaxosInstance {
-  _paxosInstances :: Mp.Map M.IndexT PI.PaxosInstance
+data GlobalState = GlobalState {
+  _paxosLog :: PL.PaxosLog,
+  _multiPaxosInstance :: MP.MultiPaxosInstance
 } deriving (G.Generic, D.Default, Show)
 
-makeLenses ''MultiPaxosInstance
+makeLenses ''GlobalState

@@ -18,6 +18,7 @@ import qualified System.Random as R
 import qualified Connections as CC
 import qualified Logging as L
 import qualified Network as N
+import qualified Records.GlobalState as GS
 import qualified MultiPaxosInstance as MP
 import qualified Message as M
 import qualified MessageHandler as MH
@@ -87,18 +88,20 @@ handleMultiPaxosThread
 handleMultiPaxosThread rg getPaxosMsg connM = do
   handlePaxosMessage D.def rg
   where
-    handlePaxosMessage :: MP.MultiPaxosInstance -> R.StdGen -> IO ()
-    handlePaxosMessage m rg = do
+    handlePaxosMessage :: GS.GlobalState -> R.StdGen -> IO ()
+    handlePaxosMessage g rg = do
       (eId, multiPaxosMessage) <- getPaxosMsg
       conn <- MV.readMVar connM
       let eIds = Mp.toList conn & map fst 
-          (msgsO, (m', rg')) = MP.handleMultiPaxos eIds eId multiPaxosMessage (m, rg)
-      if (m ^. MP.paxosLog /= m' ^. MP.paxosLog)
-        then L.infoM L.paxos $ show $ m' ^. MP.paxosLog
+          (msgsO, (multiPaxosInstance', paxosLog', rg')) =
+            MP.handleMultiPaxos eIds eId multiPaxosMessage (g ^. GS.multiPaxosInstance, g ^. GS.paxosLog, rg)
+          g' = GS.GlobalState paxosLog' multiPaxosInstance'
+      if (g ^. GS.paxosLog /= g' ^. GS.paxosLog)
+        then L.infoM L.paxos $ show $ g' ^. GS.paxosLog
         else return ()
       Mo.forM_ msgsO $ \(eId, msgO) ->
         Mp.lookup eId conn & Mb.fromJust $ M.MMessage msgO 
-      handlePaxosMessage m' rg'
+      handlePaxosMessage g' rg'
 
 startSlave :: [String] -> IO ()
 startSlave (seedStr:curIP:otherIPs) = do

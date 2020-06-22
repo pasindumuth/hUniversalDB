@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 22a806b2d2aa32b9e59d96da20b0a7436ceaf0cfed4dfe4f7dda14e0448e67d5
+-- hash: db1d00bd9ebe75aa572bc98ea401096ef96ce01a7e9847b401e7112fbd890b74
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -37,6 +37,7 @@ library
       MultiVersionKVStore
       PaxosInstance
       PaxosLog
+      Records.GlobalState
       Records.MultiPaxosInstance
       Records.MultiVersionKVStore
       Records.PaxosInstance

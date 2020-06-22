@@ -36,17 +36,17 @@ makeLenses ''Env
 
 -- Maintains the derived state.
 -- TODO: here, we don't use the return-value of kvstore read. Do that somewhere
-handleTabletParticipant
-  :: CC.EndpointId
-  -> M.MultiPaxosMessage
-  -> (TabletParticipant, Env)
-  -> ([(CC.EndpointId, M.MultiPaxosMessage)], (TabletParticipant, Env))
-handleTabletParticipant fromEId msg (tp, env) =
-  let (msgsO, (tp', env')) = (tp, env) .^. (lensProduct (_1 . multiPaxos) (_2 . rand)) $
-                               MP.handleMultiPaxos (env ^. slaveEIds) fromEId msg
-      entries = PL.newlyAddedEntries (tp ^. multiPaxos . MP.paxosLog) (tp' ^. multiPaxos . MP.paxosLog)
-      tp'' = U.s13 foldl tp' entries $ \tp' (_, msg) ->
-        case msg of
-          M.Read key timestamp -> (tp' .^. mvkvs $ MS.read key timestamp) ^. _2
-          M.Write key value timestamp -> (tp' .^. mvkvs $ MS.write key value timestamp) ^. _2
-  in (msgsO, (tp'', env'))
+--handleTabletParticipant
+--  :: CC.EndpointId
+--  -> M.MultiPaxosMessage
+--  -> (TabletParticipant, Env)
+--  -> ([(CC.EndpointId, M.MultiPaxosMessage)], (TabletParticipant, Env))
+--handleTabletParticipant fromEId msg (tp, env) =
+--  let (msgsO, (tp', env')) = (tp, env) .^. (lensProduct (_1 . multiPaxos) (_2 . rand)) $
+--                               MP.handleMultiPaxos (env ^. slaveEIds) fromEId msg
+--      entries = PL.newlyAddedEntries (tp ^. multiPaxos . MP.paxosLog) (tp' ^. multiPaxos . MP.paxosLog)
+--      tp'' = U.s13 foldl tp' entries $ \tp' (_, msg) ->
+--        case msg of
+--          M.Read key timestamp -> (tp' .^. mvkvs $ MS.read key timestamp) ^. _2
+--          M.Write key value timestamp -> (tp' .^. mvkvs $ MS.write key value timestamp) ^. _2
+--  in (msgsO, (tp'', env'))

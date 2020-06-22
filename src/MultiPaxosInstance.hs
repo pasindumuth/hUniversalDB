@@ -1,7 +1,6 @@
 module MultiPaxosInstance (
   MP.MultiPaxosInstance,
   handleMultiPaxos,
-  MP.paxosLog -- remove once PaxosLog is moved out of MultiPaxosInstance
 ) where
 
 import qualified Data.Default as D
@@ -28,12 +27,12 @@ handleMultiPaxos
   :: [CC.EndpointId]
   -> CC.EndpointId
   -> M.MultiPaxosMessage
-  -> (MP.MultiPaxosInstance, R.StdGen)
-  -> ([(CC.EndpointId, M.MultiPaxosMessage)], (MP.MultiPaxosInstance, R.StdGen))
-handleMultiPaxos eIds fromEId msg (m, rg) =
+  -> (MP.MultiPaxosInstance, PL.PaxosLog, R.StdGen)
+  -> ([(CC.EndpointId, M.MultiPaxosMessage)], (MP.MultiPaxosInstance, PL.PaxosLog, R.StdGen))
+handleMultiPaxos eIds fromEId msg (m, paxosLog, rg) =
   let (r, rg') = rg & R.randomR (1, maxRndIncrease)
       index = case msg of
-                M.Insert _ -> PL.nextAvailableIndex $ m ^. MP.paxosLog
+                M.Insert _ -> PL.nextAvailableIndex $ paxosLog
                 M.PMessage index _ -> index
       (paxosInstance, m') = m & getPaxosInstance index
       pMsg = case msg of
@@ -45,11 +44,11 @@ handleMultiPaxos eIds fromEId msg (m, rg) =
                   in M.Propose nextRnd value
                 M.PMessage _ value -> value
       (action, m'') = m' .^. MP.paxosInstances . at index $ wrapMaybe $ PI.handlePaxos pMsg
-      m''' = case action of
-               PI.Choose chosenValue -> m'' & MP.paxosLog %~ (PL.insert index chosenValue)
-               _ -> m''
+      paxosLog' = case action of
+                    PI.Choose chosenValue -> paxosLog & (PL.insert index chosenValue)
+                    _ -> paxosLog
       msgsO = case action of
              PI.Reply paxosMessage -> [(fromEId, M.PMessage index paxosMessage)]
              PI.Broadcast paxosMessage -> flip map eIds $ \e -> (e, M.PMessage index paxosMessage)
              _ -> []
-  in (msgsO, (m''', rg'))
+  in (msgsO, (m'', paxosLog', rg'))

@@ -31,22 +31,22 @@ data IMHMessage =
   SlaveMessage CC.EndpointId M.MultiPaxosMessage |
   Retry M.Retry
   deriving (Show)
-
-incomingMessageHandlerIO :: Ch.Chan IMHMessage -> IO ()
-incomingMessageHandlerIO channel = do
-  imhRepeat D.def
-  where
-    imhRepeat :: CR.GlobalState -> IO ()
-    imhRepeat state = do
-      nextMessage <- Ch.readChan channel
-      case nextMessage of
-        ClientRequest eId r -> do
-          let (retryM, state') = CR.clientRequestHandler eId r state
-          case retryM of
-            Nothing -> imhRepeat state
-            Just retry -> do
-              C.forkIO $ do
-                C.threadDelay 100000
-                Ch.writeChan channel $ Retry retry
-              imhRepeat state'
+--
+--incomingMessageHandlerIO :: Ch.Chan IMHMessage -> IO ()
+--incomingMessageHandlerIO channel = do
+--  imhRepeat D.def
+--  where
+--    imhRepeat :: CR.GlobalState -> IO ()
+--    imhRepeat state = do
+--      nextMessage <- Ch.readChan channel
+--      case nextMessage of
+--        ClientRequest eId r -> do
+--          let (retryM, state') = CR.clientRequestHandler eId r state
+--          case retryM of
+--            Nothing -> imhRepeat state
+--            Just retry -> do
+--              C.forkIO $ do
+--                C.threadDelay 100000
+--                Ch.writeChan channel $ Retry retry
+--              imhRepeat state'
 
