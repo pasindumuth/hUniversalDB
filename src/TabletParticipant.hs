@@ -19,7 +19,7 @@ import qualified PaxosLog as PL
 import qualified MultiVersionKVStore as MS
 import qualified Message as M
 import qualified Utils as U
-import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wrapMaybe, lensProduct)
+import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wrapMaybe, lp2)
 
 data TabletParticipant = TabletParticipant {
   _multiPaxos :: MP.MultiPaxosInstance,
@@ -42,7 +42,7 @@ makeLenses ''Env
 --  -> (TabletParticipant, Env)
 --  -> ([(CC.EndpointId, M.MultiPaxosMessage)], (TabletParticipant, Env))
 --handleTabletParticipant fromEId msg (tp, env) =
---  let (msgsO, (tp', env')) = (tp, env) .^. (lensProduct (_1 . multiPaxos) (_2 . rand)) $
+--  let (msgsO, (tp', env')) = (tp, env) .^. (lp2 (_1 . multiPaxos, _2 . rand)) $
 --                               MP.handleMultiPaxos (env ^. slaveEIds) fromEId msg
 --      entries = PL.newlyAddedEntries (tp ^. multiPaxos . MP.paxosLog) (tp' ^. multiPaxos . MP.paxosLog)
 --      tp'' = U.s13 foldl tp' entries $ \tp' (_, msg) ->

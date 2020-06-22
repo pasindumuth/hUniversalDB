@@ -24,7 +24,7 @@ import qualified ClientRequestHandler as CR
 import qualified Message as M
 import qualified TabletParticipant as TP
 import qualified Utils as U
-import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wrapMaybe, lensProduct)
+import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wrapMaybe, lp2)
 
 data IMHMessage =
   ClientRequest CC.EndpointId M.ClientRequest |

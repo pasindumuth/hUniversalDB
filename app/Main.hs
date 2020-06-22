@@ -22,7 +22,7 @@ import qualified Records.GlobalState as GS
 import qualified MultiPaxosInstance as MP
 import qualified Message as M
 import qualified MessageHandler as MH
-import Lens ((^.), (&))
+import Lens ((^.), (&), lp3, (.^.), _1, _2)
 
 handleSelfConn
   :: MV.MVar CC.Connections
@@ -93,9 +93,8 @@ handleMultiPaxosThread rg getPaxosMsg connM = do
       (eId, multiPaxosMessage) <- getPaxosMsg
       conn <- MV.readMVar connM
       let eIds = Mp.toList conn & map fst 
-          (msgsO, (multiPaxosInstance', paxosLog', rg')) =
-            MP.handleMultiPaxos eIds eId multiPaxosMessage (g ^. GS.multiPaxosInstance, g ^. GS.paxosLog, rg)
-          g' = GS.GlobalState paxosLog' multiPaxosInstance'
+          (msgsO, (g', rg')) = (g, rg) .^. (lp3 (_1.GS.multiPaxosInstance, _1.GS.paxosLog, _2)) $
+                                 MP.handleMultiPaxos eIds eId multiPaxosMessage
       if (g ^. GS.paxosLog /= g' ^. GS.paxosLog)
         then L.infoM L.paxos $ show $ g' ^. GS.paxosLog
         else return ()

@@ -20,7 +20,7 @@ import qualified MessageHandler as MH
 import qualified Records.GlobalState as GS
 import qualified Message as M
 import qualified Utils as U
-import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lensProduct, _1, _2)
+import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2, (.^.))
 
 type Queues = Mp.Map CC.EndpointId (Mp.Map CC.EndpointId (Sq.Seq M.Message))
 type NonemptyQueues = St.Set (CC.EndpointId, CC.EndpointId)
@@ -74,11 +74,9 @@ deliverMessage (fromEId, toEId) g =
                            else g ^. nonemptyQueues
        Just state = g ^. slaveState . at toEId
        mpMsg = MH.handleMessage msg
-       (msgsO, (multiPaxosI', paxosLog', rand')) =
-         MP.handleMultiPaxos (g ^. slaveEIds) fromEId mpMsg (state ^. GS.multiPaxosInstance, state ^. GS.paxosLog, g ^. rand)
-       state' = state & GS.multiPaxosInstance .~ multiPaxosI'
-       state'' = state' & GS.paxosLog .~ paxosLog'
-       slaveState' = g ^. slaveState & ix toEId .~ state''
+       (msgsO, (state', rand')) = (state, g ^. rand) .^. (lp3 (_1.GS.multiPaxosInstance, _1.GS.paxosLog, _2)) $
+                                    MP.handleMultiPaxos (g ^. slaveEIds) fromEId mpMsg
+       slaveState' = g ^. slaveState & ix toEId .~ state'
        (queues'', nonemptyQueues'') = U.s13 foldl (queues', nonemptyQueues') msgsO $
          \(queues', nonemptyQueues') (eId, msgO) ->
            addMsg (M.MMessage msgO) (toEId, eId) (queues', nonemptyQueues')
@@ -114,7 +112,7 @@ addClientMsg :: Int -> Int -> GlobalState -> GlobalState
 addClientMsg slaveId cliengMsgId g =
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
       msg = M.MMessage $ M.Insert $ M.Write ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
-  in g & lensProduct queues nonemptyQueues %~ addMsg msg (clientEId, slaveEId)
+  in g & lp2 (queues, nonemptyQueues) %~ addMsg msg (clientEId, slaveEId)
 
 test1 :: GlobalState -> GlobalState
 test1 g =
