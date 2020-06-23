@@ -13,6 +13,7 @@ import qualified Records.Common.Common as C
 import qualified Records.Messages.ClientMessages as CM
 import qualified Records.Messages.PaxosMessages as PM
 
+-- TODO maybe we can use prisms to construct Message from one of the constituents
 data Message =
   ClientRequest CM.ClientRequest |
   ClientResponse CM.ClientResponse |

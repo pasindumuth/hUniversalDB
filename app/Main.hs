@@ -18,11 +18,18 @@ import qualified System.Random as R
 import qualified Connections as CC
 import qualified Logging as L
 import qualified Network as N
+import qualified Records.Env as EN
 import qualified Records.GlobalState as GS
 import qualified MultiPaxosInstance as MP
-import qualified Message as M
+import qualified Records.Actions.Actions as A
+import qualified Records.Messages.ClientMessages as CM
+import qualified Records.Messages.Messages as M
+import qualified Records.Messages.PaxosMessages as PM
 import qualified MessageHandler as MH
-import Lens ((^.), (&), lp3, (.^.), _1, _2)
+import qualified Utils as U
+import Lens ((^.), (&), (.~), lp3, (.^.), _1, _2)
+import State (runST)
+import qualified State as St
 
 handleSelfConn
   :: MV.MVar CC.Connections
@@ -72,7 +79,7 @@ acceptClientConn connM receiveChan =
 
 handleReceive
   :: C.Chan (CC.EndpointId, M.Message)
-  -> C.Chan (CC.EndpointId, M.MultiPaxosMessage)
+  -> C.Chan (CC.EndpointId, PM.MultiPaxosMessage)
   -> IO ()
 handleReceive receiveChan paxosChan = do
   Mo.forever $ do
@@ -83,24 +90,28 @@ handleReceive receiveChan paxosChan = do
 -- a the IMHIO
 handleMultiPaxosThread
   :: R.StdGen
-  -> IO (CC.EndpointId, M.MultiPaxosMessage)
+  -> IO (CC.EndpointId, PM.MultiPaxosMessage)
   -> MV.MVar CC.Connections -> IO ()
 handleMultiPaxosThread rg getPaxosMsg connM = do
-  handlePaxosMessage D.def rg
+  let g = D.def & GS.env . EN.rand .~ rg
+  handlePaxosMessage g
   where
-    handlePaxosMessage :: GS.GlobalState -> R.StdGen -> IO ()
-    handlePaxosMessage g rg = do
+    handlePaxosMessage :: GS.GlobalState -> IO ()
+    handlePaxosMessage g = do
       (eId, multiPaxosMessage) <- getPaxosMsg
       conn <- MV.readMVar connM
-      let eIds = Mp.toList conn & map fst 
-          (msgsO, (g', rg')) = (g, rg) .^. (lp3 (_1.GS.multiPaxosInstance, _1.GS.paxosLog, _2)) $
-                                 MP.handleMultiPaxos eIds eId multiPaxosMessage
-      if (g ^. GS.paxosLog /= g' ^. GS.paxosLog)
-        then L.infoM L.paxos $ show $ g' ^. GS.paxosLog
+      let eIds = Mp.toList conn & map fst
+          g' = g & GS.env . EN.slaveEIds .~ eIds
+          (_, (msgsO, g'')) = runST ((lp3 (GS.multiPaxosInstance, GS.paxosLog, GS.env))
+            St..^ MP.handleMultiPaxos eId multiPaxosMessage) g'
+      if (g' ^. GS.paxosLog /= g'' ^. GS.paxosLog)
+        then L.infoM L.paxos $ show $ g'' ^. GS.paxosLog
         else return ()
-      Mo.forM_ msgsO $ \(eId, msgO) ->
-        Mp.lookup eId conn & Mb.fromJust $ M.MultiPaxosMessage msgO
-      handlePaxosMessage g' rg'
+      Mo.forM_ msgsO $ \msgO ->
+        case msgO of
+          A.Send eIds msg -> Mo.forM_ eIds $
+            \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
+      handlePaxosMessage g''
 
 startSlave :: [String] -> IO ()
 startSlave (seedStr:curIP:otherIPs) = do
@@ -143,7 +154,7 @@ startClient (ip:message) = do
     L.infoM L.main $ "Connection established to " ++ show remoteAddr
     Mo.forever $ do
       line <- getLine
-      N.sendMessage socket $ M.ClientMessage line
+      N.sendMessage socket $ M.ClientRequest $ CM.ReadRequest line 0
 
 main :: IO ()
 main = do

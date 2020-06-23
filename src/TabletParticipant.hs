@@ -17,7 +17,6 @@ import qualified Connections as CC
 import qualified MultiPaxosInstance as MP
 import qualified PaxosLog as PL
 import qualified MultiVersionKVStore as MS
-import qualified Message as M
 import qualified Utils as U
 import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wrapMaybe, lp2)
 

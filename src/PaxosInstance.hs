@@ -7,10 +7,10 @@ module PaxosInstance (
 
 import qualified Data.Map.Strict as Mp
 
-import qualified Message as M
+import qualified Records.Messages.PaxosMessages as M
 import qualified Records.PaxosInstance as P
 import Lens ((%~), (.~), (^.), (&), at, ix)
-import State (ST, runST, addA, updateS, get, getId, wrapMaybe, (.^.), (.^^.), (.^^^.))
+import State (ST, runST, addA, updateS, get, getId, wrapMaybe, (.^), (.^^), (.^^.))
 
 data Action =
   Reply M.PaxosMessage |
@@ -34,7 +34,7 @@ prepare crnd = do
 
 promise :: M.Rnd -> M.Rnd -> M.Val -> ST P.Proposal Action
 promise rnd vrnd vval = do
-  promises' <- P.promises .^^^. ((vrnd, vval):)
+  promises' <- P.promises .^^. ((vrnd, vval):)
   s <- getId
   if (length promises') /= 3
     then return Stall
@@ -72,11 +72,11 @@ handlePaxos
   -> ST P.PaxosInstance Action
 handlePaxos msg = do
   case msg of
-    M.Propose crnd cval -> P.proposerState .^. propose crnd cval
-    M.Prepare crnd -> P.acceptorState .^. prepare crnd
-    M.Promise crnd vrnd vval -> P.proposerState . P.proposals . at crnd .^. (wrapMaybe $ promise crnd vrnd vval)
-    M.Accept crnd cval -> P.acceptorState .^. accept crnd cval
-    M.Learn lrnd lval -> P.learnerState .^. learn lrnd lval
+    M.Propose crnd cval -> P.proposerState .^ propose crnd cval
+    M.Prepare crnd -> P.acceptorState .^ prepare crnd
+    M.Promise crnd vrnd vval -> P.proposerState . P.proposals . at crnd .^ (wrapMaybe $ promise crnd vrnd vval)
+    M.Accept crnd cval -> P.acceptorState .^ accept crnd cval
+    M.Learn lrnd lval -> P.learnerState .^ learn lrnd lval
 
 maxProposalM :: P.PaxosInstance -> Maybe (M.Rnd, P.Proposal)
 maxProposalM paxosInstance = paxosInstance ^. P.proposerState . P.proposals & Mp.lookupMax

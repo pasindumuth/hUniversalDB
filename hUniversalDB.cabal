@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a44107f847760735da46a2cf96d1b37aaf470f192c8f47ba37f8d9f901e9e7ec
+-- hash: 46a1ab07eb5c20679251e464cfa575a06c47e303e2543a2ee2888aefa736b324
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -34,7 +34,6 @@ library
       InputActionHandler
       Lens
       Logging
-      Message
       MessageHandler
       MultiPaxosInstance
       MultiVersionKVStore

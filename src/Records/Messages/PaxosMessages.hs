@@ -14,6 +14,10 @@ data PaxosLogEntry =
   Write { key :: String, value :: String, timestamp :: Int }
   deriving (G.Generic, B.Binary, Show, Eq)
 
+ -- TODO get rid of this by updating Acceptor to have a `Maybe val`
+instance D.Default PaxosLogEntry where
+  def = Read "" 0
+
 type IndexT = Int
 type Rnd = Int
 type Val = PaxosLogEntry

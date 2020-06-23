@@ -9,7 +9,7 @@ import qualified Data.Map as Mp
 import qualified Control.Concurrent.Chan as C
 import qualified Control.Concurrent.MVar as MV
 
-import qualified Message as M
+import qualified Records.Messages.Messages as M
 
 type EndpointId = String
 type Connections = Mp.Map EndpointId (M.Message -> IO ())

@@ -16,7 +16,6 @@ import qualified Network.Simple.TCP as TCP
 
 import qualified Connections as CC
 import qualified Logging as L
-import qualified Message as M
 
 encode :: B.Binary a => a -> BS.ByteString
 encode b = BSL.toStrict $ B.encode b

@@ -5,11 +5,15 @@
 
 module MessageHandler where
 
-import qualified Message as M
+import qualified Records.Messages.ClientMessages as CM
+import qualified Records.Messages.Messages as M
+import qualified Records.Messages.PaxosMessages as PM
 
-handleMessage :: M.Message -> M.MultiPaxosMessage
+handleMessage :: M.Message -> PM.MultiPaxosMessage
 handleMessage msg =
   case msg of
     M.MultiPaxosMessage mpMsg -> mpMsg
-    M.ClientMessage key -> M.Insert $ M.Write key "value" 1
-  
+    M.ClientRequest request ->
+      case request of
+        CM.ReadRequest key timestamp -> PM.Insert $ PM.Read key timestamp
+        CM.WriteRequest key value timestamp -> PM.Insert $ PM.Write key value timestamp

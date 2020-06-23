@@ -21,16 +21,10 @@ import qualified MultiPaxosInstance as MP
 import qualified PaxosLog as PL
 import qualified MultiVersionKVStore as MS
 import qualified ClientRequestHandler as CR
-import qualified Message as M
 import qualified TabletParticipant as TP
 import qualified Utils as U
 import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wrapMaybe, lp2)
 
-data IMHMessage =
-  ClientRequest CC.EndpointId M.ClientRequest |
-  SlaveMessage CC.EndpointId M.MultiPaxosMessage |
-  Retry M.Retry
-  deriving (Show)
 --
 --incomingMessageHandlerIO :: Ch.Chan IMHMessage -> IO ()
 --incomingMessageHandlerIO channel = do

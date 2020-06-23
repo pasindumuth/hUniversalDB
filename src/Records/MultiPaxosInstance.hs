@@ -10,11 +10,11 @@ import qualified Data.Map as Mp
 import qualified GHC.Generics as G
 
 import qualified PaxosInstance as PI
-import qualified Message as M
+import qualified Records.Messages.PaxosMessages as PM
 import Lens (makeLenses)
 
 data MultiPaxosInstance = MultiPaxosInstance {
-  _paxosInstances :: Mp.Map M.IndexT PI.PaxosInstance
+  _paxosInstances :: Mp.Map PM.IndexT PI.PaxosInstance
 } deriving (G.Generic, D.Default, Show)
 
 makeLenses ''MultiPaxosInstance

@@ -18,31 +18,30 @@ import qualified Connections as CC
 import qualified MultiPaxosInstance as MP
 import qualified PaxosLog as PL
 import qualified MultiVersionKVStore as MS
-import qualified Message as M
 import qualified TabletParticipant as TP
 import qualified Utils as U
 import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, (.^.), _1, _2, wrapMaybe, lp2)
-
-data CurrentInsert = CurrentInsert {
-  _index :: Int,
-  _entry :: M.PaxosLogEntry,
-  _retryCount :: Int,
-  _clientMessage :: M.ClientRequest,
-  _eId :: CC.EndpointId,
-  _try :: Int
-} deriving (G.Generic, Show)
-
-data GlobalState = GlobalState {
-  _tabletParticipant :: TP.TabletParticipant,
-  _currentInsert :: Maybe CurrentInsert,
-  _requestQueue :: Sq.Seq (CC.EndpointId, M.ClientRequest),
-  _tryCount :: Int
-} deriving (G.Generic, D.Default, Show)
-
-type Messages = [(CC.EndpointId, M.Message)]
-
-makeLenses ''CurrentInsert
-makeLenses ''GlobalState
+--
+--data CurrentInsert = CurrentInsert {
+--  _index :: Int,
+--  _entry :: M.PaxosLogEntry,
+--  _retryCount :: Int,
+--  _clientMessage :: M.ClientRequest,
+--  _eId :: CC.EndpointId,
+--  _try :: Int
+--} deriving (G.Generic, Show)
+--
+--data GlobalState = GlobalState {
+--  _tabletParticipant :: TP.TabletParticipant,
+--  _currentInsert :: Maybe CurrentInsert,
+--  _requestQueue :: Sq.Seq (CC.EndpointId, M.ClientRequest),
+--  _tryCount :: Int
+--} deriving (G.Generic, D.Default, Show)
+--
+--type Messages = [(CC.EndpointId, M.Message)]
+--
+--makeLenses ''CurrentInsert
+--makeLenses ''GlobalState
 
 --clientRequestHandler
 --  :: CC.EndpointId
@@ -75,10 +74,10 @@ makeLenses ''GlobalState
 --      try = g ^. tryCount
 --      g' = g & currentInsert .~ Just (CurrentInsert nextAvailableIndex pLEntry retryCount clientRequest eId try)
 --  in (Just $ M.Retry try, g')
-
-createPLEntry :: M.ClientRequest -> M.PaxosLogEntry
-createPLEntry clientRequest =
-  case clientRequest of
-    M.CRead key timestamp -> M.Read key timestamp
-    M.CWrite key value timestamp -> M.Write key value timestamp
-
+--
+--createPLEntry :: M.ClientRequest -> M.PaxosLogEntry
+--createPLEntry clientRequest =
+--  case clientRequest of
+--    M.CRead key timestamp -> M.Read key timestamp
+--    M.CWrite key value timestamp -> M.Write key value timestamp
+--
