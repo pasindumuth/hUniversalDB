@@ -11,17 +11,22 @@ import qualified PaxosInstance as PI
 import qualified PaxosLog as PL
 import qualified Message as M
 import qualified Records.MultiPaxosInstance as MP
-import Lens ((%~), (.~), (^.), (&), (?~), at, ix, (.^.), wrapMaybe)
+import qualified Records.Env as E
+import Lens ((%~), (.~), (^.), (&), (.^.), (?~), at, ix, wrapMaybe, _1, _2, _3)
+import State (ST, runST, addA, updateS, get)
+import State as St
 
 maxRndIncrease = 1000
 
-getPaxosInstance ::  M.IndexT -> MP.MultiPaxosInstance -> (PI.PaxosInstance, MP.MultiPaxosInstance)
-getPaxosInstance index m =
-  case m ^. MP.paxosInstances . at index of
-    Just paxosInstance -> (paxosInstance, m)
-    Nothing ->
-      let paxosInstance' = D.def :: PI.PaxosInstance
-      in (paxosInstance', m & MP.paxosInstances . at index ?~ paxosInstance')
+getPaxosInstance ::  M.IndexT -> ST MP.MultiPaxosInstance PI.PaxosInstance
+getPaxosInstance index = do
+  pIM <- get $ MP.paxosInstances . at index
+  case pIM of
+    Just paxosInstance -> return paxosInstance
+    Nothing -> do
+      let paxosInstance = D.def :: PI.PaxosInstance
+      updateS $ MP.paxosInstances . at index ?~ paxosInstance
+      return paxosInstance
 
 handleMultiPaxos
   :: [CC.EndpointId]
@@ -34,16 +39,16 @@ handleMultiPaxos eIds fromEId msg (m, paxosLog, rg) =
       index = case msg of
                 M.Insert _ -> PL.nextAvailableIndex $ paxosLog
                 M.PaxosMessage index _ -> index
-      (paxosInstance, m') = m & getPaxosInstance index
+      (paxosInstance, (_, m')) = runST (getPaxosInstance index) m
       pMsg = case msg of
-                M.Insert value -> 
+                M.Insert value ->
                   let maxProposalM = PI.maxProposalM paxosInstance
                       nextRnd = case maxProposalM of
                                   Just (rnd, _) -> rnd + r
                                   Nothing -> r
                   in M.Propose nextRnd value
                 M.PaxosMessage _ value -> value
-      (action, m'') = m' .^. MP.paxosInstances . at index $ wrapMaybe $ PI.handlePaxos pMsg
+      (action, (_, m'')) = runST (MP.paxosInstances . at index St..^. St.wrapMaybe (PI.handlePaxos pMsg)) m'
       paxosLog' = case action of
                     PI.Choose chosenValue -> paxosLog & (PL.insert index chosenValue)
                     _ -> paxosLog

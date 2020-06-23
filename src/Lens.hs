@@ -13,13 +13,13 @@ module Lens(
   ix,
   lp2,
   lp3,
-  _1, _2,
+  _1, _2, _3,
   -- custom exports
   (.^.),
   wrapMaybe
 ) where
 
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), Lens', _1, _2, ALens', (^#), (<&>), (#~))
+import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), Lens', _1, _2, _3, ALens', (^#), (<&>), (#~))
 import Control.Lens.At (at, ix)
 
 infixl 1 .^.
