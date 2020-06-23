@@ -10,6 +10,6 @@ import qualified Message as M
 handleMessage :: M.Message -> M.MultiPaxosMessage
 handleMessage msg =
   case msg of
-    M.MMessage mpMsg -> mpMsg
+    M.MultiPaxosMessage mpMsg -> mpMsg
     M.ClientMessage key -> M.Insert $ M.Write key "value" 1
   

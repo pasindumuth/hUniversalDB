@@ -99,7 +99,7 @@ handleMultiPaxosThread rg getPaxosMsg connM = do
         then L.infoM L.paxos $ show $ g' ^. GS.paxosLog
         else return ()
       Mo.forM_ msgsO $ \(eId, msgO) ->
-        Mp.lookup eId conn & Mb.fromJust $ M.MMessage msgO 
+        Mp.lookup eId conn & Mb.fromJust $ M.MultiPaxosMessage msgO
       handlePaxosMessage g' rg'
 
 startSlave :: [String] -> IO ()

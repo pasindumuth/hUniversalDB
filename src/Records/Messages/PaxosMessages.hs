@@ -1,24 +1,18 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
-module Message where
+module Records.Messages.PaxosMessages where
 
 import qualified Data.Binary as B
 import qualified Data.Default as D
 import qualified GHC.Generics as G
 
-type Key = String
-type Value = String
-type Timestamp = Int
-
-data PaxosLogEntry = Read Key Timestamp | Write Key Value Timestamp
+data PaxosLogEntry =
+  Read { key :: String, timestamp :: Int } |
+  Write { key :: String, value :: String, timestamp :: Int }
   deriving (G.Generic, B.Binary, Show, Eq)
-
- -- TODO get rid of this by updating Acceptor to have a `Maybe val`
-instance D.Default PaxosLogEntry where
-  def = Read "" 0
 
 type IndexT = Int
 type Rnd = Int
@@ -36,17 +30,3 @@ data MultiPaxosMessage =
   Insert { val :: PaxosLogEntry } |
   PaxosMessage { index :: IndexT, message :: PaxosMessage }
   deriving (G.Generic, B.Binary, Show)
-
-data Message =
-  MultiPaxosMessage MultiPaxosMessage |
-  ClientMessage String
-  deriving (G.Generic, B.Binary, Show)
-
-data ClientRequest =
-  CRead Key Timestamp |
-  CWrite Key Value Timestamp
-  deriving (G.Generic, B.Binary, Show, Eq)
-
-data Retry = Retry {
-  try :: Int
-} deriving (Show)

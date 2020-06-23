@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: db1d00bd9ebe75aa572bc98ea401096ef96ce01a7e9847b401e7112fbd890b74
+-- hash: 98a25412492a388297455c046910d69429c43801c10092f106fa3d289af1a0f1
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -28,7 +28,10 @@ source-repository head
 library
   exposed-modules:
       ClientRequestHandler
+      ClientRequestManager
       Connections
+      DerivedState
+      InputActionHandler
       Lens
       Logging
       Message
@@ -37,7 +40,15 @@ library
       MultiVersionKVStore
       PaxosInstance
       PaxosLog
+      Records.Actions.Actions
+      Records.ClientRequestManager
+      Records.Common.Common
+      Records.DerivedState
+      Records.Env
       Records.GlobalState
+      Records.Messages.ClientMessages
+      Records.Messages.Messages
+      Records.Messages.PaxosMessages
       Records.MultiPaxosInstance
       Records.MultiVersionKVStore
       Records.PaxosInstance

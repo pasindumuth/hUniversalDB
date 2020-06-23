@@ -33,7 +33,7 @@ handleMultiPaxos eIds fromEId msg (m, paxosLog, rg) =
   let (r, rg') = rg & R.randomR (1, maxRndIncrease)
       index = case msg of
                 M.Insert _ -> PL.nextAvailableIndex $ paxosLog
-                M.PMessage index _ -> index
+                M.PaxosMessage index _ -> index
       (paxosInstance, m') = m & getPaxosInstance index
       pMsg = case msg of
                 M.Insert value -> 
@@ -42,13 +42,13 @@ handleMultiPaxos eIds fromEId msg (m, paxosLog, rg) =
                                   Just (rnd, _) -> rnd + r
                                   Nothing -> r
                   in M.Propose nextRnd value
-                M.PMessage _ value -> value
+                M.PaxosMessage _ value -> value
       (action, m'') = m' .^. MP.paxosInstances . at index $ wrapMaybe $ PI.handlePaxos pMsg
       paxosLog' = case action of
                     PI.Choose chosenValue -> paxosLog & (PL.insert index chosenValue)
                     _ -> paxosLog
       msgsO = case action of
-             PI.Reply paxosMessage -> [(fromEId, M.PMessage index paxosMessage)]
-             PI.Broadcast paxosMessage -> flip map eIds $ \e -> (e, M.PMessage index paxosMessage)
+             PI.Reply paxosMessage -> [(fromEId, M.PaxosMessage index paxosMessage)]
+             PI.Broadcast paxosMessage -> flip map eIds $ \e -> (e, M.PaxosMessage index paxosMessage)
              _ -> []
   in (msgsO, (m'', paxosLog', rg'))

@@ -79,7 +79,7 @@ deliverMessage (fromEId, toEId) g =
        slaveState' = g ^. slaveState & ix toEId .~ state'
        (queues'', nonemptyQueues'') = U.s13 foldl (queues', nonemptyQueues') msgsO $
          \(queues', nonemptyQueues') (eId, msgO) ->
-           addMsg (M.MMessage msgO) (toEId, eId) (queues', nonemptyQueues')
+           addMsg (M.MultiPaxosMessage msgO) (toEId, eId) (queues', nonemptyQueues')
    in g & queues .~ queues''
         & nonemptyQueues .~ nonemptyQueues''
         & slaveState .~ slaveState'
@@ -111,7 +111,7 @@ simulateAll g =
 addClientMsg :: Int -> Int -> GlobalState -> GlobalState
 addClientMsg slaveId cliengMsgId g =
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = M.MMessage $ M.Insert $ M.Write ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
+      msg = M.MultiPaxosMessage $ M.Insert $ M.Write ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   in g & lp2 (queues, nonemptyQueues) %~ addMsg msg (clientEId, slaveEId)
 
 test1 :: GlobalState -> GlobalState
