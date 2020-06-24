@@ -26,7 +26,7 @@ handlingState = (lp5 (GS.paxosLog, GS.multiPaxosInstance, GS.derivedState, GS.cl
 
 handleClientRequest :: C.EndpointId -> CM.ClientRequest -> ST HandlingState ()
 handleClientRequest eId request = do
-  requestQueue <- _4 . CRM.requestQueue .^^. (Sq.|> (eId, request))
+  requestQueue <- _4 . CRM.requestQueue .^^. U.push (eId, request)
   if Sq.length requestQueue == 1
     then handleNextRequest
     else return ()
@@ -36,7 +36,7 @@ handleNextRequest = do
   requestQueue <- get $ _4 . CRM.requestQueue
   if Sq.length requestQueue > 0
     then do
-      let (eId, request) Sq.:< _ = Sq.viewl requestQueue
+      let (eId, request) = U.peek requestQueue
       requestHandled <- tryHandling eId request
       if requestHandled
         then pollAndNext
@@ -81,7 +81,7 @@ handleInsert = do
       nextAvailableIndex <- _1 .^^^ PL.nextAvailableIndex
       if nextAvailableIndex > index
         then do
-          nextEntryM <- _1 .^^^ PL.getPLEntry (index + 1)
+          nextEntryM <- _1 .^^^ PL.getPLEntry index
           let Just nextEntry = nextEntryM
           if nextEntry == entry
             then do
@@ -117,7 +117,7 @@ tryHandling eId request = do
   case request of
     CM.ReadRequest key timestamp -> do
       case MS.staticReadLat key kvstore of
-        Just lat | lat <= timestamp -> do
+        Just lat | timestamp <= lat -> do
           addA $ A.Send [eId] $ M.ClientResponse $ CM.ReadResponse $ MS.staticRead key timestamp kvstore
           return True
         _ -> return False

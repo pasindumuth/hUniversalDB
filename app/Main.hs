@@ -21,6 +21,7 @@ import qualified Network as N
 import qualified Records.Env as EN
 import qualified Records.GlobalState as GS
 import qualified MultiPaxosInstance as MP
+import qualified InputActionHandler as IAH
 import qualified Records.Actions.Actions as A
 import qualified Records.Messages.ClientMessages as CM
 import qualified Records.Messages.Messages as M
@@ -30,6 +31,8 @@ import qualified Utils as U
 import Lens ((^.), (&), (.~), lp3, (.^.), _1, _2)
 import State (runST)
 import qualified State as St
+
+slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
 
 handleSelfConn
   :: MV.MVar CC.Connections
@@ -49,8 +52,8 @@ createConnHandlers
   -> (TCP.Socket, TCP.SockAddr)
   -> IO ()
 createConnHandlers connM receiveChan (socket, remoteAddr) = do
-  L.infoM L.main $ "Connection established to " ++ show remoteAddr
-  let eId = show remoteAddr
+  let eId = U.prefix  ':' $ show remoteAddr
+  L.infoM L.main $ "Connection established to " ++ eId
   sendChan <- CC.addConn connM eId
   C.forkFinally (N.handleSend sendChan socket) $ \_ -> CC.delConn connM eId
   N.handleReceive eId receiveChan socket
@@ -79,39 +82,38 @@ acceptClientConn connM receiveChan =
 
 handleReceive
   :: C.Chan (CC.EndpointId, M.Message)
-  -> C.Chan (CC.EndpointId, PM.MultiPaxosMessage)
+  -> C.Chan (A.InputAction)
   -> IO ()
-handleReceive receiveChan paxosChan = do
+handleReceive receiveChan iActionChan = do
   Mo.forever $ do
     (eId, msg) <- C.readChan receiveChan
-    C.writeChan paxosChan (eId, MH.handleMessage msg)
+    C.writeChan iActionChan $ A.Receive eId msg
 
--- TODO: client connections should be passing the messages into
--- a the IMHIO
 handleMultiPaxosThread
   :: R.StdGen
-  -> IO (CC.EndpointId, PM.MultiPaxosMessage)
+  -> C.Chan (A.InputAction)
   -> MV.MVar CC.Connections -> IO ()
-handleMultiPaxosThread rg getPaxosMsg connM = do
-  let g = D.def & GS.env . EN.rand .~ rg
+handleMultiPaxosThread rg iActionChan connM = do
+  let g = D.def & GS.env . EN.rand .~ rg & GS.env . EN.slaveEIds .~ slaveEIds
   handlePaxosMessage g
   where
     handlePaxosMessage :: GS.GlobalState -> IO ()
     handlePaxosMessage g = do
-      (eId, multiPaxosMessage) <- getPaxosMsg
+      iAction <- C.readChan iActionChan
+      let (_, (oActions, g')) = runST (IAH.handleInputAction iAction) g
       conn <- MV.readMVar connM
-      let eIds = Mp.toList conn & map fst
-          g' = g & GS.env . EN.slaveEIds .~ eIds
-          (_, (msgsO, g'')) = runST ((lp3 (GS.multiPaxosInstance, GS.paxosLog, GS.env))
-            St..^ MP.handleMultiPaxos eId multiPaxosMessage) g'
-      if (g' ^. GS.paxosLog /= g'' ^. GS.paxosLog)
-        then L.infoM L.paxos $ show $ g'' ^. GS.paxosLog
-        else return ()
-      Mo.forM_ msgsO $ \msgO ->
-        case msgO of
+      Mo.forM_ (reverse oActions) $ \action ->
+        case action of
           A.Send eIds msg -> Mo.forM_ eIds $
             \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-      handlePaxosMessage g''
+          A.RetryOutput clockVal -> do
+            C.forkIO $ do
+              C.threadDelay 100000
+              C.writeChan iActionChan $ A.RetryInput clockVal
+            return ()
+          A.Print message -> do
+            print message
+      handlePaxosMessage g'
 
 startSlave :: [String] -> IO ()
 startSlave (seedStr:curIP:otherIPs) = do
@@ -132,29 +134,35 @@ startSlave (seedStr:curIP:otherIPs) = do
   -- Initiate connections with other slaves
   Mo.forM_ otherIPs $ \ip -> C.forkIO $ connectToSlave ip connM receiveChan
 
-  -- Create the Client Connections object
-  clientConnM <- MV.newMVar Mp.empty
-
   -- Start accepting slave connections
-  C.forkIO $ acceptClientConn clientConnM receiveChan
+  C.forkIO $ acceptClientConn connM receiveChan
 
   -- Setup message routing thread
-  paxosChan <- C.newChan
-  C.forkIO $ handleReceive receiveChan paxosChan
+  iActionChan <- C.newChan
+  C.forkIO $ handleReceive receiveChan iActionChan
 
   -- Start Paxos handling thread
   let seed = read seedStr :: Int
       rg = R.mkStdGen seed
-  handleMultiPaxosThread rg (C.readChan paxosChan) connM
+  handleMultiPaxosThread rg iActionChan connM
 
+-- Example commands: r k 0, w k v 0
 startClient :: [String] -> IO ()
 startClient (ip:message) = do
   L.infoM L.main "Starting client"
   TCP.connect ip "9000" $ \(socket, remoteAddr) -> do
     L.infoM L.main $ "Connection established to " ++ show remoteAddr
+    C.forkIO $ Mo.forever $ do
+      msg <- N.receiveMessage socket
+      print (msg :: M.Message)
     Mo.forever $ do
       line <- getLine
-      N.sendMessage socket $ M.ClientRequest $ CM.ReadRequest line 0
+      case words line of
+        ["r", key, timestamp] -> do
+          N.sendMessage socket $ M.ClientRequest $ CM.ReadRequest key (read timestamp)
+        ["w", key, value, timestamp] -> do
+          N.sendMessage socket $ M.ClientRequest $ CM.WriteRequest key value (read timestamp)
+        _ -> print "Unrecognized command or number of arguments"
 
 main :: IO ()
 main = do

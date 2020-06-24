@@ -15,3 +15,15 @@ poll :: Queue a -> (a, Queue a)
 poll queue =
   let val Sq.:< queue' = Sq.viewl queue
   in (val, queue')
+
+peek :: Queue a -> a
+peek queue =
+  let val Sq.:< _ = Sq.viewl queue
+  in val
+
+prefix :: (Eq a) => a -> [a] -> [a]
+prefix s [] = []
+prefix s (x:xs) =
+  if s == x
+    then []
+    else x : prefix s xs
