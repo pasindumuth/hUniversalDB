@@ -17,5 +17,5 @@ data ClientRequest =
 data ClientResponse =
   Error { message :: String } |
   ReadResponse { value :: Maybe String } |
-  WritResponse
+  WriteResponse
   deriving (G.Generic, B.Binary, Show)

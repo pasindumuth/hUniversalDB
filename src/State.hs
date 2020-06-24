@@ -16,17 +16,12 @@ type ST s a = St.State ([A.OutputAction], s) a
 runST :: ST s a -> s -> (a, ([A.OutputAction], s))
 runST st s = St.runState st ([], s)
 
+makeST :: a -> ST s a
+makeST ret = St.state $ \(as, s) -> (ret, (as, s))
+
 -- Adds actions. Importantly, this adds actions in reverse.
 addA :: A.OutputAction -> ST s ()
 addA a = St.state $ \(as, s) ->((), (a:as, s))
-
--- if we can find an identity lens, we can get rid of updateS and just
--- use .^^^.. We can also get rid of getId
-updateS :: (s -> s) -> ST s s
-updateS f = St.state $ \(as, state) -> (f state, (as, f state))
-
-getId :: ST s s
-getId = St.state $ \(as, state) -> (state, (as, state))
 
 get :: Lens' s1 s2 -> ST s1 s2
 get lens = St.state $ \(as, state) -> (state ^. lens, (as, state))

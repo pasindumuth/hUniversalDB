@@ -4,6 +4,7 @@ module PaxosLog (
   nextAvailableIndex,
   newlyAddedEntries,
   plog,
+  getPLEntry,
 ) where
 
 import qualified Data.Map as Mp
@@ -43,3 +44,6 @@ newlyAddedEntries pl pl' =
 
 plog :: P.PaxosLog -> Mp.Map M.IndexT M.PaxosLogEntry
 plog pl = pl ^. P.plog
+
+getPLEntry :: M.IndexT -> P.PaxosLog -> Maybe M.PaxosLogEntry
+getPLEntry index pl = pl ^. P.plog . at index

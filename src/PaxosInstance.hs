@@ -10,7 +10,7 @@ import qualified Data.Map.Strict as Mp
 import qualified Records.Messages.PaxosMessages as M
 import qualified Records.PaxosInstance as P
 import Lens ((%~), (.~), (^.), (&), at, ix)
-import State (ST, runST, addA, updateS, get, getId, wrapMaybe, (.^), (.^^), (.^^.))
+import State (ST, runST, addA, get, wrapMaybe, (.^), (.^^), (.^^.))
 
 data Action =
   Reply M.PaxosMessage |
@@ -20,22 +20,22 @@ data Action =
 
 propose :: M.Rnd -> M.Val -> ST P.ProposerState Action
 propose crnd cval = do
-  updateS $ P.proposals %~ (Mp.insert crnd (P.Proposal crnd cval []))
+  id .^^. P.proposals %~ (Mp.insert crnd (P.Proposal crnd cval []))
   return $ Broadcast $ M.Prepare crnd
 
 prepare :: M.Rnd -> ST P.AcceptorState Action
 prepare crnd = do
-  s <- getId
+  s <- get id
   if s ^. P.rnd >= crnd
     then return Stall
     else do
-      updateS $ P.rnd .~ crnd
+      id .^^. P.rnd .~ crnd
       return $ Reply $ M.Promise crnd (s ^. P.vrnd) (s ^. P.vval)
 
 promise :: M.Rnd -> M.Rnd -> M.Val -> ST P.Proposal Action
 promise rnd vrnd vval = do
   promises' <- P.promises .^^. ((vrnd, vval):)
-  s <- getId
+  s <- get id
   if (length promises') /= 3
     then return Stall
     else do
@@ -53,7 +53,7 @@ accept crnd cval = do
   if crnd < rnd
     then return Stall
     else do
-      updateS $ \_ -> P.AcceptorState crnd crnd cval
+      id .^^. \_ -> P.AcceptorState crnd crnd cval
       return $ Broadcast $ M.Learn crnd cval
 
 learn :: M.Rnd -> M.Val -> ST P.LearnerState Action
@@ -62,7 +62,7 @@ learn lrnd lval = do
   let count = case learns & Mp.lookup lrnd of
                 Just (_, count) -> count + 1
                 _ -> 1
-  updateS $ P.learns %~ Mp.insert lrnd (lval, count)
+  id .^^. P.learns %~ Mp.insert lrnd (lval, count)
   if count < 3
     then return $ Stall
     else return $ Choose lval

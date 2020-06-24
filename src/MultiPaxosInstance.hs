@@ -15,7 +15,7 @@ import qualified Records.Messages.PaxosMessages as PM
 import qualified Records.Messages.Messages as M
 import qualified Records.Env as E
 import Lens ((?~), at, _1, _2, _3)
-import State (ST, addA, updateS, get, wrapMaybe, (.^), (.^^), (.^^.), (.^^^))
+import State (ST, addA, get, wrapMaybe, (.^), (.^^), (.^^.), (.^^^))
 
 maxRndIncrease = 1000
 
@@ -26,7 +26,7 @@ getPaxosInstance index = do
     Just paxosInstance -> return paxosInstance
     Nothing -> do
       let paxosInstance = D.def :: PI.PaxosInstance
-      updateS $ MP.paxosInstances . at index ?~ paxosInstance
+      id .^^. MP.paxosInstances . at index ?~ paxosInstance
       return paxosInstance
 
 handleMultiPaxos :: CC.EndpointId
