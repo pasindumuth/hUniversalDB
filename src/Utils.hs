@@ -4,7 +4,7 @@ import qualified Data.Sequence as Sq
 
 for = flip map
 s13 f a b c = f c a b
-
+s31 f a b c = f b c a
 
 type Queue = Sq.Seq
 

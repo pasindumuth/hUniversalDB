@@ -4,6 +4,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+import qualified Control.Monad as Mo
 import qualified Data.Default as D
 import qualified Data.Map as Mp
 import qualified Data.Set as St
@@ -26,9 +27,8 @@ import qualified Records.Messages.ClientMessages as CM
 import qualified Records.Messages.Messages as M
 import qualified Records.Messages.PaxosMessages as PM
 import qualified Utils as U
-import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2, (.^.))
-import State (runST)
-import qualified State as St
+import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
+import State (ST, runST, get, addA, getA, (.^), (.^^), (.^^^), (.^^.), (.^^*), (.^^^*), wrapMaybe)
 
 type Queues = Mp.Map CC.EndpointId (Mp.Map CC.EndpointId (Sq.Seq M.Message))
 type NonemptyQueues = St.Set (CC.EndpointId, CC.EndpointId)
@@ -78,65 +78,69 @@ addMsg msg (fromEId, toEId) (queues, nonemptyQueues) =
           else nonemptyQueues
   in (queues', nonemptyQueues')
 
-deliverMessage :: (CC.EndpointId, CC.EndpointId) -> GlobalState -> GlobalState
-deliverMessage (fromEId, toEId) g =
-   let msg Sq.:< queue' = Sq.viewl $ g ^. queues . ix fromEId . ix toEId
-       queues' = g ^. queues & ix fromEId %~ ix toEId .~ queue'
-       nonemptyQueues' = if (Sq.length queue') == 0
-                           then g ^. nonemptyQueues & St.delete (fromEId, toEId)
-                           else g ^. nonemptyQueues
-       (_, (msgsO, g')) = runST (slaveState . at toEId
-         St..^ (St.wrapMaybe $ IAH.handleInputAction $ A.Receive fromEId msg)) g
-       (queues'', nonemptyQueues'') = U.s13 foldl (queues', nonemptyQueues') msgsO $
-         \(queues', nonemptyQueues') msgO ->
-           case msgO of
-             A.Send eIds msg -> U.s13 foldl (queues', nonemptyQueues') eIds $
-               \(queues', nonemptyQueues') eId ->
-                 addMsg msg (toEId, eId) (queues', nonemptyQueues')
-             _ -> (queues', nonemptyQueues')
-   in g' & queues .~ queues''
-         & nonemptyQueues .~ nonemptyQueues''
+deliverMessage :: (CC.EndpointId, CC.EndpointId) -> ST GlobalState ()
+deliverMessage (fromEId, toEId) = do
+  msg <- queues . ix fromEId . ix toEId .^^* U.poll
+  queueLength <- queues . ix fromEId . ix toEId .^^^* Sq.length
+  if queueLength == 0
+    then nonemptyQueues .^^. St.delete (fromEId, toEId)
+    else nonemptyQueues .^^. id
+  (_, msgsO) <- getA (slaveState . at toEId) (wrapMaybe $ IAH.handleInputAction $ A.Receive fromEId msg)
+  (lp2 (queues, nonemptyQueues)) .^^. (U.s31 foldl (reverse msgsO) $
+    \(queues', nonemptyQueues') msgO ->
+      case msgO of
+        A.Send eIds msg -> U.s13 foldl (queues', nonemptyQueues') eIds $
+          \(queues', nonemptyQueues') eId ->
+            addMsg msg (toEId, eId) (queues', nonemptyQueues')
+        _ -> (queues', nonemptyQueues'))
+  return ()
 
-simulateOnce :: GlobalState -> GlobalState
-simulateOnce g =
-  if (g ^. nonemptyQueues & St.size) == 0
-    then g
-    else
-      let (randQueueIndex, rg') = R.randomR (0, g ^. nonemptyQueues & St.size & (subtract 1)) (g ^. rand)
-          g' = g & rand .~ rg'
-          queueId = g' ^. nonemptyQueues & St.elemAt randQueueIndex
-          g'' = deliverMessage queueId g'
-      in g''
+simulateOnce :: ST GlobalState ()
+simulateOnce = do
+  length <- nonemptyQueues .^^^ St.size
+  if length == 0
+    then return ()
+    else do
+      randQueueIndex <- rand .^^ R.randomR (0, length - 1)
+      queueId <- nonemptyQueues .^^^  St.elemAt randQueueIndex
+      deliverMessage queueId
 
-simulateN :: Int -> GlobalState -> GlobalState
-simulateN n g =
-  if (g ^. nonemptyQueues & St.size) == 0 || n == 0
-    then g
-    else simulateN (n - 1) $ simulateOnce g
+simulateN :: Int -> ST GlobalState ()
+simulateN n = do
+  length <- nonemptyQueues .^^^ St.size
+  if length == 0 || n == 0
+    then return ()
+    else do
+      simulateOnce
+      simulateN (n - 1)
 
-simulateAll :: GlobalState -> GlobalState
-simulateAll g =
-  if (g ^. nonemptyQueues & St.size) == 0
-    then g
-    else simulateAll $ simulateOnce g
+simulateAll :: ST GlobalState ()
+simulateAll = do
+  length <- nonemptyQueues .^^^ St.size
+  if length == 0
+    then return ()
+    else do
+      simulateOnce
+      simulateAll
 
-addClientMsg :: Int -> Int -> GlobalState -> GlobalState
-addClientMsg slaveId cliengMsgId g =
+addClientMsg :: Int -> Int -> ST GlobalState ()
+addClientMsg slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
       msg = M.MultiPaxosMessage $ PM.Insert $ PM.Write ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
-  in g & lp2 (queues, nonemptyQueues) %~ addMsg msg (clientEId, slaveEId)
+  (lp2 (queues, nonemptyQueues)) .^^. addMsg msg (clientEId, slaveEId)
+  return ()
 
-test1 :: GlobalState -> GlobalState
-test1 g =
-  simulateAll . addClientMsg 0 0 $ g
+test1 :: ST GlobalState ()
+test1 = do
+  addClientMsg 0 0; simulateAll
 
-test2 :: GlobalState -> GlobalState
-test2 g =
-  simulateN 25 . addClientMsg 4 4 .
-  simulateN 25 . addClientMsg 3 3 .
-  simulateN 25 . addClientMsg 2 2 .
-  simulateN 25 . addClientMsg 1 1 .
-  simulateN 25 . addClientMsg 0 0 $ g
+test2 :: ST GlobalState ()
+test2 = do
+  addClientMsg 0 0; simulateN 25
+  addClientMsg 1 1; simulateN 25
+  addClientMsg 2 2; simulateN 25
+  addClientMsg 3 3; simulateN 25
+  addClientMsg 4 4; simulateN 25
 
 mergePaxosLog :: GlobalState -> Maybe (Mp.Map PM.IndexT PM.PaxosLogEntry)
 mergePaxosLog g =
@@ -157,10 +161,15 @@ mergePaxosLog g =
                                           then mergedLogM
                                           else Nothing
 
-driveTest :: Int -> (GlobalState -> GlobalState) -> IO ()
+driveTest :: Int -> ST GlobalState () -> IO ()
 driveTest testNum test = do
   let g = createGlobalState 0 5 1
-      g' = test g
+      (_, (oActions, g')) = runST test g
+  Mo.forM_ (reverse oActions) $ \action ->
+    case action of
+      A.Print message -> do
+        print message
+      _ -> return ()
   case mergePaxosLog g' of
     Just mergedLog -> print $
       "Test " ++ (show testNum) ++ " Passed! " ++ (show $ Mp.size mergedLog) ++ " entries."

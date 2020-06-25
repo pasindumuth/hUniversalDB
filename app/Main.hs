@@ -28,7 +28,7 @@ import qualified Records.Messages.Messages as M
 import qualified Records.Messages.PaxosMessages as PM
 import qualified MessageHandler as MH
 import qualified Utils as U
-import Lens ((^.), (&), (.~), lp3, (.^.), _1, _2)
+import Lens ((^.), (&), (.~), lp3, _1, _2)
 import State (runST)
 import qualified State as St
 
