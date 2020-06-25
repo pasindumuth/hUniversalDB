@@ -7,6 +7,7 @@
 import qualified Data.Default as D
 import qualified Data.Map as Mp
 import qualified Data.Set as St
+import qualified Data.Functor.Const
 import qualified Data.Sequence as Sq
 import qualified System.Environment as E
 import qualified System.Random as R
@@ -15,6 +16,7 @@ import Text.Pretty.Simple (pPrintNoColor)
 import qualified Connections as CC
 import qualified Logging as L
 import qualified MultiPaxosInstance as MP
+import qualified InputActionHandler as IAH
 import qualified PaxosLog as PL
 import qualified MessageHandler as MH
 import qualified Records.Actions.Actions as A
@@ -83,20 +85,17 @@ deliverMessage (fromEId, toEId) g =
        nonemptyQueues' = if (Sq.length queue') == 0
                            then g ^. nonemptyQueues & St.delete (fromEId, toEId)
                            else g ^. nonemptyQueues
-       Just state = g ^. slaveState . at toEId
-       mpMsg = MH.handleMessage msg
-       (_, (msgsO, state')) = runST ((lp3 (GS.multiPaxosInstance, GS.paxosLog, GS.env))
-         St..^ MP.handleMultiPaxos fromEId mpMsg) state
-       slaveState' = g ^. slaveState & ix toEId .~ state'
+       (_, (msgsO, g')) = runST (slaveState . at toEId
+         St..^ (St.wrapMaybe $ IAH.handleInputAction $ A.Receive fromEId msg)) g
        (queues'', nonemptyQueues'') = U.s13 foldl (queues', nonemptyQueues') msgsO $
          \(queues', nonemptyQueues') msgO ->
            case msgO of
              A.Send eIds msg -> U.s13 foldl (queues', nonemptyQueues') eIds $
                \(queues', nonemptyQueues') eId ->
                  addMsg msg (toEId, eId) (queues', nonemptyQueues')
-   in g & queues .~ queues''
-        & nonemptyQueues .~ nonemptyQueues''
-        & slaveState .~ slaveState'
+             _ -> (queues', nonemptyQueues')
+   in g' & queues .~ queues''
+         & nonemptyQueues .~ nonemptyQueues''
 
 simulateOnce :: GlobalState -> GlobalState
 simulateOnce g =
