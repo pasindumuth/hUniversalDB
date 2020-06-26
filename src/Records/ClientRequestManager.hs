@@ -13,7 +13,7 @@ import qualified Records.Common.Common as C
 import qualified Records.MultiVersionKVStore as MS
 import qualified Records.Messages.PaxosMessages as PM
 import qualified Records.Messages.ClientMessages as CM
-import Lens (makeLenses)
+import Lens
 
 data CurrentInsert = CurrentInsert {
   _index :: Int,

@@ -16,7 +16,7 @@ import qualified Records.GlobalState as GS
 import qualified Records.Messages.ClientMessages as CM
 import qualified Records.Messages.Messages as M
 import qualified Records.Messages.PaxosMessages as PM
-import Lens (Lens', _1, _2, _3, _4, _5, (&), (^.), lp3, lp5, at)
+import Lens
 import State
 
 type HandlingState = (PL.PaxosLog, MP.MultiPaxosInstance, DS.DerivedState, CRM.ClientRequestManager, E.Env)

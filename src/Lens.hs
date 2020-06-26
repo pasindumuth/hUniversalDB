@@ -1,7 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Lens(
-  -- re-exorts from lens libriary
   makeLenses,
   (%~),
   (.~),
@@ -13,7 +12,6 @@ module Lens(
   ix,
   lp2, lp3, lp4, lp5,
   _1, _2, _3, _4, _5,
-  -- custom exports
 ) where
 
 import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), Lens', _1, _2, _3, _4, _5, ALens', (^#), (<&>), (#~))

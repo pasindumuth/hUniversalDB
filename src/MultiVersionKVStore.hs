@@ -9,7 +9,7 @@ module MultiVersionKVStore (
 import qualified Control.Exception.Base as Ex
 
 import qualified Records.MultiVersionKVStore as MS
-import Lens ((%~), (.~), (^.), (&), (?~), at, ix, _2)
+import Lens
 
 -- When a key is not present, that's not the fault of the caller. Subsequent reads
 -- at that timestamp will always return a Nothing. 

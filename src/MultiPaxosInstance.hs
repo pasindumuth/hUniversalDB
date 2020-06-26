@@ -14,7 +14,7 @@ import qualified Records.MultiPaxosInstance as MP
 import qualified Records.Messages.PaxosMessages as PM
 import qualified Records.Messages.Messages as M
 import qualified Records.Env as E
-import Lens ((?~), at, ix, _1, _2, _3)
+import Lens
 import State
 
 maxRndIncrease = 1000

@@ -10,7 +10,7 @@ import qualified GHC.Generics as G
 
 import qualified System.Random as R
 import qualified Records.Common.Common as C
-import Lens (makeLenses)
+import Lens
 
 data Env = Env {
   _rand :: R.StdGen,

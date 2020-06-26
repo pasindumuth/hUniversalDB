@@ -7,7 +7,7 @@ import qualified PaxosLog as PL
 import qualified Records.GlobalState as GS
 import qualified Records.Actions.Actions as A
 import qualified Records.Messages.Messages as M
-import Lens (lp3)
+import Lens
 import State
 
 handleInputAction

@@ -10,7 +10,7 @@ import qualified Data.Map as Mp
 import qualified Data.Set as S
 
 import qualified Records.Messages.PaxosMessages as M
-import Lens (makeLenses)
+import Lens
 
 data PaxosLog = PaxosLog {
   _plog :: Mp.Map M.IndexT M.PaxosLogEntry,
