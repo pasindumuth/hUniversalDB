@@ -5,11 +5,11 @@
 
 module Records.ClientRequestManager where
 
-import qualified Data.Default as D
+import qualified Data.Default as Df
 import qualified Data.Sequence as Sq
-import qualified GHC.Generics as G
+import qualified GHC.Generics as Gn
 
-import qualified Records.Common.Common as C
+import qualified Records.Common.Common as Co
 import qualified Records.MultiVersionKVStore as MS
 import qualified Records.Messages.PaxosMessages as PM
 import qualified Records.Messages.ClientMessages as CM
@@ -20,15 +20,15 @@ data CurrentInsert = CurrentInsert {
   _entry :: PM.PaxosLogEntry,
   _retryCount :: Int,
   _clientMessage :: CM.ClientRequest,
-  _eId :: C.EndpointId,
+  _eId :: Co.EndpointId,
   _counterValue :: Int
-} deriving (G.Generic, Show)
+} deriving (Gn.Generic, Show)
 
 data ClientRequestManager = ClientRequestManager {
   _currentInsert :: Maybe CurrentInsert,
-  _requestQueue :: Sq.Seq (C.EndpointId, CM.ClientRequest),
+  _requestQueue :: Sq.Seq (Co.EndpointId, CM.ClientRequest),
   _counter :: Int
-} deriving (G.Generic, D.Default, Show)
+} deriving (Gn.Generic, Df.Default, Show)
 
 makeLenses ''CurrentInsert
 makeLenses ''ClientRequestManager

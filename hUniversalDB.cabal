@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e60bdcebf8da7c153126165e4de8e3f72b273cfc59186b47733d4094905a638e
+-- hash: 2d9d1543be64555378bd1c8063a92ee946a887704c57b08b3496cf4648745f8c
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -33,7 +33,6 @@ library
       InputActionHandler
       Lens
       Logging
-      MessageHandler
       MultiPaxosInstance
       MultiVersionKVStore
       PaxosInstance
@@ -73,13 +72,36 @@ library
     , stm
   default-language: Haskell2010
 
-executable hUniversalDB-exe
+executable hUniversalDB-client-exe
   main-is: Main.hs
   other-modules:
-      Network
       Paths_hUniversalDB
   hs-source-dirs:
-      app
+      client
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      async
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , containers
+    , data-default
+    , hUniversalDB
+    , hslogger
+    , lens
+    , mtl
+    , network-simple
+    , pretty-simple
+    , random
+    , stm
+  default-language: Haskell2010
+
+executable hUniversalDB-slave-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_hUniversalDB
+  hs-source-dirs:
+      slave
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       async

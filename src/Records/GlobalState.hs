@@ -5,15 +5,15 @@
 
 module Records.GlobalState where
 
-import qualified Data.Default as D
+import qualified Data.Default as Df
 import qualified Data.Map as Mp
-import qualified GHC.Generics as G
+import qualified GHC.Generics as Gn
 
 import qualified Records.MultiPaxosInstance as MP
 import qualified Records.PaxosLog as PL
 import qualified Records.DerivedState as DS
 import qualified Records.ClientRequestManager as CRM
-import qualified Records.Env as E
+import qualified Records.Env as En
 import Lens
 
 data GlobalState = GlobalState {
@@ -21,7 +21,7 @@ data GlobalState = GlobalState {
   _multiPaxosInstance :: MP.MultiPaxosInstance,
   _derivedState :: DS.DerivedState,
   _clientRequestManager :: CRM.ClientRequestManager,
-  _env :: E.Env
-} deriving (G.Generic, D.Default, Show)
+  _env :: En.Env
+} deriving (Gn.Generic, Df.Default, Show)
 
 makeLenses ''GlobalState

@@ -5,14 +5,14 @@
 
 module Records.DerivedState where
 
-import qualified Data.Default as D
-import qualified GHC.Generics as G
+import qualified Data.Default as Df
+import qualified GHC.Generics as Gn
 
 import qualified Records.MultiVersionKVStore as MS
 import Lens
 
 data DerivedState = DerivedState {
   _kvStore :: MS.MultiVersionKVStore
-} deriving (G.Generic, D.Default, Show)
+} deriving (Gn.Generic, Df.Default, Show)
 
 makeLenses ''DerivedState

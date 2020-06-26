@@ -38,15 +38,25 @@ library:
   source-dirs: src
 
 executables:
-  hUniversalDB-exe:
+  hUniversalDB-slave-exe:
     main:                Main.hs
-    source-dirs:         app
+    source-dirs:         slave
     ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
     dependencies:
-    - hUniversalDB
+      - hUniversalDB
+
+  hUniversalDB-client-exe:
+    main:                Main.hs
+    source-dirs:         client
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - hUniversalDB
 
 tests:
   hUniversalDB-test:

@@ -3,17 +3,17 @@ module MultiPaxosInstance (
   handleMultiPaxos,
 ) where
 
-import qualified Data.Default as D
-import qualified System.Random as R
+import qualified Data.Default as Df
+import qualified System.Random as Rn
 
-import qualified Connections as CC
 import qualified PaxosInstance as PI
 import qualified PaxosLog as PL
-import qualified Records.Actions.Actions as A
+import qualified Records.Actions.Actions as Ac
+import qualified Records.Common.Common as Co
 import qualified Records.MultiPaxosInstance as MP
 import qualified Records.Messages.PaxosMessages as PM
-import qualified Records.Messages.Messages as M
-import qualified Records.Env as E
+import qualified Records.Messages.Messages as Ms
+import qualified Records.Env as En
 import Lens
 import State
 
@@ -25,15 +25,15 @@ getPaxosInstance index = do
   case pIM of
     Just paxosInstance -> return paxosInstance
     Nothing -> do
-      let paxosInstance = D.def :: PI.PaxosInstance
+      let paxosInstance = Df.def :: PI.PaxosInstance
       id .^^. MP.paxosInstances . at index ?~ paxosInstance
       return paxosInstance
 
-handleMultiPaxos :: CC.EndpointId
+handleMultiPaxos :: Co.EndpointId
   -> PM.MultiPaxosMessage
-  -> ST (MP.MultiPaxosInstance, PL.PaxosLog, E.Env) ()
+  -> ST (MP.MultiPaxosInstance, PL.PaxosLog, En.Env) ()
 handleMultiPaxos fromEId msg = do
-  r <- _3.E.rand .^^ R.randomR (1, maxRndIncrease)
+  r <- _3.En.rand .^^ Rn.randomR (1, maxRndIncrease)
   index <- case msg of
              PM.Insert _ -> _2 .^^^ PL.nextAvailableIndex
              PM.PaxosMessage index _ -> return index
@@ -50,8 +50,8 @@ handleMultiPaxos fromEId msg = do
   case action of
     PI.Choose chosenValue -> _2 .^^. (PL.insert index chosenValue)
     _ -> getL _2
-  fromEIds <- getL $ _3 .E.slaveEIds
+  fromEIds <- getL $ _3 .En.slaveEIds
   case action of
-    PI.Reply paxosMessage -> addA $ A.Send [fromEId] $ M.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
-    PI.Broadcast paxosMessage -> addA $ A.Send fromEIds $ M.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
+    PI.Reply paxosMessage -> addA $ Ac.Send [fromEId] $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
+    PI.Broadcast paxosMessage -> addA $ Ac.Send fromEIds $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
     _ -> return ()

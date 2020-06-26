@@ -3,7 +3,7 @@
 module State where
 
 import qualified Control.Monad.State as St
-import qualified Records.Actions.Actions as A
+import qualified Records.Actions.Actions as Ac
 import Control.Lens (Lens', Traversal', (.~), (&), (^?!))
 
 infixl 1 .^
@@ -16,16 +16,16 @@ infixl 1 .^^*
 infixl 1 .^^.*
 infixl 1 .^^^*
 
-type ST s a = St.State ([A.OutputAction], s) a
+type ST s a = St.State ([Ac.OutputAction], s) a
 
-runST :: ST s a -> s -> (a, ([A.OutputAction], s))
+runST :: ST s a -> s -> (a, ([Ac.OutputAction], s))
 runST st s = St.runState st ([], s)
 
 makeST :: a -> ST s a
 makeST ret = St.state $ \(as, s) -> (ret, (as, s))
 
 -- Adds actions. Importantly, this adds actions in reverse.
-addA :: A.OutputAction -> ST s ()
+addA :: Ac.OutputAction -> ST s ()
 addA a = St.state $ \(as, s) ->((), (a:as, s))
 
 getL :: Lens' s1 s2 -> ST s1 s2
@@ -35,13 +35,13 @@ getT :: Traversal' s1 s2 -> ST s1 s2
 getT traversal = St.state $ \(as, state) -> (state ^?! traversal, (as, state))
 
 -- Dig, update state, and return the return value and actions. 
-runL :: Lens' s1 s2 -> ST s2 a -> ST s1 (a, [A.OutputAction])
+runL :: Lens' s1 s2 -> ST s2 a -> ST s1 (a, [Ac.OutputAction])
 runL lens st = St.state $ \(as, state) ->
   let (ret, (as', subState)) = St.runState st ([], state ^?! lens)
   in ((ret, as'), (as, state & lens .~ subState))
 
 -- Dig, update state, and return the return value and actions from a Traversal
-runT :: Traversal' s1 s2 -> ST s2 a -> ST s1 (a, [A.OutputAction])
+runT :: Traversal' s1 s2 -> ST s2 a -> ST s1 (a, [Ac.OutputAction])
 runT traversal st = St.state $ \(as, state) ->
   let (ret, (as', subState)) = St.runState st ([], state ^?! traversal)
   in ((ret, as'), (as, state & traversal .~ subState))

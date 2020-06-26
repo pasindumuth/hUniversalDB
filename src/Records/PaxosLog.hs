@@ -5,7 +5,7 @@
 
 module Records.PaxosLog where
 
-import qualified Data.Default as D
+import qualified Data.Default as Df
 import qualified Data.Map as Mp
 import qualified Data.Set as S
 
@@ -17,7 +17,7 @@ data PaxosLog = PaxosLog {
   _availableIndices :: S.Set Int
 } deriving (Show, Eq)
 
-instance D.Default PaxosLog where
+instance Df.Default PaxosLog where
   def = PaxosLog Mp.empty $ S.fromList [0]
 
 makeLenses ''PaxosLog

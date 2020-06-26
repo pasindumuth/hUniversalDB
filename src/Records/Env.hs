@@ -5,19 +5,19 @@
 
 module Records.Env where
 
-import qualified Data.Default as D
-import qualified GHC.Generics as G
+import qualified Data.Default as Df
+import qualified GHC.Generics as Gn
 
-import qualified System.Random as R
-import qualified Records.Common.Common as C
+import qualified System.Random as Rn
+import qualified Records.Common.Common as Co
 import Lens
 
 data Env = Env {
-  _rand :: R.StdGen,
-  _slaveEIds :: [C.EndpointId]
-} deriving (G.Generic, Show)
+  _rand :: Rn.StdGen,
+  _slaveEIds :: [Co.EndpointId]
+} deriving (Gn.Generic, Show)
 
-instance D.Default Env where
-  def = Env (R.mkStdGen 0) []
+instance Df.Default Env where
+  def = Env (Rn.mkStdGen 0) []
 
 makeLenses ''Env

@@ -5,17 +5,17 @@
 
 module Records.Messages.ClientMessages where
 
-import qualified Data.Binary as B
-import qualified Data.Default as D
-import qualified GHC.Generics as G
+import qualified Data.Binary as Bn
+import qualified Data.Default as Df
+import qualified GHC.Generics as Gn
 
 data ClientRequest =
   ReadRequest { key :: String, timestamp :: Int } |
   WriteRequest { key :: String, value :: String, timestamp :: Int }
-  deriving (G.Generic, B.Binary, Show)
+  deriving (Gn.Generic, Bn.Binary, Show)
 
 data ClientResponse =
   Error { message :: String } |
   ReadResponse { value :: Maybe String } |
   WriteResponse
-  deriving (G.Generic, B.Binary, Show)
+  deriving (Gn.Generic, Bn.Binary, Show)

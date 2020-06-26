@@ -6,50 +6,47 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import qualified Control.Monad as Mo
-import qualified Data.Default as D
+import qualified Data.Default as Df
 import qualified Data.Map as Mp
 import qualified Data.Set as St
 import qualified Data.Functor.Const
 import qualified Data.Sequence as Sq
-import qualified System.Environment as E
-import qualified System.Random as R
+import qualified System.Random as Rn
 import Text.Pretty.Simple (pPrintNoColor)
 
-import qualified Connections as CC
-import qualified Logging as L
 import qualified MultiPaxosInstance as MP
 import qualified InputActionHandler as IAH
 import qualified PaxosLog as PL
-import qualified MessageHandler as MH
-import qualified Records.Actions.Actions as A
+import qualified Records.Actions.Actions as Ac
+import qualified Records.Common.Common as Co
 import qualified Records.GlobalState as GS
-import qualified Records.Env as EN
+import qualified Records.Env as En
 import qualified Records.Messages.ClientMessages as CM
-import qualified Records.Messages.Messages as M
+import qualified Records.Messages.Messages as Ms
 import qualified Records.Messages.PaxosMessages as PM
 import qualified Utils as U
 import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
 import State
 
-type Queues = Mp.Map CC.EndpointId (Mp.Map CC.EndpointId (Sq.Seq M.Message))
-type NonemptyQueues = St.Set (CC.EndpointId, CC.EndpointId)
+type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
+type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)
 
 data GlobalState = GlobalState {
-  _slaveEIds :: [CC.EndpointId], -- EndpointIds for all slaves in the system
-  _clientEIds :: [CC.EndpointId], -- EndpointIds for all client's we use for testing
+  _slaveEIds :: [Co.EndpointId], -- EndpointIds for all slaves in the system
+  _clientEIds :: [Co.EndpointId], -- EndpointIds for all client's we use for testing
   -- `queues` contains 2 queues (in for each direction) for every pair of
   -- for both client EndpointIds and slave Endpoints.
   _queues :: Queues,
   -- We use pairs of endpoints as identifiers of a queue. `nonemptyQueues`
   -- contain all queue IDs where the queue is non-empty
   _nonemptyQueues :: NonemptyQueues,
-  _slaveState :: Mp.Map CC.EndpointId GS.GlobalState,
-  _rand :: R.StdGen, -- Random Number Generator for simulation
+  _slaveState :: Mp.Map Co.EndpointId GS.GlobalState,
+  _rand :: Rn.StdGen, -- Random Number Generator for simulation
 
   -- The following are everything related to asynchronous computation
   -- done at a node.
-  _asyncQueues :: Mp.Map CC.EndpointId (Sq.Seq (A.InputAction, Int)),
-  _clocks :: Mp.Map CC.EndpointId Int
+  _asyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (Ac.InputAction, Int)),
+  _clocks :: Mp.Map Co.EndpointId Int
 } deriving (Show)
 
 makeLenses ''GlobalState
@@ -66,11 +63,11 @@ createGlobalState seed numSlaves numClients =
         (eid1, Mp.fromList $ U.for eIds $ \eid2 ->
         (eid2, Sq.empty))
       nonemptyQueues = St.empty
-      rand = R.mkStdGen seed
+      rand = Rn.mkStdGen seed
       (slaves, rand') = U.s31 foldl ([], rand) slaveEIds $
         \(slaves, rand) eId ->
-          let (r, rand')  = R.random rand
-              g = D.def & GS.env . EN.rand .~ (R.mkStdGen r) & GS.env . EN.slaveEIds .~ slaveEIds
+          let (r, rand')  = Rn.random rand
+              g = Df.def & GS.env . En.rand .~ (Rn.mkStdGen r) & GS.env . En.slaveEIds .~ slaveEIds
           in ((eId, g):slaves, rand')
       slaveState = Mp.fromList slaves
       asyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Sq.empty)
@@ -86,7 +83,7 @@ createGlobalState seed numSlaves numClients =
       _clocks = clocks
     }
 
-addMsg :: M.Message -> (CC.EndpointId, CC.EndpointId) -> ST GlobalState ()
+addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST GlobalState ()
 addMsg msg (fromEId, toEId) = do
   queue <- queues . ix fromEId . ix toEId .^^.* U.push msg
   if Sq.length queue == 1
@@ -94,7 +91,7 @@ addMsg msg (fromEId, toEId) = do
     else nonemptyQueues .^^. id
   return ()
 
-pollMsg :: (CC.EndpointId, CC.EndpointId) -> ST GlobalState M.Message
+pollMsg :: (Co.EndpointId, Co.EndpointId) -> ST GlobalState Ms.Message
 pollMsg (fromEId, toEId) = do
   msg <- queues . ix fromEId . ix toEId .^^* U.poll
   queueLength <- queues . ix fromEId . ix toEId .^^^* Sq.length
@@ -103,22 +100,22 @@ pollMsg (fromEId, toEId) = do
     else nonemptyQueues .^^. id
   return msg
 
-runIAction :: CC.EndpointId -> A.InputAction -> ST GlobalState ()
+runIAction :: Co.EndpointId -> Ac.InputAction -> ST GlobalState ()
 runIAction eId iAction = do
   (_, msgsO) <- runT (slaveState . ix eId) (IAH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
     case msgO of
-      A.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
-      A.RetryOutput counterValue -> do
+      Ac.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
+      Ac.RetryOutput counterValue -> do
         currentTime <- getT $ clocks . ix eId
-        asyncQueues . ix eId .^^.* U.push (A.RetryInput counterValue, currentTime + 100)
+        asyncQueues . ix eId .^^.* U.push (Ac.RetryInput counterValue, currentTime + 100)
         return ()
       _ -> return ()
 
-deliverMessage :: (CC.EndpointId, CC.EndpointId) -> ST GlobalState ()
+deliverMessage :: (Co.EndpointId, Co.EndpointId) -> ST GlobalState ()
 deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
-  runIAction toEId $ A.Receive fromEId msg
+  runIAction toEId $ Ac.Receive fromEId msg
 
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
@@ -128,7 +125,7 @@ simulateOnce numMessages = do
   -- increment each slave's clocks and run async tasks that are now ready
   eIds <- getL slaveEIds
   Mo.forM_ eIds $ \eId -> do
-    randPercent :: Int <- rand .^^ R.randomR (1, 100)
+    randPercent :: Int <- rand .^^ Rn.randomR (1, 100)
     if randPercent <= 95
       then do
         clockVal <- clocks . ix eId .^^.* (+1)
@@ -142,7 +139,7 @@ simulateOnce numMessages = do
     if length == 0
       then return ()
       else do
-        randQueueIndex <- rand .^^ R.randomR (0, length - 1)
+        randQueueIndex <- rand .^^ Rn.randomR (0, length - 1)
         queueId <- nonemptyQueues .^^^  St.elemAt randQueueIndex
         deliverMessage queueId
 
@@ -171,7 +168,7 @@ simulateAll = do
 addClientMsg :: Int -> Int -> ST GlobalState ()
 addClientMsg slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = M.MultiPaxosMessage $ PM.Insert $ PM.Write ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
+      msg = Ms.MultiPaxosMessage $ PM.Insert $ PM.Write ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   addMsg msg (clientEId, slaveEId)
   return ()
 
@@ -212,7 +209,7 @@ driveTest testNum test = do
       (_, (oActions, g')) = runST test g
   Mo.forM_ (reverse oActions) $ \action ->
     case action of
-      A.Print message -> do
+      Ac.Print message -> do
         print message
       _ -> return ()
   case mergePaxosLog g' of

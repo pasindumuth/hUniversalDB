@@ -5,17 +5,17 @@
 
 module Records.Messages.PaxosMessages where
 
-import qualified Data.Binary as B
-import qualified Data.Default as D
-import qualified GHC.Generics as G
+import qualified Data.Binary as Bn
+import qualified Data.Default as Df
+import qualified GHC.Generics as Gn
 
 data PaxosLogEntry =
   Read { key :: String, timestamp :: Int } |
   Write { key :: String, value :: String, timestamp :: Int }
-  deriving (G.Generic, B.Binary, Show, Eq)
+  deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
  -- TODO get rid of this by updating Acceptor to have a `Maybe val`
-instance D.Default PaxosLogEntry where
+instance Df.Default PaxosLogEntry where
   def = Read "" 0
 
 type IndexT = Int
@@ -28,9 +28,9 @@ data PaxosMessage =
   Promise { crnd :: Rnd, vrnd :: Rnd, vval :: Val } |
   Accept { crnd :: Rnd, cval :: Val } |
   Learn { lrnd :: Rnd, lval :: Val }
-  deriving (G.Generic, B.Binary, Show)
+  deriving (Gn.Generic, Bn.Binary, Show)
 
 data MultiPaxosMessage =
   Insert { val :: PaxosLogEntry } |
   PaxosMessage { index :: IndexT, message :: PaxosMessage }
-  deriving (G.Generic, B.Binary, Show)
+  deriving (Gn.Generic, Bn.Binary, Show)
