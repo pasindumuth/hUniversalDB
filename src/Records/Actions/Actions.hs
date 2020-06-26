@@ -14,10 +14,10 @@ import qualified Records.Messages.Messages as M
 
 data InputAction =
   Receive { eId :: C.EndpointId, msg :: M.Message } |
-  RetryInput { clockValue :: Int }
+  RetryInput { counterValue :: Int }
   deriving (G.Generic, B.Binary, Show)
 
 data OutputAction =
   Send { eIds :: [C.EndpointId], msg :: M.Message} |
-  RetryOutput { clockVal :: Int } |
+  RetryOutput { counterValue :: Int } |
   Print { message :: String }

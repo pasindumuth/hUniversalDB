@@ -3,8 +3,9 @@ module Utils where
 import qualified Data.Sequence as Sq
 
 for = flip map
-s13 f a b c = f c a b
-s31 f a b c = f b c a
+s12 f a b = f b a
+s31 f a b c = f c a b
+s13 f a b c = f b c a
 
 type Queue = Sq.Seq
 

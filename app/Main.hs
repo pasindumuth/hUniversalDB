@@ -29,7 +29,7 @@ import qualified Records.Messages.PaxosMessages as PM
 import qualified MessageHandler as MH
 import qualified Utils as U
 import Lens ((^.), (&), (.~), lp3, _1, _2)
-import State (runST)
+import State
 import qualified State as St
 
 slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
@@ -106,10 +106,10 @@ handleMultiPaxosThread rg iActionChan connM = do
         case action of
           A.Send eIds msg -> Mo.forM_ eIds $
             \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-          A.RetryOutput clockVal -> do
+          A.RetryOutput counterValue -> do
             C.forkIO $ do
               C.threadDelay 100000
-              C.writeChan iActionChan $ A.RetryInput clockVal
+              C.writeChan iActionChan $ A.RetryInput counterValue
             return ()
           A.Print message -> do
             print message

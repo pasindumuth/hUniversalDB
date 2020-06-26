@@ -14,14 +14,14 @@ import qualified Records.MultiPaxosInstance as MP
 import qualified Records.Messages.PaxosMessages as PM
 import qualified Records.Messages.Messages as M
 import qualified Records.Env as E
-import Lens ((?~), at, _1, _2, _3)
-import State (ST, addA, get, wrapMaybe, (.^), (.^^), (.^^.), (.^^^))
+import Lens ((?~), at, ix, _1, _2, _3)
+import State
 
 maxRndIncrease = 1000
 
 getPaxosInstance ::  PM.IndexT -> ST MP.MultiPaxosInstance PI.PaxosInstance
 getPaxosInstance index = do
-  pIM <- get $ MP.paxosInstances . at index
+  pIM <- getL $ MP.paxosInstances . at index
   case pIM of
     Just paxosInstance -> return paxosInstance
     Nothing -> do
@@ -46,11 +46,11 @@ handleMultiPaxos fromEId msg = do
                                  Nothing -> r
                  in PM.Propose nextRnd value
                PM.PaxosMessage _ value -> value
-  action <- _1 . MP.paxosInstances . at index .^ wrapMaybe (PI.handlePaxos pMsg)
+  action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos pMsg)
   case action of
     PI.Choose chosenValue -> _2 .^^. (PL.insert index chosenValue)
-    _ -> get _2
-  fromEIds <- get $ _3 .E.slaveEIds
+    _ -> getL _2
+  fromEIds <- getL $ _3 .E.slaveEIds
   case action of
     PI.Reply paxosMessage -> addA $ A.Send [fromEId] $ M.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
     PI.Broadcast paxosMessage -> addA $ A.Send fromEIds $ M.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage

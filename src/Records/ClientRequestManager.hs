@@ -21,13 +21,13 @@ data CurrentInsert = CurrentInsert {
   _retryCount :: Int,
   _clientMessage :: CM.ClientRequest,
   _eId :: C.EndpointId,
-  _clockValue :: Int
+  _counterValue :: Int
 } deriving (G.Generic, Show)
 
 data ClientRequestManager = ClientRequestManager {
   _currentInsert :: Maybe CurrentInsert,
   _requestQueue :: Sq.Seq (C.EndpointId, CM.ClientRequest),
-  _clock :: Int
+  _counter :: Int
 } deriving (G.Generic, D.Default, Show)
 
 makeLenses ''CurrentInsert

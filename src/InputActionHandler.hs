@@ -8,7 +8,7 @@ import qualified Records.GlobalState as GS
 import qualified Records.Actions.Actions as A
 import qualified Records.Messages.Messages as M
 import Lens (lp3)
-import State (ST, get, addA, (.^), (.^^^))
+import State
 
 handleInputAction
   :: A.InputAction
@@ -20,14 +20,14 @@ handleInputAction iAction =
         M.ClientRequest request ->
           CRM.handlingState .^ CRM.handleClientRequest eId request
         M.MultiPaxosMessage multiPaxosMsg -> do
-          pl <- get GS.paxosLog
-          (lp3 (GS.multiPaxosInstance, GS.paxosLog, GS.env)) .^ MP.handleMultiPaxos eId multiPaxosMsg
-          pl' <- get GS.paxosLog
+          pl <- getL GS.paxosLog
+          lp3 (GS.multiPaxosInstance, GS.paxosLog, GS.env) .^ MP.handleMultiPaxos eId multiPaxosMsg
+          pl' <- getL GS.paxosLog
           if (pl /= pl')
             then do
               addA $ A.Print $ show pl'
               GS.derivedState .^ DS.handleDerivedState pl pl'
               CRM.handlingState .^ CRM.handleInsert
             else return ()
-    A.RetryInput clockValue ->
-      CRM.handlingState .^ CRM.handleRetry clockValue
+    A.RetryInput counterValue ->
+      CRM.handlingState .^ CRM.handleRetry counterValue

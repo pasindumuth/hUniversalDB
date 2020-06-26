@@ -17,7 +17,7 @@ import qualified Records.Messages.ClientMessages as CM
 import qualified Records.Messages.Messages as M
 import qualified Records.Messages.PaxosMessages as PM
 import Lens (Lens', _1, _2, _3, _4, _5, (&), (^.), lp3, lp5, at)
-import State (ST, addA, makeST, get, wrapMaybe, (.^), (.^^), (.^^.), (.^^^))
+import State
 
 type HandlingState = (PL.PaxosLog, MP.MultiPaxosInstance, DS.DerivedState, CRM.ClientRequestManager, E.Env)
 
@@ -33,7 +33,7 @@ handleClientRequest eId request = do
 
 handleNextRequest :: ST HandlingState ()
 handleNextRequest = do
-  requestQueue <- get $ _4 . CRM.requestQueue
+  requestQueue <- getL $ _4 . CRM.requestQueue
   if Sq.length requestQueue > 0
     then do
       let (eId, request) = U.peek requestQueue
@@ -52,32 +52,32 @@ handleRequest :: C.EndpointId -> CM.ClientRequest -> Int -> ST HandlingState ()
 handleRequest eId request retryCount = do
   index <- _1 .^^^ PL.nextAvailableIndex
   let entry = createPLEntry request
-  clockVal <- get $ _4 . CRM.clock
-  _4 . CRM.currentInsert .^^. \_ -> Just $ CRM.CurrentInsert index entry retryCount request eId clockVal
-  (lp3 (_2, _1, _5)) .^ MP.handleMultiPaxos eId (PM.Insert entry)
-  addA $ A.RetryOutput clockVal
+  counterValue <- getL $ _4 . CRM.counter
+  _4 . CRM.currentInsert .^^. \_ -> Just $ CRM.CurrentInsert index entry retryCount request eId counterValue
+  lp3 (_2, _1, _5) .^ MP.handleMultiPaxos eId (PM.Insert entry)
+  addA $ A.RetryOutput counterValue
 
 handleRetry :: Int -> ST HandlingState ()
-handleRetry clockValue = do
-  currentInsertM <- get $ _4 . CRM.currentInsert
+handleRetry counterValue = do
+  currentInsertM <- getL $ _4 . CRM.currentInsert
   case currentInsertM of
-    Just currentInsert | currentInsert ^. CRM.clockValue == clockValue -> do
+    Just currentInsert | currentInsert ^. CRM.counterValue == counterValue -> do
       if currentInsert ^. CRM.retryCount == 2
         then do
-          _4 .^ incrementClock
+          _4 .^ incrementCounter
           addA $ A.Send [currentInsert ^. CRM.eId] $ M.ClientResponse $ CM.Error "Timeout"
         else do
-          _4 .^ incrementClock
+          _4 .^ incrementCounter
           handleRequest (currentInsert ^. CRM.eId) (currentInsert ^. CRM.clientMessage) (currentInsert ^. CRM.retryCount + 1)
     _ -> return ()
 
 handleInsert :: ST HandlingState ()
 handleInsert = do
-  currentInsertM <- get $ _4 . CRM.currentInsert
-  currentClock <- get $ _4 . CRM.clock
+  currentInsertM <- getL $ _4 . CRM.currentInsert
+  currentCounter <- getL $ _4 . CRM.counter
   case currentInsertM of
-    Just currentInsert | currentInsert ^. CRM.clockValue == currentClock -> do
-      let CRM.CurrentInsert index entry retryCount clientMessage eId clockValue = currentInsert
+    Just currentInsert | currentInsert ^. CRM.counterValue == currentCounter -> do
+      let CRM.CurrentInsert index entry retryCount clientMessage eId counterValue = currentInsert
       nextAvailableIndex <- _1 .^^^ PL.nextAvailableIndex
       if nextAvailableIndex > index
         then do
@@ -91,21 +91,21 @@ handleInsert = do
                   addA $ A.Send [eId] $ M.ClientResponse $ CM.ReadResponse value
                 CM.WriteRequest _ _ _ -> do
                   addA $ A.Send [eId] $ M.ClientResponse $ CM.WriteResponse
-              _4 .^ incrementClock
+              _4 .^ incrementCounter
               pollAndNext
             else do
               requestHandled <- tryHandling eId clientMessage
               if requestHandled
                 then do
-                  _4 .^ incrementClock
+                  _4 .^ incrementCounter
                   pollAndNext
                 else
                   if retryCount == 2
                     then do
-                      _4 .^ incrementClock
+                      _4 .^ incrementCounter
                       addA $ A.Send [eId] $ M.ClientResponse $ CM.Error "Timeout"
                     else do
-                      _4 .^ incrementClock
+                      _4 .^ incrementCounter
                       handleRequest eId clientMessage (retryCount + 1)
         else return ()
     _ -> return ()
@@ -113,7 +113,7 @@ handleInsert = do
 -- TODO: pass the data in unmodifiably.
 tryHandling :: C.EndpointId -> CM.ClientRequest -> ST HandlingState Bool
 tryHandling eId request = do
-  kvstore <- get $ _3 . DS.kvStore
+  kvstore <- getL $ _3 . DS.kvStore
   case request of
     CM.ReadRequest key timestamp -> do
       case MS.staticReadLat key kvstore of
@@ -134,8 +134,8 @@ createPLEntry request =
     CM.ReadRequest key timestamp -> PM.Read key timestamp
     CM.WriteRequest key value timestamp -> PM.Write key value timestamp
 
-incrementClock :: ST CRM.ClientRequestManager ()
-incrementClock = do
+incrementCounter :: ST CRM.ClientRequestManager ()
+incrementCounter = do
   CRM.currentInsert .^^. \_ -> Nothing
-  CRM.clock .^^. (+1)
+  CRM.counter .^^. (+1)
   return ()

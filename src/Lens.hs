@@ -14,16 +14,10 @@ module Lens(
   lp2, lp3, lp4, lp5,
   _1, _2, _3, _4, _5,
   -- custom exports
-  wrapMaybe
 ) where
 
 import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), Lens', _1, _2, _3, _4, _5, ALens', (^#), (<&>), (#~))
 import Control.Lens.At (at, ix)
-
-wrapMaybe :: (a -> (c, b)) -> (Maybe a -> (c, Maybe b))
-wrapMaybe f (Just x) =
-  let (ret, state) = f x
-  in (ret, Just state)
 
 lp2 :: (ALens' s a1, ALens' s a2) -> Lens' s (a1, a2)
 lp2 (l1, l2) f s =
