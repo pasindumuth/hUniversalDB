@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Connections where
+module Net.Connections where
 
 import qualified Control.Monad as Mo
 import qualified Data.Binary as Bn
@@ -15,16 +15,14 @@ import qualified Control.Concurrent.MVar as MV
 import qualified Network.Simple.TCP as TCP
 
 import qualified Infra.Logging as Lg
+import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 
-type EndpointId = String
-type Connections = Mp.Map EndpointId (Ms.Message -> IO ())
-
--- remove from common code; only EndpointId should be common
+type Connections = Mp.Map Co.EndpointId (Ms.Message -> IO ())
 
 addConn
   :: MV.MVar Connections
-  -> EndpointId
+  -> Co.EndpointId
   -> IO (C.Chan Ms.Message)
 addConn connM endpointId = do
    sendChan <- C.newChan
@@ -34,7 +32,7 @@ addConn connM endpointId = do
 
 delConn
   :: MV.MVar Connections
-  -> EndpointId
+  -> Co.EndpointId
   -> IO ()
 delConn connM endpointId = do
   conn <- MV.takeMVar connM
@@ -64,7 +62,7 @@ sendMessage socket msg = do
   TCP.send socket bodyB
 
 -- Thread function for receiving
-handleReceive :: Bn.Binary a => EndpointId -> C.Chan (EndpointId, a) -> TCP.Socket -> IO ()
+handleReceive :: Bn.Binary a => Co.EndpointId -> C.Chan (Co.EndpointId, a) -> TCP.Socket -> IO ()
 handleReceive endpointId chan socket = do
   Mo.forever $ do
     message <- receiveMessage socket

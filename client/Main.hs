@@ -10,7 +10,7 @@ import qualified Control.Monad as Mo
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as SE
 
-import qualified Connections as Cn
+import qualified Net.Connections as Cn
 import qualified Infra.Logging as Lg
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages as Ms

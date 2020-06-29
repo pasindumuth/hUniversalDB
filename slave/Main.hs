@@ -15,7 +15,7 @@ import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as SE
 import qualified System.Random as Rn
 
-import qualified Connections as Cn
+import qualified Net.Connections as Cn
 import qualified InputActionHandler as IAH
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
