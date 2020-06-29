@@ -9,8 +9,8 @@ import qualified Data.Map.Strict as Mp
 
 import qualified Paxos.Internal.PaxosInstance as P
 import qualified Proto.Messages.PaxosMessages as M
-import Lens
-import State
+import Infra.Lens
+import Infra.State
 
 data Action =
   Reply M.PaxosMessage |

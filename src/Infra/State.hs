@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
-module State where
+module Infra.State where
 
 import qualified Control.Monad.State as St
 import qualified Proto.Actions.Actions as Ac

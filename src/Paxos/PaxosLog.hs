@@ -14,8 +14,8 @@ import qualified Data.Set as S
 
 import qualified Paxos.Internal.PaxosLog as P
 import qualified Proto.Messages.PaxosMessages as M
-import qualified Utils as U
-import Lens
+import qualified Infra.Utils as U
+import Infra.Lens
 
 insert :: M.IndexT -> M.PaxosLogEntry -> P.PaxosLog -> P.PaxosLog
 insert index val p =

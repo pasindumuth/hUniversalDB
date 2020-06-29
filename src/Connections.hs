@@ -14,7 +14,7 @@ import qualified Control.Concurrent.Chan as C
 import qualified Control.Concurrent.MVar as MV
 import qualified Network.Simple.TCP as TCP
 
-import qualified Logging as Lg
+import qualified Infra.Logging as Lg
 import qualified Proto.Messages as Ms
 
 type EndpointId = String

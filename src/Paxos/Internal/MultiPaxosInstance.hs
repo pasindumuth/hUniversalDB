@@ -11,7 +11,7 @@ import qualified GHC.Generics as Gn
 
 import qualified Paxos.PaxosInstance as PI
 import qualified Proto.Messages.PaxosMessages as PM
-import Lens
+import Infra.Lens
 
 data MultiPaxosInstance = MultiPaxosInstance {
   _paxosInstances :: Mp.Map PM.IndexT PI.PaxosInstance

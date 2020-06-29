@@ -14,7 +14,7 @@ import qualified Paxos.Internal.PaxosLog as PL
 import qualified Records.DerivedState as DS
 import qualified Records.ClientRequestManager as CRM
 import qualified Records.Env as En
-import Lens
+import Infra.Lens
 
 data GlobalState = GlobalState {
   _paxosLog :: PL.PaxosLog,

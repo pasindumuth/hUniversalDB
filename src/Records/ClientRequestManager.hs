@@ -13,7 +13,7 @@ import qualified Proto.Common as Co
 import qualified Records.MultiVersionKVStore as MS
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.ClientMessages as CM
-import Lens
+import Infra.Lens
 
 data CurrentInsert = CurrentInsert {
   _index :: Int,

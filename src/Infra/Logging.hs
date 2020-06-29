@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Logging where
+module Infra.Logging where
 
 import qualified System.Log.Logger as L
 

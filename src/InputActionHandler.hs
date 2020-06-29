@@ -7,8 +7,8 @@ import qualified Paxos.PaxosLog as PL
 import qualified Records.GlobalState as GS
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Messages as Ms
-import Lens
-import State
+import Infra.Lens
+import Infra.State
 
 handleInputAction
   :: Ac.InputAction

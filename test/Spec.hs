@@ -24,9 +24,9 @@ import qualified Records.Env as En
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Utils as U
-import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
-import State
+import qualified Infra.Utils as U
+import Infra.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
+import Infra.State
 
 type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
 type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)

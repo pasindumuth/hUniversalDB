@@ -6,7 +6,7 @@ import qualified Paxos.PaxosLog as PL
 import qualified Data.Sequence as Sq
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified MultiVersionKVStore as MS
-import qualified Utils as U
+import qualified Infra.Utils as U
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Records.ClientRequestManager as CRM
@@ -16,8 +16,8 @@ import qualified Records.GlobalState as GS
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
-import Lens
-import State
+import Infra.Lens
+import Infra.State
 
 type HandlingState = (PL.PaxosLog, MP.MultiPaxosInstance, DS.DerivedState, CRM.ClientRequestManager, En.Env)
 

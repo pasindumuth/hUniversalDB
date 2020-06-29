@@ -9,7 +9,7 @@ import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
 import qualified Records.MultiVersionKVStore as MS
-import Lens
+import Infra.Lens
 
 data DerivedState = DerivedState {
   _kvStore :: MS.MultiVersionKVStore

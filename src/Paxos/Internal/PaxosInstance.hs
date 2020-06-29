@@ -10,7 +10,7 @@ import qualified Data.Map.Strict as Mp
 import qualified GHC.Generics as Gn
 
 import qualified Proto.Messages.PaxosMessages as M
-import Lens
+import Infra.Lens
 
 data Proposal = Proposal {
   _crnd :: M.Rnd,

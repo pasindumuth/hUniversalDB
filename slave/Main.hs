@@ -16,16 +16,16 @@ import qualified System.Environment as SE
 import qualified System.Random as Rn
 
 import qualified Connections as Cn
-import qualified Logging as Lg
-import qualified Records.Env as En
-import qualified Records.GlobalState as GS
 import qualified InputActionHandler as IAH
+import qualified Infra.Logging as Lg
+import qualified Infra.Utils as U
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
-import qualified Utils as U
-import Lens
-import State
+import qualified Records.Env as En
+import qualified Records.GlobalState as GS
+import Infra.Lens
+import Infra.State
 
 slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
 

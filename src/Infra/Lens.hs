@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
-module Lens(
+module Infra.Lens (
   makeLenses,
   (%~),
   (.~),

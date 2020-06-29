@@ -14,8 +14,8 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages as Ms
 import qualified Records.Env as En
-import Lens
-import State
+import Infra.Lens
+import Infra.State
 
 maxRndIncrease = 1000
 

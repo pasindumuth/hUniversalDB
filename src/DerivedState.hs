@@ -8,7 +8,7 @@ import qualified Records.DerivedState as DS
 import qualified MultiVersionKVStore as MS
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Messages.PaxosMessages as PM
-import State
+import Infra.State
 
 handleDerivedState :: PL.PaxosLog -> PL.PaxosLog -> ST DS.DerivedState ()
 handleDerivedState pl pl' = do

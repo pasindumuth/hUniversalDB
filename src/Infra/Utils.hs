@@ -1,4 +1,4 @@
-module Utils where
+module Infra.Utils where
 
 import qualified Data.Sequence as Sq
 
