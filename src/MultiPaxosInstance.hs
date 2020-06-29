@@ -8,11 +8,11 @@ import qualified System.Random as Rn
 
 import qualified PaxosInstance as PI
 import qualified PaxosLog as PL
-import qualified Records.Actions.Actions as Ac
-import qualified Records.Common.Common as Co
+import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Common as Co
 import qualified Records.MultiPaxosInstance as MP
-import qualified Records.Messages.PaxosMessages as PM
-import qualified Records.Messages.Messages as Ms
+import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages as Ms
 import qualified Records.Env as En
 import Lens
 import State

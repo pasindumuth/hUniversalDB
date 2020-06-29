@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.Messages.PaxosMessages where
+module Proto.Messages.PaxosMessages where
 
 import qualified Data.Binary as Bn
 import qualified Data.Default as Df

@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.Messages.ClientMessages where
+module Proto.Messages.ClientMessages where
 
 import qualified Data.Binary as Bn
 import qualified Data.Default as Df

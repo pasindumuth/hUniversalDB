@@ -17,13 +17,13 @@ import Text.Pretty.Simple (pPrintNoColor)
 import qualified MultiPaxosInstance as MP
 import qualified InputActionHandler as IAH
 import qualified PaxosLog as PL
-import qualified Records.Actions.Actions as Ac
-import qualified Records.Common.Common as Co
+import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Common as Co
 import qualified Records.GlobalState as GS
 import qualified Records.Env as En
-import qualified Records.Messages.ClientMessages as CM
-import qualified Records.Messages.Messages as Ms
-import qualified Records.Messages.PaxosMessages as PM
+import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages as Ms
+import qualified Proto.Messages.PaxosMessages as PM
 import qualified Utils as U
 import Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
 import State

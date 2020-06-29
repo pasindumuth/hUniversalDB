@@ -5,8 +5,8 @@ import qualified MultiPaxosInstance as MP
 import qualified DerivedState as DS
 import qualified PaxosLog as PL
 import qualified Records.GlobalState as GS
-import qualified Records.Actions.Actions as Ac
-import qualified Records.Messages.Messages as Ms
+import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Messages as Ms
 import Lens
 import State
 

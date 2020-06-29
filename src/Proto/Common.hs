@@ -3,6 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.Common.Common where
+module Proto.Common where
 
 type EndpointId = String
+

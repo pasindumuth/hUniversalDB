@@ -9,7 +9,7 @@ import qualified Data.Default as Df
 import qualified Data.Map.Strict as Mp
 import qualified GHC.Generics as Gn
 
-import qualified Records.Messages.PaxosMessages as M
+import qualified Proto.Messages.PaxosMessages as M
 import Lens
 
 data Proposal = Proposal {

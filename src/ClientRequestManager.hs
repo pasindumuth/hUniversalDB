@@ -7,15 +7,15 @@ import qualified Data.Sequence as Sq
 import qualified MultiPaxosInstance as MP
 import qualified MultiVersionKVStore as MS
 import qualified Utils as U
-import qualified Records.Actions.Actions as Ac
-import qualified Records.Common.Common as Co
+import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Common as Co
 import qualified Records.ClientRequestManager as CRM
 import qualified Records.DerivedState as DS
 import qualified Records.Env as En
 import qualified Records.GlobalState as GS
-import qualified Records.Messages.ClientMessages as CM
-import qualified Records.Messages.Messages as Ms
-import qualified Records.Messages.PaxosMessages as PM
+import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages as Ms
+import qualified Proto.Messages.PaxosMessages as PM
 import Lens
 import State
 

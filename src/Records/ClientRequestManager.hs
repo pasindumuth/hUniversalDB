@@ -9,10 +9,10 @@ import qualified Data.Default as Df
 import qualified Data.Sequence as Sq
 import qualified GHC.Generics as Gn
 
-import qualified Records.Common.Common as Co
+import qualified Proto.Common as Co
 import qualified Records.MultiVersionKVStore as MS
-import qualified Records.Messages.PaxosMessages as PM
-import qualified Records.Messages.ClientMessages as CM
+import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages.ClientMessages as CM
 import Lens
 
 data CurrentInsert = CurrentInsert {

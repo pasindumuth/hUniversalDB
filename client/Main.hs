@@ -12,8 +12,8 @@ import qualified System.Environment as SE
 
 import qualified Logging as Lg
 import qualified Connections as Cn
-import qualified Records.Messages.ClientMessages as CM
-import qualified Records.Messages.Messages as Ms
+import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages as Ms
 
 -- Example commands: r k 0, w k v 0
 startClient :: [String] -> IO ()

@@ -7,7 +7,7 @@ module PaxosInstance (
 
 import qualified Data.Map.Strict as Mp
 
-import qualified Records.Messages.PaxosMessages as M
+import qualified Proto.Messages.PaxosMessages as M
 import qualified Records.PaxosInstance as P
 import Lens
 import State

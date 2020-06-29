@@ -3,7 +3,7 @@
 module State where
 
 import qualified Control.Monad.State as St
-import qualified Records.Actions.Actions as Ac
+import qualified Proto.Actions.Actions as Ac
 import Control.Lens (Lens', Traversal', (.~), (&), (^?!))
 
 infixl 1 .^

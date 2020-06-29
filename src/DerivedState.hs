@@ -7,7 +7,7 @@ import qualified Control.Monad as Mo
 import qualified Records.DerivedState as DS
 import qualified MultiVersionKVStore as MS
 import qualified PaxosLog as PL
-import qualified Records.Messages.PaxosMessages as PM
+import qualified Proto.Messages.PaxosMessages as PM
 import State
 
 handleDerivedState :: PL.PaxosLog -> PL.PaxosLog -> ST DS.DerivedState ()

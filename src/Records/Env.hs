@@ -9,7 +9,7 @@ import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
 import qualified System.Random as Rn
-import qualified Records.Common.Common as Co
+import qualified Proto.Common as Co
 import Lens
 
 data Env = Env {

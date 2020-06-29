@@ -12,7 +12,7 @@ import qualified Data.Maybe as Mb
 import qualified Control.Exception.Base as Ex
 import qualified Data.Set as S
 
-import qualified Records.Messages.PaxosMessages as M
+import qualified Proto.Messages.PaxosMessages as M
 import qualified Utils as U
 import qualified Records.PaxosLog as P
 import Lens

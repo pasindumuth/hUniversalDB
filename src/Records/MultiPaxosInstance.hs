@@ -10,7 +10,7 @@ import qualified Data.Map as Mp
 import qualified GHC.Generics as Gn
 
 import qualified PaxosInstance as PI
-import qualified Records.Messages.PaxosMessages as PM
+import qualified Proto.Messages.PaxosMessages as PM
 import Lens
 
 data MultiPaxosInstance = MultiPaxosInstance {

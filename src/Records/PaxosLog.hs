@@ -9,7 +9,7 @@ import qualified Data.Default as Df
 import qualified Data.Map as Mp
 import qualified Data.Set as S
 
-import qualified Records.Messages.PaxosMessages as M
+import qualified Proto.Messages.PaxosMessages as M
 import Lens
 
 data PaxosLog = PaxosLog {

@@ -15,7 +15,7 @@ import qualified Control.Concurrent.MVar as MV
 import qualified Network.Simple.TCP as TCP
 
 import qualified Logging as Lg
-import qualified Records.Messages.Messages as Ms
+import qualified Proto.Messages as Ms
 
 type EndpointId = String
 type Connections = Mp.Map EndpointId (Ms.Message -> IO ())

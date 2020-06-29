@@ -20,9 +20,9 @@ import qualified Logging as Lg
 import qualified Records.Env as En
 import qualified Records.GlobalState as GS
 import qualified InputActionHandler as IAH
-import qualified Records.Actions.Actions as Ac
-import qualified Records.Common.Common as Co
-import qualified Records.Messages.Messages as Ms
+import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Common as Co
+import qualified Proto.Messages as Ms
 import qualified Utils as U
 import Lens
 import State
