@@ -1,0 +1,2 @@
+module Slave.KeySpaceManager where
+

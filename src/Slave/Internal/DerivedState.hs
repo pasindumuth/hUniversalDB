@@ -3,16 +3,16 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Proto.Common where
+module Slave.Internal.DerivedState where
 
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
-type EndpointId = String
+import qualified Slave.Internal.KeySpaceManager as KSM
+import Infra.Lens
 
-data KeySpaceRange = KeySpaceRange {
-  databaseId :: String,
-  tableId :: String,
-  keyStart :: String,
-  keyEnd :: String
+data DerivedState = DerivedState {
+  _keySpaceManager :: KSM.KeySpaceManager
 } deriving (Gn.Generic, Df.Default, Show)
+
+makeLenses ''DerivedState

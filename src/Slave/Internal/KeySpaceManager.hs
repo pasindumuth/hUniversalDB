@@ -3,16 +3,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Proto.Common where
+module Slave.Internal.KeySpaceManager where
 
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
-type EndpointId = String
+import qualified Proto.Common as Co
 
-data KeySpaceRange = KeySpaceRange {
-  databaseId :: String,
-  tableId :: String,
-  keyStart :: String,
-  keyEnd :: String
+data KeySpaceManager = KeySpaceManager {
+  ranges :: [Co.KeySpaceRange],
+  generation :: Int
 } deriving (Gn.Generic, Df.Default, Show)
