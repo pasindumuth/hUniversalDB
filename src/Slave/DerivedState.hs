@@ -1,11 +1,11 @@
-module DerivedState (
+module Slave.DerivedState (
   DS.DerivedState,
   handleDerivedState
 ) where
 
 import qualified Control.Monad as Mo
-import qualified Records.DerivedState as DS
-import qualified MultiVersionKVStore as MS
+import qualified Slave.Internal.DerivedState as DS
+import qualified Slave.MultiVersionKVStore as MS
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Messages.PaxosMessages as PM
 import Infra.State

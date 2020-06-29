@@ -15,12 +15,12 @@ import qualified System.Random as Rn
 import Text.Pretty.Simple (pPrintNoColor)
 
 import qualified Paxos.MultiPaxosInstance as MP
-import qualified InputActionHandler as IAH
+import qualified Slave.InputActionHandler as IAH
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
-import qualified Records.GlobalState as GS
-import qualified Records.Env as En
+import qualified Slave.Internal.GlobalState as GS
+import qualified Slave.Internal.Env as En
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM

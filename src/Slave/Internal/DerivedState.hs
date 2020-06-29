@@ -3,12 +3,12 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.DerivedState where
+module Slave.Internal.DerivedState where
 
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
-import qualified Records.MultiVersionKVStore as MS
+import qualified Slave.Internal.MultiVersionKVStore as MS
 import Infra.Lens
 
 data DerivedState = DerivedState {

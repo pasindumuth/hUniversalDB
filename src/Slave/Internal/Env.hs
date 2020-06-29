@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.Env where
+module Slave.Internal.Env where
 
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn

@@ -16,14 +16,14 @@ import qualified System.Environment as SE
 import qualified System.Random as Rn
 
 import qualified Net.Connections as Cn
-import qualified InputActionHandler as IAH
+import qualified Slave.InputActionHandler as IAH
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
-import qualified Records.Env as En
-import qualified Records.GlobalState as GS
+import qualified Slave.Internal.Env as En
+import qualified Slave.Internal.GlobalState as GS
 import Infra.Lens
 import Infra.State
 

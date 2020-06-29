@@ -1,6 +1,6 @@
-module MultiVersionKVStore (
+module Slave.MultiVersionKVStore (
   MS.MultiVersionKVStore,
-  MultiVersionKVStore.read, -- qualified to avoid conflict with Prelude.read
+  Slave.MultiVersionKVStore.read, -- qualified to avoid conflict with Prelude.read
   staticRead,
   staticReadLat,
   write,
@@ -8,7 +8,7 @@ module MultiVersionKVStore (
 
 import qualified Control.Exception.Base as Ex
 
-import qualified Records.MultiVersionKVStore as MS
+import qualified Slave.Internal.MultiVersionKVStore as MS
 import Infra.Lens
 
 -- When a key is not present, that's not the fault of the caller. Subsequent reads

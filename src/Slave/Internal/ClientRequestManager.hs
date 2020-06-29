@@ -3,14 +3,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.ClientRequestManager where
+module Slave.Internal.ClientRequestManager where
 
 import qualified Data.Default as Df
 import qualified Data.Sequence as Sq
 import qualified GHC.Generics as Gn
 
 import qualified Proto.Common as Co
-import qualified Records.MultiVersionKVStore as MS
+import qualified Slave.Internal.MultiVersionKVStore as MS
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.ClientMessages as CM
 import Infra.Lens
