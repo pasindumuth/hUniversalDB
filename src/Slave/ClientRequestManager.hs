@@ -54,7 +54,8 @@ handleRequest eId request retryCount = do
   let entry = createPLEntry request
   counterValue <- getL $ _4 . CRM.counter
   _4 . CRM.currentInsert .^^. \_ -> Just $ CRM.CurrentInsert index entry retryCount request eId counterValue
-  lp3 (_2, _1, _5) .^ MP.handleMultiPaxos eId (PM.Insert entry)
+  slaveEIds <- getL $ _5.En.slaveEIds
+  lp3 (_2, _1, _5.En.rand) .^ MP.handleMultiPaxos eId slaveEIds (PM.Insert entry)
   addA $ Ac.RetryOutput counterValue
 
 handleRetry :: Int -> ST HandlingState ()

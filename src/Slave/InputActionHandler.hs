@@ -6,6 +6,7 @@ import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Messages as Ms
 import qualified Slave.ClientRequestManager as CRM
 import qualified Slave.DerivedState as DS
+import qualified Slave.Internal.Env as En
 import qualified Slave.Internal.GlobalState as GS
 import Infra.Lens
 import Infra.State
@@ -21,7 +22,8 @@ handleInputAction iAction =
           CRM.handlingState .^ CRM.handleClientRequest eId request
         Ms.MultiPaxosMessage multiPaxosMsg -> do
           pl <- getL GS.paxosLog
-          lp3 (GS.multiPaxosInstance, GS.paxosLog, GS.env) .^ MP.handleMultiPaxos eId multiPaxosMsg
+          slaveEIds <- getL $ GS.env.En.slaveEIds
+          lp3 (GS.multiPaxosInstance, GS.paxosLog, GS.env.En.rand) .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg
           pl' <- getL GS.paxosLog
           if (pl /= pl')
             then do

@@ -13,7 +13,6 @@ import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Slave.Internal.Env as En
 import Infra.Lens
 import Infra.State
 
@@ -30,10 +29,11 @@ getPaxosInstance index = do
       return paxosInstance
 
 handleMultiPaxos :: Co.EndpointId
+  -> [Co.EndpointId]
   -> PM.MultiPaxosMessage
-  -> ST (MP.MultiPaxosInstance, PL.PaxosLog, En.Env) ()
-handleMultiPaxos fromEId msg = do
-  r <- _3.En.rand .^^ Rn.randomR (1, maxRndIncrease)
+  -> ST (MP.MultiPaxosInstance, PL.PaxosLog, Rn.StdGen) ()
+handleMultiPaxos fromEId slaveEIds msg = do
+  r <- _3 .^^ Rn.randomR (1, maxRndIncrease)
   index <- case msg of
              PM.Insert _ -> _2 .^^^ PL.nextAvailableIndex
              PM.PaxosMessage index _ -> return index
@@ -50,8 +50,7 @@ handleMultiPaxos fromEId msg = do
   case action of
     PI.Choose chosenValue -> _2 .^^. (PL.insert index chosenValue)
     _ -> getL _2
-  fromEIds <- getL $ _3 .En.slaveEIds
   case action of
     PI.Reply paxosMessage -> addA $ Ac.Send [fromEId] $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
-    PI.Broadcast paxosMessage -> addA $ Ac.Send fromEIds $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
+    PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
     _ -> return ()
