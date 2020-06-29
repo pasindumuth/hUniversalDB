@@ -10,9 +10,9 @@ import qualified Data.Sequence as Sq
 import qualified GHC.Generics as Gn
 
 import qualified Proto.Common as Co
-import qualified Slave.Internal.MultiVersionKVStore as MS
-import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages.PaxosMessages as PM
+import qualified Slave.Internal.MultiVersionKVStore as MS
 import Infra.Lens
 
 data CurrentInsert = CurrentInsert {

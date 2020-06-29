@@ -7,12 +7,12 @@ import qualified Data.Default as Df
 import qualified System.Random as Rn
 
 import qualified Paxos.Internal.MultiPaxosInstance as MP
-import qualified Paxos.PaxosInstance as PI
 import qualified Paxos.PaxosLog as PL
+import qualified Paxos.PaxosInstance as PI
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
-import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages as Ms
+import qualified Proto.Messages.PaxosMessages as PM
 import qualified Slave.Internal.Env as En
 import Infra.Lens
 import Infra.State

@@ -5,13 +5,13 @@
 
 module Net.Connections where
 
-import qualified Control.Monad as Mo
 import qualified Data.Binary as Bn
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Map as Mp
 import qualified Control.Concurrent.Chan as C
 import qualified Control.Concurrent.MVar as MV
+import qualified Control.Monad as Mo
 import qualified Network.Simple.TCP as TCP
 
 import qualified Infra.Logging as Lg

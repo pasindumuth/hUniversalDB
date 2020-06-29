@@ -1,12 +1,12 @@
 module Slave.InputActionHandler where
 
-import qualified Slave.ClientRequestManager as CRM
 import qualified Paxos.MultiPaxosInstance as MP
-import qualified Slave.DerivedState as DS
 import qualified Paxos.PaxosLog as PL
-import qualified Slave.Internal.GlobalState as GS
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Messages as Ms
+import qualified Slave.ClientRequestManager as CRM
+import qualified Slave.DerivedState as DS
+import qualified Slave.Internal.GlobalState as GS
 import Infra.Lens
 import Infra.State
 

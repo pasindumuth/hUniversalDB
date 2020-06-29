@@ -3,6 +3,7 @@
 module Infra.State where
 
 import qualified Control.Monad.State as St
+
 import qualified Proto.Actions.Actions as Ac
 import Control.Lens (Lens', Traversal', (.~), (&), (^?!))
 

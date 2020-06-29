@@ -11,8 +11,8 @@ import qualified GHC.Generics as Gn
 
 import qualified Paxos.Internal.MultiPaxosInstance as MP
 import qualified Paxos.Internal.PaxosLog as PL
-import qualified Slave.Internal.DerivedState as DS
 import qualified Slave.Internal.ClientRequestManager as CRM
+import qualified Slave.Internal.DerivedState as DS
 import qualified Slave.Internal.Env as En
 import Infra.Lens
 

@@ -7,8 +7,8 @@ module Slave.Internal.Env where
 
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
-
 import qualified System.Random as Rn
+
 import qualified Proto.Common as Co
 import Infra.Lens
 

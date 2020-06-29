@@ -14,17 +14,17 @@ import qualified Data.Sequence as Sq
 import qualified System.Random as Rn
 import Text.Pretty.Simple (pPrintNoColor)
 
+import qualified Infra.Utils as U
 import qualified Paxos.MultiPaxosInstance as MP
-import qualified Slave.InputActionHandler as IAH
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
-import qualified Slave.Internal.GlobalState as GS
-import qualified Slave.Internal.Env as En
-import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages as Ms
+import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Infra.Utils as U
+import qualified Slave.InputActionHandler as IAH
+import qualified Slave.Internal.Env as En
+import qualified Slave.Internal.GlobalState as GS
 import Infra.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
 import Infra.State
 

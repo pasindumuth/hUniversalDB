@@ -1,21 +1,21 @@
 module Slave.ClientRequestManager where
 
 import qualified Data.Maybe as Mb
-
-import qualified Paxos.PaxosLog as PL
 import qualified Data.Sequence as Sq
-import qualified Paxos.MultiPaxosInstance as MP
-import qualified Slave.MultiVersionKVStore as MS
+
 import qualified Infra.Utils as U
+import qualified Paxos.MultiPaxosInstance as MP
+import qualified Paxos.PaxosLog as PL
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
+import qualified Proto.Messages as Ms
+import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages.PaxosMessages as PM
+import qualified Slave.MultiVersionKVStore as MS
 import qualified Slave.Internal.ClientRequestManager as CRM
 import qualified Slave.Internal.DerivedState as DS
 import qualified Slave.Internal.Env as En
 import qualified Slave.Internal.GlobalState as GS
-import qualified Proto.Messages.ClientMessages as CM
-import qualified Proto.Messages as Ms
-import qualified Proto.Messages.PaxosMessages as PM
 import Infra.Lens
 import Infra.State
 
