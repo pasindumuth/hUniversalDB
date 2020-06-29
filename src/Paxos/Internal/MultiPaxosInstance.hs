@@ -3,13 +3,13 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.MultiPaxosInstance where
+module Paxos.Internal.MultiPaxosInstance where
 
 import qualified Data.Default as Df
 import qualified Data.Map as Mp
 import qualified GHC.Generics as Gn
 
-import qualified PaxosInstance as PI
+import qualified Paxos.PaxosInstance as PI
 import qualified Proto.Messages.PaxosMessages as PM
 import Lens
 

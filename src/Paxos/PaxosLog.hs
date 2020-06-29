@@ -1,4 +1,4 @@
-module PaxosLog (
+module Paxos.PaxosLog (
   P.PaxosLog,
   insert,
   nextAvailableIndex,
@@ -7,14 +7,14 @@ module PaxosLog (
   getPLEntry,
 ) where
 
+import qualified Control.Exception.Base as Ex
 import qualified Data.Map as Mp
 import qualified Data.Maybe as Mb
-import qualified Control.Exception.Base as Ex
 import qualified Data.Set as S
 
+import qualified Paxos.Internal.PaxosLog as P
 import qualified Proto.Messages.PaxosMessages as M
 import qualified Utils as U
-import qualified Records.PaxosLog as P
 import Lens
 
 insert :: M.IndexT -> M.PaxosLogEntry -> P.PaxosLog -> P.PaxosLog

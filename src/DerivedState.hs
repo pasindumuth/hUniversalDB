@@ -6,7 +6,7 @@ module DerivedState (
 import qualified Control.Monad as Mo
 import qualified Records.DerivedState as DS
 import qualified MultiVersionKVStore as MS
-import qualified PaxosLog as PL
+import qualified Paxos.PaxosLog as PL
 import qualified Proto.Messages.PaxosMessages as PM
 import State
 

@@ -1,9 +1,9 @@
 module InputActionHandler where
 
 import qualified ClientRequestManager as CRM
-import qualified MultiPaxosInstance as MP
+import qualified Paxos.MultiPaxosInstance as MP
 import qualified DerivedState as DS
-import qualified PaxosLog as PL
+import qualified Paxos.PaxosLog as PL
 import qualified Records.GlobalState as GS
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Messages as Ms

@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.PaxosLog where
+module Paxos.Internal.PaxosLog where
 
 import qualified Data.Default as Df
 import qualified Data.Map as Mp

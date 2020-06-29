@@ -9,8 +9,8 @@ import qualified Data.Default as Df
 import qualified Data.Map as Mp
 import qualified GHC.Generics as Gn
 
-import qualified Records.MultiPaxosInstance as MP
-import qualified Records.PaxosLog as PL
+import qualified Paxos.Internal.MultiPaxosInstance as MP
+import qualified Paxos.Internal.PaxosLog as PL
 import qualified Records.DerivedState as DS
 import qualified Records.ClientRequestManager as CRM
 import qualified Records.Env as En

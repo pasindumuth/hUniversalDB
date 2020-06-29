@@ -1,4 +1,4 @@
-module MultiPaxosInstance (
+module Paxos.MultiPaxosInstance (
   MP.MultiPaxosInstance,
   handleMultiPaxos,
 ) where
@@ -6,11 +6,11 @@ module MultiPaxosInstance (
 import qualified Data.Default as Df
 import qualified System.Random as Rn
 
-import qualified PaxosInstance as PI
-import qualified PaxosLog as PL
+import qualified Paxos.Internal.MultiPaxosInstance as MP
+import qualified Paxos.PaxosInstance as PI
+import qualified Paxos.PaxosLog as PL
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
-import qualified Records.MultiPaxosInstance as MP
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages as Ms
 import qualified Records.Env as En

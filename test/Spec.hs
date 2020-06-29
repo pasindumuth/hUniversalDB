@@ -14,9 +14,9 @@ import qualified Data.Sequence as Sq
 import qualified System.Random as Rn
 import Text.Pretty.Simple (pPrintNoColor)
 
-import qualified MultiPaxosInstance as MP
+import qualified Paxos.MultiPaxosInstance as MP
 import qualified InputActionHandler as IAH
-import qualified PaxosLog as PL
+import qualified Paxos.PaxosLog as PL
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Records.GlobalState as GS

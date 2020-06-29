@@ -2,9 +2,9 @@ module ClientRequestManager where
 
 import qualified Data.Maybe as Mb
 
-import qualified PaxosLog as PL
+import qualified Paxos.PaxosLog as PL
 import qualified Data.Sequence as Sq
-import qualified MultiPaxosInstance as MP
+import qualified Paxos.MultiPaxosInstance as MP
 import qualified MultiVersionKVStore as MS
 import qualified Utils as U
 import qualified Proto.Actions.Actions as Ac

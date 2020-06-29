@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Records.PaxosInstance where
+module Paxos.Internal.PaxosInstance where
 
 import qualified Data.Default as Df
 import qualified Data.Map.Strict as Mp

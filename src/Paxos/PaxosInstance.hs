@@ -1,4 +1,4 @@
-module PaxosInstance (
+module Paxos.PaxosInstance (
   P.PaxosInstance,
   Action (Reply, Broadcast, Choose, Stall),
   handlePaxos,
@@ -7,8 +7,8 @@ module PaxosInstance (
 
 import qualified Data.Map.Strict as Mp
 
+import qualified Paxos.Internal.PaxosInstance as P
 import qualified Proto.Messages.PaxosMessages as M
-import qualified Records.PaxosInstance as P
 import Lens
 import State
 
