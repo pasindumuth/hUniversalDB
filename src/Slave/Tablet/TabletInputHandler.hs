@@ -1,13 +1,13 @@
-module Slave.InputActionHandler where
+module Slave.Tablet.TabletInputHandler where
 
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Messages as Ms
-import qualified Slave.ClientRequestManager as CRM
-import qualified Slave.DerivedState as DS
-import qualified Slave.Internal.Env as En
-import qualified Slave.Internal.GlobalState as GS
+import qualified Slave.Tablet.TabletRequestManager as TRM
+import qualified Slave.Tablet.DerivedState as DS
+import qualified Slave.Tablet.Internal.Env as En
+import qualified Slave.Tablet.Internal.GlobalState as GS
 import Infra.Lens
 import Infra.State
 
@@ -19,7 +19,7 @@ handleInputAction iAction =
     Ac.Receive eId msg ->
       case msg of
         Ms.ClientRequest request ->
-          CRM.handlingState .^ CRM.handleClientRequest eId request
+          TRM.handlingState .^ TRM.handleClientRequest eId request
         Ms.MultiPaxosMessage multiPaxosMsg -> do
           pl <- getL GS.paxosLog
           slaveEIds <- getL $ GS.env.En.slaveEIds
@@ -29,7 +29,7 @@ handleInputAction iAction =
             then do
               addA $ Ac.Print $ show pl'
               GS.derivedState .^ DS.handleDerivedState pl pl'
-              CRM.handlingState .^ CRM.handleInsert
+              TRM.handlingState .^ TRM.handleInsert
             else return ()
     Ac.RetryInput counterValue ->
-      CRM.handlingState .^ CRM.handleRetry counterValue
+      TRM.handlingState .^ TRM.handleRetry counterValue

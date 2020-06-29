@@ -1,4 +1,4 @@
-module Slave.ClientRequestManager where
+module Slave.Tablet.TabletRequestManager where
 
 import qualified Data.Maybe as Mb
 import qualified Data.Sequence as Sq
@@ -11,29 +11,29 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Slave.MultiVersionKVStore as MS
-import qualified Slave.Internal.ClientRequestManager as CRM
-import qualified Slave.Internal.DerivedState as DS
-import qualified Slave.Internal.Env as En
-import qualified Slave.Internal.GlobalState as GS
+import qualified Slave.Tablet.MultiVersionKVStore as MS
+import qualified Slave.Tablet.Internal.TabletRequestManager as TRM
+import qualified Slave.Tablet.Internal.DerivedState as DS
+import qualified Slave.Tablet.Internal.Env as En
+import qualified Slave.Tablet.Internal.GlobalState as GS
 import Infra.Lens
 import Infra.State
 
-type HandlingState = (PL.PaxosLog, MP.MultiPaxosInstance, DS.DerivedState, CRM.ClientRequestManager, En.Env)
+type HandlingState = (PL.PaxosLog, MP.MultiPaxosInstance, DS.DerivedState, TRM.TabletRequestManager, En.Env)
 
 handlingState :: Lens' GS.GlobalState HandlingState
-handlingState = (lp5 (GS.paxosLog, GS.multiPaxosInstance, GS.derivedState, GS.clientRequestManager, GS.env))
+handlingState = (lp5 (GS.paxosLog, GS.multiPaxosInstance, GS.derivedState, GS.tabletRequestManager, GS.env))
 
 handleClientRequest :: Co.EndpointId -> CM.ClientRequest -> ST HandlingState ()
 handleClientRequest eId request = do
-  requestQueue <- _4 . CRM.requestQueue .^^. U.push (eId, request)
+  requestQueue <- _4 . TRM.requestQueue .^^. U.push (eId, request)
   if Sq.length requestQueue == 1
     then handleNextRequest
     else return ()
 
 handleNextRequest :: ST HandlingState ()
 handleNextRequest = do
-  requestQueue <- getL $ _4 . CRM.requestQueue
+  requestQueue <- getL $ _4 . TRM.requestQueue
   if Sq.length requestQueue > 0
     then do
       let (eId, request) = U.peek requestQueue
@@ -45,40 +45,40 @@ handleNextRequest = do
 
 pollAndNext :: ST HandlingState ()
 pollAndNext = do
-  _4 . CRM.requestQueue .^^ U.poll
+  _4 . TRM.requestQueue .^^ U.poll
   handleNextRequest
 
 handleRequest :: Co.EndpointId -> CM.ClientRequest -> Int -> ST HandlingState ()
 handleRequest eId request retryCount = do
   index <- _1 .^^^ PL.nextAvailableIndex
   let entry = createPLEntry request
-  counterValue <- getL $ _4 . CRM.counter
-  _4 . CRM.currentInsert .^^. \_ -> Just $ CRM.CurrentInsert index entry retryCount request eId counterValue
+  counterValue <- getL $ _4 . TRM.counter
+  _4 . TRM.currentInsert .^^. \_ -> Just $ TRM.CurrentInsert index entry retryCount request eId counterValue
   slaveEIds <- getL $ _5.En.slaveEIds
   lp3 (_2, _1, _5.En.rand) .^ MP.handleMultiPaxos eId slaveEIds (PM.Insert entry)
   addA $ Ac.RetryOutput counterValue
 
 handleRetry :: Int -> ST HandlingState ()
 handleRetry counterValue = do
-  currentInsertM <- getL $ _4 . CRM.currentInsert
+  currentInsertM <- getL $ _4 . TRM.currentInsert
   case currentInsertM of
-    Just currentInsert | currentInsert ^. CRM.counterValue == counterValue -> do
-      if currentInsert ^. CRM.retryCount == 2
+    Just currentInsert | currentInsert ^. TRM.counterValue == counterValue -> do
+      if currentInsert ^. TRM.retryCount == 2
         then do
           _4 .^ incrementCounter
-          addA $ Ac.Send [currentInsert ^. CRM.eId] $ Ms.ClientResponse $ CM.Error "Timeout"
+          addA $ Ac.Send [currentInsert ^. TRM.eId] $ Ms.ClientResponse $ CM.Error "Timeout"
         else do
           _4 .^ incrementCounter
-          handleRequest (currentInsert ^. CRM.eId) (currentInsert ^. CRM.clientMessage) (currentInsert ^. CRM.retryCount + 1)
+          handleRequest (currentInsert ^. TRM.eId) (currentInsert ^. TRM.clientMessage) (currentInsert ^. TRM.retryCount + 1)
     _ -> return ()
 
 handleInsert :: ST HandlingState ()
 handleInsert = do
-  currentInsertM <- getL $ _4 . CRM.currentInsert
-  currentCounter <- getL $ _4 . CRM.counter
+  currentInsertM <- getL $ _4 . TRM.currentInsert
+  currentCounter <- getL $ _4 . TRM.counter
   case currentInsertM of
-    Just currentInsert | currentInsert ^. CRM.counterValue == currentCounter -> do
-      let CRM.CurrentInsert index entry retryCount clientMessage eId counterValue = currentInsert
+    Just currentInsert | currentInsert ^. TRM.counterValue == currentCounter -> do
+      let TRM.CurrentInsert index entry retryCount clientMessage eId counterValue = currentInsert
       nextAvailableIndex <- _1 .^^^ PL.nextAvailableIndex
       if nextAvailableIndex > index
         then do
@@ -135,8 +135,8 @@ createPLEntry request =
     CM.ReadRequest key timestamp -> PM.Read key timestamp
     CM.WriteRequest key value timestamp -> PM.Write key value timestamp
 
-incrementCounter :: ST CRM.ClientRequestManager ()
+incrementCounter :: ST TRM.TabletRequestManager ()
 incrementCounter = do
-  CRM.currentInsert .^^. \_ -> Nothing
-  CRM.counter .^^. (+1)
+  TRM.currentInsert .^^. \_ -> Nothing
+  TRM.counter .^^. (+1)
   return ()

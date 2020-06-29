@@ -21,9 +21,9 @@ import qualified Net.Connections as Cn
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
-import qualified Slave.InputActionHandler as IAH
-import qualified Slave.Internal.Env as En
-import qualified Slave.Internal.GlobalState as GS
+import qualified Slave.Tablet.TabletInputHandler as TIH
+import qualified Slave.Tablet.Internal.Env as En
+import qualified Slave.Tablet.Internal.GlobalState as GS
 import Infra.Lens
 import Infra.State
 
@@ -95,7 +95,7 @@ handleMultiPaxosThread rg iActionChan connM = do
     handlePaxosMessage :: GS.GlobalState -> IO ()
     handlePaxosMessage g = do
       iAction <- Ct.readChan iActionChan
-      let (_, (oActions, g')) = runST (IAH.handleInputAction iAction) g
+      let (_, (oActions, g')) = runST (TIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
       Mo.forM_ (reverse oActions) $ \action ->
         case action of

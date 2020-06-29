@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Slave.Internal.Env where
+module Slave.Tablet.Internal.Env where
 
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn

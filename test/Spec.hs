@@ -22,9 +22,9 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Slave.InputActionHandler as IAH
-import qualified Slave.Internal.Env as En
-import qualified Slave.Internal.GlobalState as GS
+import qualified Slave.Tablet.TabletInputHandler as TIH
+import qualified Slave.Tablet.Internal.Env as En
+import qualified Slave.Tablet.Internal.GlobalState as GS
 import Infra.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
 import Infra.State
 
@@ -102,7 +102,7 @@ pollMsg (fromEId, toEId) = do
 
 runIAction :: Co.EndpointId -> Ac.InputAction -> ST GlobalState ()
 runIAction eId iAction = do
-  (_, msgsO) <- runT (slaveState . ix eId) (IAH.handleInputAction iAction)
+  (_, msgsO) <- runT (slaveState . ix eId) (TIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
     case msgO of
       Ac.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
