@@ -26,21 +26,22 @@ handlingState = (lp5 (GS.paxosLog, GS.multiPaxosInstance, GS.derivedState, GS.ta
 
 handleClientRequest :: Co.EndpointId -> CM.ClientRequest -> ST HandlingState ()
 handleClientRequest eId request = do
-  requestQueue <- _4 . TRM.requestQueue .^^. U.push (eId, request)
-  if Sq.length requestQueue == 1
-    then handleNextRequest
-    else return ()
+  requestHandled <- tryHandling eId request
+  if requestHandled
+    then return ()
+    else do
+      requestQueue <- _4.TRM.requestQueue .^^. U.push (eId, request)
+      if Sq.length requestQueue == 1
+        then handleNextRequest
+        else return ()
 
 handleNextRequest :: ST HandlingState ()
 handleNextRequest = do
-  requestQueue <- getL $ _4 . TRM.requestQueue
+  requestQueue <- getL $ _4.TRM.requestQueue
   if Sq.length requestQueue > 0
     then do
       let (eId, request) = U.peek requestQueue
-      requestHandled <- tryHandling eId request
-      if requestHandled
-        then pollAndNext
-        else handleRequest eId request 0
+      handleRequest eId request
     else return ()
 
 pollAndNext :: ST HandlingState ()
@@ -48,42 +49,38 @@ pollAndNext = do
   _4 . TRM.requestQueue .^^ U.poll
   handleNextRequest
 
-handleRequest :: Co.EndpointId -> CM.ClientRequest -> Int -> ST HandlingState ()
-handleRequest eId request retryCount = do
-  index <- _1 .^^^ PL.nextAvailableIndex
-  let entry = createPLEntry request
-  counterValue <- getL $ _4 . TRM.counter
-  _4 . TRM.currentInsert .^^. \_ -> Just $ TRM.CurrentInsert index entry retryCount request eId counterValue
-  slaveEIds <- getL $ _5.En.slaveEIds
-  lp3 (_2, _1, _5.En.rand) .^ MP.handleMultiPaxos eId slaveEIds (PM.Insert entry)
-  addA $ Ac.RetryOutput counterValue
+handleRequest :: Co.EndpointId -> CM.ClientRequest -> ST HandlingState ()
+handleRequest eId request = do
+  _4.TRM.currentInsert .^^. \_ -> Nothing
+  requestHandled <- tryHandling eId request
+  if requestHandled
+    then pollAndNext
+    else do
+      index <- _1 .^^^ PL.nextAvailableIndex
+      let entry = createPLEntry request
+      _4.TRM.currentInsert .^^. \_ -> Just $ TRM.CurrentInsert index entry request eId
+      slaveEIds <- getL $ _5.En.slaveEIds
+      lp3 (_2, _1, _5.En.rand) .^ MP.handleMultiPaxos eId slaveEIds (PM.Insert entry)
+      counterValue <- _4.TRM.counter .^^. (+1)
+      addA $ Ac.RetryOutput counterValue
 
 handleRetry :: Int -> ST HandlingState ()
 handleRetry counterValue = do
-  currentInsertM <- getL $ _4 . TRM.currentInsert
+  currentInsertM <- getL $ _4.TRM.currentInsert
+  counter <- getL $ _4.TRM.counter
   case currentInsertM of
-    Just currentInsert | currentInsert ^. TRM.counterValue == counterValue -> do
-      if currentInsert ^. TRM.retryCount == 2
-        then do
-          _4 .^ incrementCounter
-          addA $ Ac.Send [currentInsert ^. TRM.eId] $ Ms.ClientResponse $ CM.Error "Timeout"
-        else do
-          _4 .^ incrementCounter
-          handleRequest (currentInsert ^. TRM.eId) (currentInsert ^. TRM.clientMessage) (currentInsert ^. TRM.retryCount + 1)
+    Just (TRM.CurrentInsert _ _ clientMessage eId) | counter == counterValue -> do
+      handleRequest eId clientMessage
     _ -> return ()
 
 handleInsert :: ST HandlingState ()
 handleInsert = do
-  currentInsertM <- getL $ _4 . TRM.currentInsert
-  currentCounter <- getL $ _4 . TRM.counter
+  currentInsertM <- getL $ _4.TRM.currentInsert
   case currentInsertM of
-    Just currentInsert | currentInsert ^. TRM.counterValue == currentCounter -> do
-      let TRM.CurrentInsert index entry retryCount clientMessage eId counterValue = currentInsert
-      nextAvailableIndex <- _1 .^^^ PL.nextAvailableIndex
-      if nextAvailableIndex > index
-        then do
-          nextEntryM <- _1 .^^^ PL.getPLEntry index
-          let Just nextEntry = nextEntryM
+    Just (TRM.CurrentInsert index entry clientMessage eId) -> do
+      nextEntryM <- _1 .^^^ PL.getPLEntry index
+      case nextEntryM of
+        Just nextEntry -> do
           if nextEntry == entry
             then do
               case clientMessage of
@@ -92,26 +89,13 @@ handleInsert = do
                   addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ReadResponse value
                 CM.WriteRequest _ _ _ -> do
                   addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.WriteResponse
-              _4 .^ incrementCounter
               pollAndNext
-            else do
-              requestHandled <- tryHandling eId clientMessage
-              if requestHandled
-                then do
-                  _4 .^ incrementCounter
-                  pollAndNext
-                else
-                  if retryCount == 2
-                    then do
-                      _4 .^ incrementCounter
-                      addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Error "Timeout"
-                    else do
-                      _4 .^ incrementCounter
-                      handleRequest eId clientMessage (retryCount + 1)
-        else return ()
+            else handleRequest eId clientMessage
+        _ -> return ()
     _ -> return ()
 
 -- TODO: pass the data in unmodifiably.
+-- Maybe this needs to be a const callback.
 tryHandling :: Co.EndpointId -> CM.ClientRequest -> ST HandlingState Bool
 tryHandling eId request = do
   kvstore <- getL $ _3 . DS.kvStore
@@ -134,9 +118,3 @@ createPLEntry request =
   case request of
     CM.ReadRequest key timestamp -> PM.Read key timestamp
     CM.WriteRequest key value timestamp -> PM.Write key value timestamp
-
-incrementCounter :: ST TRM.TabletRequestManager ()
-incrementCounter = do
-  TRM.currentInsert .^^. \_ -> Nothing
-  TRM.counter .^^. (+1)
-  return ()

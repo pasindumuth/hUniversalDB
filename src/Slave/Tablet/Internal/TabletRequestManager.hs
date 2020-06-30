@@ -12,16 +12,13 @@ import qualified GHC.Generics as Gn
 import qualified Proto.Common as Co
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Slave.Tablet.Internal.MultiVersionKVStore as MS
 import Infra.Lens
 
 data CurrentInsert = CurrentInsert {
   _index :: Int,
   _entry :: PM.PaxosLogEntry,
-  _retryCount :: Int,
   _clientMessage :: CM.ClientRequest,
-  _eId :: Co.EndpointId,
-  _counterValue :: Int
+  _eId :: Co.EndpointId
 } deriving (Gn.Generic, Show)
 
 data TabletRequestManager = TabletRequestManager {
