@@ -7,7 +7,7 @@ import qualified Control.Monad as Mo
 
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Slave.Tablet.Internal.DerivedState as DS
+import qualified Slave.Tablet.Internal_DerivedState as DS
 import qualified Slave.Tablet.MultiVersionKVStore as MS
 import Infra.State
 

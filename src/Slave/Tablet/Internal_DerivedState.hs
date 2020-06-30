@@ -3,14 +3,16 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Slave.Internal.KeySpaceManager where
+module Slave.Tablet.Internal_DerivedState where
 
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
-import qualified Proto.Common as Co
+import qualified Slave.Tablet.Internal_MultiVersionKVStore as MS
+import Infra.Lens
 
-data KeySpaceManager = KeySpaceManager {
-  ranges :: [Co.KeySpaceRange],
-  generation :: Int
+data DerivedState = DerivedState {
+  _kvStore :: MS.MultiVersionKVStore
 } deriving (Gn.Generic, Df.Default, Show)
+
+makeLenses ''DerivedState

@@ -7,7 +7,7 @@ import qualified Control.Monad as Mo
 
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Slave.Internal.DerivedState as DS
+import qualified Slave.Internal_DerivedState as DS
 import Infra.State
 
 handleDerivedState :: PL.PaxosLog -> PL.PaxosLog -> ST DS.DerivedState ()

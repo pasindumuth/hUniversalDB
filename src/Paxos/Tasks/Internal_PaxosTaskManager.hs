@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Paxos.Tasks.Internal.PaxosTaskManager where
+module Paxos.Tasks.Internal_PaxosTaskManager where
 
 import qualified Data.Default as Df
 import qualified Data.Sequence as Sq

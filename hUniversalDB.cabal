@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f3e720e132d873b80746e9f42f38971ccc80cd32e4175ce8d23af3fe00823349
+-- hash: 151b6b0d6bde4edaffd090b72fb44e3c5f2472d5604fb41100c638a532ba7b07
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -32,13 +32,13 @@ library
       Infra.State
       Infra.Utils
       Net.Connections
-      Paxos.Internal.MultiPaxosInstance
-      Paxos.Internal.PaxosInstance
-      Paxos.Internal.PaxosLog
+      Paxos.Internal_MultiPaxosInstance
+      Paxos.Internal_PaxosInstance
+      Paxos.Internal_PaxosLog
       Paxos.MultiPaxosInstance
       Paxos.PaxosInstance
       Paxos.PaxosLog
-      Paxos.Tasks.Internal.PaxosTaskManager
+      Paxos.Tasks.Internal_PaxosTaskManager
       Paxos.Tasks.PaxosTaskManager
       Paxos.Tasks.Task
       Proto.Actions.Actions
@@ -47,17 +47,17 @@ library
       Proto.Messages.ClientMessages
       Proto.Messages.PaxosMessages
       Slave.DerivedState
-      Slave.Internal.DerivedState
-      Slave.Internal.Env
-      Slave.Internal.GlobalState
-      Slave.Internal.KeySpaceManager
+      Slave.Env
+      Slave.GlobalState
+      Slave.Internal_DerivedState
+      Slave.Internal_KeySpaceManager
       Slave.KeySpaceManager
       Slave.SlaveInputHandler
       Slave.Tablet.DerivedState
-      Slave.Tablet.Internal.DerivedState
-      Slave.Tablet.Internal.Env
-      Slave.Tablet.Internal.GlobalState
-      Slave.Tablet.Internal.MultiVersionKVStore
+      Slave.Tablet.Env
+      Slave.Tablet.GlobalState
+      Slave.Tablet.Internal_DerivedState
+      Slave.Tablet.Internal_MultiVersionKVStore
       Slave.Tablet.MultiVersionKVStore
       Slave.Tablet.TabletInputHandler
   other-modules:

@@ -8,7 +8,7 @@ module Slave.Tablet.MultiVersionKVStore (
 
 import qualified Control.Exception.Base as Ex
 
-import qualified Slave.Tablet.Internal.MultiVersionKVStore as MS
+import qualified Slave.Tablet.Internal_MultiVersionKVStore as MS
 import Infra.Lens
 
 -- When a key is not present, that's not the fault of the caller. Subsequent reads

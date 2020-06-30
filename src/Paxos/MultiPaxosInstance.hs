@@ -6,7 +6,7 @@ module Paxos.MultiPaxosInstance (
 import qualified Data.Default as Df
 import qualified System.Random as Rn
 
-import qualified Paxos.Internal.MultiPaxosInstance as MP
+import qualified Paxos.Internal_MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Paxos.PaxosInstance as PI
 import qualified Proto.Actions.Actions as Ac

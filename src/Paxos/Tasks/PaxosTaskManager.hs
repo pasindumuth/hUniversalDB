@@ -13,7 +13,7 @@ import qualified Infra.Utils as U
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Paxos.Tasks.Task as Ta
-import qualified Paxos.Tasks.Internal.PaxosTaskManager as PTM
+import qualified Paxos.Tasks.Internal_PaxosTaskManager as PTM
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages.PaxosMessages as PM

@@ -6,8 +6,8 @@ import qualified Paxos.Tasks.PaxosTaskManager as PTM
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Messages as Ms
 import qualified Slave.Tablet.DerivedState as DS
-import qualified Slave.Tablet.Internal.Env as En
-import qualified Slave.Tablet.Internal.GlobalState as GS
+import qualified Slave.Tablet.Env as En
+import qualified Slave.Tablet.GlobalState as GS
 import Infra.Lens
 import Infra.State
 
@@ -18,7 +18,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Slave.Tablet.MultiVersionKVStore as MS
-import qualified Slave.Tablet.Internal.DerivedState as DS
+import qualified Slave.Tablet.Internal_DerivedState as DS
 
 handlingState :: Lens' GS.GlobalState (
   PL.PaxosLog,

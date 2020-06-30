@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Slave.Tablet.Internal.MultiVersionKVStore where
+module Slave.Tablet.Internal_MultiVersionKVStore where
 
 import qualified Data.Map as Mp
 

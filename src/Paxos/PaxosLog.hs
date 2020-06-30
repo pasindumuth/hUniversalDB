@@ -12,7 +12,7 @@ import qualified Data.Map as Mp
 import qualified Data.Maybe as Mb
 import qualified Data.Set as S
 
-import qualified Paxos.Internal.PaxosLog as P
+import qualified Paxos.Internal_PaxosLog as P
 import qualified Proto.Messages.PaxosMessages as M
 import qualified Infra.Utils as U
 import Infra.Lens
