@@ -32,7 +32,7 @@ prepare crnd = do
       id .^^. P.rnd .~ crnd
       return $ Reply $ M.Promise crnd (s ^. P.vrnd) (s ^. P.vval)
 
-promise :: M.Rnd -> M.Rnd -> M.Val -> ST P.Proposal Action
+promise :: M.Rnd -> M.Rnd -> Maybe M.Val -> ST P.Proposal Action
 promise rnd vrnd vval = do
   promises' <- P.promises .^^. ((vrnd, vval):)
   s <- getL id
@@ -43,7 +43,7 @@ promise rnd vrnd vval = do
           cval' = if maxVal == 0
                       then s ^. P.cval
                       else
-                        let ((_, cval):_) = filter (\(x, _) -> x == maxVal) promises'
+                        let ((_, Just cval):_) = filter (\(x, _) -> x == maxVal) promises'
                         in cval
       return $ Broadcast $ M.Accept (s ^. P.crnd) cval'
 
@@ -53,7 +53,7 @@ accept crnd cval = do
   if crnd < rnd
     then return Stall
     else do
-      id .^^. \_ -> P.AcceptorState crnd crnd cval
+      id .^^. \_ -> P.AcceptorState crnd crnd (Just cval)
       return $ Broadcast $ M.Learn crnd cval
 
 learn :: M.Rnd -> M.Val -> ST P.LearnerState Action

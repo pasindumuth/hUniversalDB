@@ -65,7 +65,7 @@ createClientTask eId request =
     (CM.ReadRequest key timestamp) ->
       let description = description
           tryHandling derivedState = do
-            case MS.staticReadLat key (derivedState ^. DS.kvStore) of
+            case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ReadResponse $ MS.staticRead key timestamp (derivedState ^. DS.kvStore)
                 return True
@@ -78,7 +78,7 @@ createClientTask eId request =
     (CM.WriteRequest key value timestamp) ->
       let description = description
           tryHandling derivedState = do
-            case MS.staticReadLat key (derivedState ^. DS.kvStore) of
+            case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Error "Attempting to write into the past."
                 return True

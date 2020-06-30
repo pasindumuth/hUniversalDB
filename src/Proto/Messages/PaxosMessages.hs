@@ -14,10 +14,6 @@ data PaxosLogEntry =
   Write { key :: String, value :: String, timestamp :: Int }
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
- -- TODO get rid of this by updating Acceptor to have a `Maybe val`
-instance Df.Default PaxosLogEntry where
-  def = Read "" 0
-
 type IndexT = Int
 type Rnd = Int
 type Val = PaxosLogEntry
@@ -25,7 +21,7 @@ type Val = PaxosLogEntry
 data PaxosMessage =
   Propose { crnd :: Rnd, cval :: Val } |
   Prepare { crnd :: Rnd} |
-  Promise { crnd :: Rnd, vrnd :: Rnd, vval :: Val } |
+  Promise { crnd :: Rnd, vrnd :: Rnd, vval :: Maybe Val } |
   Accept { crnd :: Rnd, cval :: Val } |
   Learn { lrnd :: Rnd, lval :: Val }
   deriving (Gn.Generic, Bn.Binary, Show)

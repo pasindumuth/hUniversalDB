@@ -15,7 +15,7 @@ import Infra.Lens
 data Proposal = Proposal {
   _crnd :: M.Rnd,
   _cval :: M.Val,
-  _promises :: [(M.Rnd, M.Val)]
+  _promises :: [(M.Rnd, Maybe M.Val)]
 } deriving (Show)
 
 data ProposerState = ProposerState {
@@ -25,7 +25,7 @@ data ProposerState = ProposerState {
 data AcceptorState = AcceptorState {
   _rnd :: M.Rnd,
   _vrnd :: M.Rnd,
-  _vval :: M.Val
+  _vval :: Maybe M.Val
 } deriving (Gn.Generic, Df.Default, Show)
 
 data LearnerState = LearnerState {
