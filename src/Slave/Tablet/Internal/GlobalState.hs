@@ -11,7 +11,7 @@ import qualified GHC.Generics as Gn
 
 import qualified Paxos.Internal.MultiPaxosInstance as MP
 import qualified Paxos.Internal.PaxosLog as PL
-import qualified Slave.Tablet.Internal.TabletRequestManager as TRM
+import qualified Paxos.Tasks.PaxosTaskManager as PTM
 import qualified Slave.Tablet.Internal.DerivedState as DS
 import qualified Slave.Tablet.Internal.Env as En
 import Infra.Lens
@@ -20,7 +20,7 @@ data GlobalState = GlobalState {
   _paxosLog :: PL.PaxosLog,
   _multiPaxosInstance :: MP.MultiPaxosInstance,
   _derivedState :: DS.DerivedState,
-  _tabletRequestManager :: TRM.TabletRequestManager,
+  _paxosTaskManager :: PTM.PaxosTaskManager DS.DerivedState,
   _env :: En.Env
 } deriving (Gn.Generic, Df.Default, Show)
 

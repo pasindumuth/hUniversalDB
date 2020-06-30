@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2db4bc8433c29e0a172526b26c468064b538acc25b4ff2b48490e21d3d282c31
+-- hash: 66232c195dd02f4e712245e66d415a0b0136accf4936442b8d037b26555ad676
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -38,6 +38,9 @@ library
       Paxos.MultiPaxosInstance
       Paxos.PaxosInstance
       Paxos.PaxosLog
+      Paxos.Tasks.Internal.PaxosTaskManager
+      Paxos.Tasks.PaxosTaskManager
+      Paxos.Tasks.Task
       Proto.Actions.Actions
       Proto.Common
       Proto.Messages
@@ -56,10 +59,8 @@ library
       Slave.Tablet.Internal.Env
       Slave.Tablet.Internal.GlobalState
       Slave.Tablet.Internal.MultiVersionKVStore
-      Slave.Tablet.Internal.TabletRequestManager
       Slave.Tablet.MultiVersionKVStore
       Slave.Tablet.TabletInputHandler
-      Slave.Tablet.TabletRequestManager
   other-modules:
       Paths_hUniversalDB
   hs-source-dirs:

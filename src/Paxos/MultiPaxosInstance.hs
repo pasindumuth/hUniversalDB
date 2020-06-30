@@ -28,6 +28,7 @@ getPaxosInstance index = do
       id .^^. MP.paxosInstances . at index ?~ paxosInstance
       return paxosInstance
 
+-- TODO: fromEId doesn't always make sense, like in the case of a PL.Insert
 handleMultiPaxos :: Co.EndpointId
   -> [Co.EndpointId]
   -> PM.MultiPaxosMessage
