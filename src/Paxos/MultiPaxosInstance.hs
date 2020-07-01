@@ -1,5 +1,6 @@
 module Paxos.MultiPaxosInstance (
   MP.MultiPaxosInstance,
+  insertMultiPaxos,
   handleMultiPaxos,
 ) where
 
@@ -18,7 +19,7 @@ import Infra.State
 
 maxRndIncrease = 1000
 
-getPaxosInstance ::  PM.IndexT -> ST MP.MultiPaxosInstance PI.PaxosInstance
+getPaxosInstance :: PM.IndexT -> ST MP.MultiPaxosInstance PI.PaxosInstance
 getPaxosInstance index = do
   pIM <- getL $ MP.paxosInstances . at index
   case pIM of
@@ -28,30 +29,33 @@ getPaxosInstance index = do
       id .^^. MP.paxosInstances . at index ?~ paxosInstance
       return paxosInstance
 
--- TODO: fromEId doesn't always make sense, like in the case of a PL.Insert
-handleMultiPaxos :: Co.EndpointId
+insertMultiPaxos
+  :: [Co.EndpointId]
+  -> PM.PaxosLogEntry
+  -> ST (MP.MultiPaxosInstance, PL.PaxosLog, Rn.StdGen) ()
+insertMultiPaxos slaveEIds entry = do
+  r <- _3 .^^ Rn.randomR (1, maxRndIncrease)
+  index <- _2 .^^^ PL.nextAvailableIndex
+  paxosInstance <- _1 .^ getPaxosInstance index
+  let nextRnd = case PI.maxProposalM paxosInstance of
+                 Just (rnd, _) -> rnd + r
+                 Nothing -> r
+  action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos $ PM.Propose nextRnd entry)
+  case action of
+    PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
+
+handleMultiPaxos
+  :: Co.EndpointId
   -> [Co.EndpointId]
   -> PM.MultiPaxosMessage
   -> ST (MP.MultiPaxosInstance, PL.PaxosLog, Rn.StdGen) ()
-handleMultiPaxos fromEId slaveEIds msg = do
-  r <- _3 .^^ Rn.randomR (1, maxRndIncrease)
-  index <- case msg of
-             PM.Insert _ -> _2 .^^^ PL.nextAvailableIndex
-             PM.PaxosMessage index _ -> return index
-  paxosInstance <- _1 .^ getPaxosInstance index
-  let pMsg = case msg of
-               PM.Insert value ->
-                 let maxProposalM = PI.maxProposalM paxosInstance
-                     nextRnd = case maxProposalM of
-                                 Just (rnd, _) -> rnd + r
-                                 Nothing -> r
-                 in PM.Propose nextRnd value
-               PM.PaxosMessage _ value -> value
+handleMultiPaxos fromEId slaveEIds (PM.PaxosMessage index pMsg) = do
+  _1 .^ getPaxosInstance index
   action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos pMsg)
-  case action of
-    PI.Choose chosenValue -> _2 .^^. (PL.insert index chosenValue)
-    _ -> getL _2
   case action of
     PI.Reply paxosMessage -> addA $ Ac.Send [fromEId] $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
     PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
+    PI.Choose chosenValue -> do
+      _2 .^^. (PL.insert index chosenValue)
+      return ()
     _ -> return ()

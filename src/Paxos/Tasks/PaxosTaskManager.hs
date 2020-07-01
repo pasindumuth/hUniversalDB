@@ -60,7 +60,7 @@ handleNextTask' task = do
       let entry = Ta.createPLEntry task derivedState
       _4.PTM.currentInsert .^^. \_ -> Just $ PTM.CurrentInsert index entry task
       slaveEIds <- getL $ _6
-      lp3 (_2, _1, _5) .^ MP.handleMultiPaxos "" slaveEIds (PM.Insert entry)
+      lp3 (_2, _1, _5) .^ MP.insertMultiPaxos slaveEIds entry
       counterValue <- _4.PTM.counter .^^. (+1)
       addA $ Ac.RetryOutput counterValue
 
