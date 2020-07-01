@@ -16,4 +16,4 @@ data KeySpaceRange = KeySpaceRange {
   tableId :: String,
   keyStart :: Maybe String,
   keyEnd :: Maybe String
-} deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq)
+} deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)

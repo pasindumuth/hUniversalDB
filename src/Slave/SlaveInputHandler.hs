@@ -42,7 +42,9 @@ handleInputAction iAction =
   case iAction of
     Ac.Receive eId msg ->
       case msg of
-        Ms.ClientRequest request -> handlingState .^ (PTM.handleTask $ createClientTask eId request)
+        Ms.ClientRequest request ->
+          case request of
+            CM.CreateDatabase _ _ -> handlingState .^ (PTM.handleTask $ createClientTask eId request)
         Ms.MultiPaxosMessage multiPaxosMsg -> do
           pl <- getL SS.paxosLog
           slaveEIds <- getL $ SS.env.En.slaveEIds
@@ -58,7 +60,7 @@ createClientTask :: Co.EndpointId -> CM.ClientRequest -> Ta.Task DS.DerivedState
 createClientTask eId request =
   let description = show (eId, request)
   in case request of
-    (CM.CreateDatabase databaseId tableId) ->
+    CM.CreateDatabase databaseId tableId ->
       let description = description
           tryHandling _ = do return False
           done _ = do return ()

@@ -7,6 +7,7 @@ module Infra.Lens (
   (^.),
   (&),
   (?~),
+  (^?!),
   Lens',
   at,
   ix,
@@ -14,7 +15,7 @@ module Infra.Lens (
   _1, _2, _3, _4, _5, _6,
 ) where
 
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), Lens', _1, _2, _3, _4, _5, _6, ALens', (^#), (<&>), (#~))
+import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), (^?!), Lens', _1, _2, _3, _4, _5, _6, ALens', (^#), (<&>), (#~))
 import Control.Lens.At (at, ix)
 
 lp0 :: Lens' s ()

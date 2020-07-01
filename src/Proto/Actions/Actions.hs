@@ -21,5 +21,5 @@ data OutputAction =
   Send { eIds :: [Co.EndpointId], msg :: Ms.Message} |
   RetryOutput { counterValue :: Int } |
   Print { message :: String } |
-  Slave_CreateTablet { keySpaceRange :: Co.KeySpaceRange } |
+  Slave_CreateTablet { range :: Co.KeySpaceRange } |
   Slave_Forward { range :: Co.KeySpaceRange, eId :: Co.EndpointId, msg :: Ms.Message }
