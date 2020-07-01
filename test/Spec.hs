@@ -24,14 +24,14 @@ import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.Env as En
-import qualified Slave.Tablet.GlobalState as GS
+import qualified Slave.Tablet.TabletState as TS
 import Infra.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
 import Infra.State
 
 type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
 type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)
 
-data GlobalState = GlobalState {
+data TabletState = TabletState {
   _slaveEIds :: [Co.EndpointId], -- EndpointIds for all slaves in the system
   _clientEIds :: [Co.EndpointId], -- EndpointIds for all client's we use for testing
   -- `queues` contains 2 queues (in for each direction) for every pair of
@@ -40,7 +40,7 @@ data GlobalState = GlobalState {
   -- We use pairs of endpoints as identifiers of a queue. `nonemptyQueues`
   -- contain all queue IDs where the queue is non-empty
   _nonemptyQueues :: NonemptyQueues,
-  _slaveState :: Mp.Map Co.EndpointId GS.GlobalState,
+  _slaveState :: Mp.Map Co.EndpointId TS.TabletState,
   _rand :: Rn.StdGen, -- Random Number Generator for simulation
 
   -- The following are everything related to asynchronous computation
@@ -49,12 +49,12 @@ data GlobalState = GlobalState {
   _clocks :: Mp.Map Co.EndpointId Int
 } deriving (Show)
 
-makeLenses ''GlobalState
+makeLenses ''TabletState
 
 mkSlaveEId i = "s" ++ show i
 mkClientEId i = "c" ++ show i
 
-createGlobalState :: Int -> Int -> Int -> GlobalState
+createGlobalState :: Int -> Int -> Int -> TabletState
 createGlobalState seed numSlaves numClients =
   let slaveEIds = U.for [0..(numSlaves - 1)] $ mkSlaveEId
       clientEIds = U.for [0..(numClients - 1)] $ mkClientEId
@@ -67,12 +67,12 @@ createGlobalState seed numSlaves numClients =
       (slaves, rand') = U.s31 foldl ([], rand) slaveEIds $
         \(slaves, rand) eId ->
           let (r, rand')  = Rn.random rand
-              g = Df.def & GS.env . En.rand .~ (Rn.mkStdGen r) & GS.env . En.slaveEIds .~ slaveEIds
+              g = Df.def & TS.env . En.rand .~ (Rn.mkStdGen r) & TS.env . En.slaveEIds .~ slaveEIds
           in ((eId, g):slaves, rand')
       slaveState = Mp.fromList slaves
       asyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Sq.empty)
       clocks = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, 0)
-  in GlobalState {
+  in TabletState {
       _slaveEIds = slaveEIds,
       _clientEIds = clientEIds,
       _queues = queues,
@@ -83,7 +83,7 @@ createGlobalState seed numSlaves numClients =
       _clocks = clocks
     }
 
-addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST GlobalState ()
+addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST TabletState ()
 addMsg msg (fromEId, toEId) = do
   queue <- queues . ix fromEId . ix toEId .^^.* U.push msg
   if Sq.length queue == 1
@@ -91,7 +91,7 @@ addMsg msg (fromEId, toEId) = do
     else nonemptyQueues .^^. id
   return ()
 
-pollMsg :: (Co.EndpointId, Co.EndpointId) -> ST GlobalState Ms.Message
+pollMsg :: (Co.EndpointId, Co.EndpointId) -> ST TabletState Ms.Message
 pollMsg (fromEId, toEId) = do
   msg <- queues . ix fromEId . ix toEId .^^* U.poll
   queueLength <- queues . ix fromEId . ix toEId .^^^* Sq.length
@@ -100,7 +100,7 @@ pollMsg (fromEId, toEId) = do
     else nonemptyQueues .^^. id
   return msg
 
-runIAction :: Co.EndpointId -> Ac.InputAction -> ST GlobalState ()
+runIAction :: Co.EndpointId -> Ac.InputAction -> ST TabletState ()
 runIAction eId iAction = do
   (_, msgsO) <- runT (slaveState . ix eId) (TIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
@@ -112,7 +112,7 @@ runIAction eId iAction = do
         return ()
       _ -> return ()
 
-deliverMessage :: (Co.EndpointId, Co.EndpointId) -> ST GlobalState ()
+deliverMessage :: (Co.EndpointId, Co.EndpointId) -> ST TabletState ()
 deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
   slaveEIds' <- getL $ slaveEIds
@@ -123,7 +123,7 @@ deliverMessage (fromEId, toEId) = do
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
 -- `numMessages` number of messages.
-simulateOnce :: Int -> ST GlobalState ()
+simulateOnce :: Int -> ST TabletState ()
 simulateOnce numMessages = do
   -- increment each slave's clocks and run async tasks that are now ready
   eIds <- getL slaveEIds
@@ -148,14 +148,14 @@ simulateOnce numMessages = do
         deliverMessage queueId
 
 -- Simulate `n` milliseconds of execution
-simulateN :: Int -> ST GlobalState ()
+simulateN :: Int -> ST TabletState ()
 simulateN n = do
   numChans <- lp2 (slaveEIds, clientEIds) .^^^ \(s, c) -> (length s) + (length c)
   Mo.forM_ [1..n] $ \_ -> simulateOnce (numChans * (numChans + 1) `div` 2)
 
 -- Simulate execution until there are no more messages in any channel
 -- or any asyncQueue.
-simulateAll :: ST GlobalState ()
+simulateAll :: ST TabletState ()
 simulateAll = do
   numChans <- lp2 (slaveEIds, clientEIds) .^^^ \(s, c) -> (length s) + (length c)
   let simulate =
@@ -169,18 +169,18 @@ simulateAll = do
             else return ()
   simulate
 
-addClientMsg :: Int -> Int -> ST GlobalState ()
+addClientMsg :: Int -> Int -> ST TabletState ()
 addClientMsg slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
       msg = Ms.ClientRequest $ CM.WriteRequest ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   addMsg msg (clientEId, slaveEId)
   return ()
 
-test1 :: ST GlobalState ()
+test1 :: ST TabletState ()
 test1 = do
   addClientMsg 0 0; simulateAll
 
-test2 :: ST GlobalState ()
+test2 :: ST TabletState ()
 test2 = do
   addClientMsg 0 0; simulateN 2
   addClientMsg 1 1; simulateN 2
@@ -188,9 +188,9 @@ test2 = do
   addClientMsg 3 3; simulateN 2
   addClientMsg 4 4; simulateN 2
 
-mergePaxosLog :: GlobalState -> Maybe (Mp.Map PM.IndexT PM.PaxosLogEntry)
+mergePaxosLog :: TabletState -> Maybe (Mp.Map PM.IndexT PM.PaxosLogEntry)
 mergePaxosLog g =
-  let paxosLogs = g ^. slaveState & Mp.toList & map (^. _2 . GS.paxosLog)
+  let paxosLogs = g ^. slaveState & Mp.toList & map (^. _2 . TS.paxosLog)
   in U.s31 foldl (Just Mp.empty) paxosLogs $
        \mergedLogM paxosLog ->
          case mergedLogM of
@@ -207,7 +207,7 @@ mergePaxosLog g =
                                           then mergedLogM
                                           else Nothing
 
-driveTest :: Int -> ST GlobalState () -> IO ()
+driveTest :: Int -> ST TabletState () -> IO ()
 driveTest testNum test = do
   let g = createGlobalState 0 5 1
       (_, (oActions, g')) = runST test g

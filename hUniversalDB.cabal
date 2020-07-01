@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 151b6b0d6bde4edaffd090b72fb44e3c5f2472d5604fb41100c638a532ba7b07
+-- hash: 734cf7d997d37902633613c76853748328d503edc829b6bf1c4bc748da5675f5
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -48,18 +48,18 @@ library
       Proto.Messages.PaxosMessages
       Slave.DerivedState
       Slave.Env
-      Slave.GlobalState
       Slave.Internal_DerivedState
       Slave.Internal_KeySpaceManager
       Slave.KeySpaceManager
       Slave.SlaveInputHandler
+      Slave.SlaveState
       Slave.Tablet.DerivedState
       Slave.Tablet.Env
-      Slave.Tablet.GlobalState
       Slave.Tablet.Internal_DerivedState
       Slave.Tablet.Internal_MultiVersionKVStore
       Slave.Tablet.MultiVersionKVStore
       Slave.Tablet.TabletInputHandler
+      Slave.Tablet.TabletState
   other-modules:
       Paths_hUniversalDB
   hs-source-dirs:

@@ -23,7 +23,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.Env as En
-import qualified Slave.Tablet.GlobalState as GS
+import qualified Slave.Tablet.TabletState as TS
 import Infra.Lens
 import Infra.State
 
@@ -89,10 +89,10 @@ handleMultiPaxosThread
   -> Ct.Chan (Ac.InputAction)
   -> MV.MVar Cn.Connections -> IO ()
 handleMultiPaxosThread rg iActionChan connM = do
-  let g = Df.def & GS.env . En.rand .~ rg & GS.env . En.slaveEIds .~ slaveEIds
+  let g = Df.def & TS.env . En.rand .~ rg & TS.env . En.slaveEIds .~ slaveEIds
   handlePaxosMessage g
   where
-    handlePaxosMessage :: GS.GlobalState -> IO ()
+    handlePaxosMessage :: TS.TabletState -> IO ()
     handlePaxosMessage g = do
       iAction <- Ct.readChan iActionChan
       let (_, (oActions, g')) = runST (TIH.handleInputAction iAction) g

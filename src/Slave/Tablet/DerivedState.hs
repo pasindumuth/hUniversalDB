@@ -15,8 +15,8 @@ handleDerivedState :: PL.PaxosLog -> PL.PaxosLog -> ST DS.DerivedState ()
 handleDerivedState pl pl' = do
   Mo.forM_ (PL.newlyAddedEntries pl pl') $ \(index, plEntry) ->
     case plEntry of
-      PM.Read key timestamp -> do
+      PM.Tablet_Read key timestamp -> do
         DS.kvStore .^^ MS.read key timestamp
         return ()
-      PM.Write key value timestamp -> do
+      PM.Tablet_Write key value timestamp -> do
         DS.kvStore .^^ MS.write key value timestamp

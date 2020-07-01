@@ -9,9 +9,22 @@ import qualified Data.Binary as Bn
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
+import qualified Proto.Common as Co
+
 data PaxosLogEntry =
-  Read { key :: String, timestamp :: Int } |
-  Write { key :: String, value :: String, timestamp :: Int }
+  -- Tablet
+  Tablet_Read {
+    key :: String,
+    timestamp :: Int } |
+  Tablet_Write {
+    key :: String,
+    value :: String,
+    timestamp :: Int } |
+  -- Slave
+  Slave_KeySpaceChange {
+    oldRanges :: [Co.KeySpaceRange],
+    newRanges :: [Co.KeySpaceRange],
+    generation :: Int }
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
 type IndexT = Int
