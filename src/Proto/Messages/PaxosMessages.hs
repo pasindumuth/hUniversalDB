@@ -21,9 +21,8 @@ data PaxosLogEntry =
     value :: String,
     timestamp :: Int } |
   -- Slave
-  Slave_KeySpaceChange {
-    oldRanges :: [Co.KeySpaceRange],
-    newRanges :: [Co.KeySpaceRange],
+  Slave_AddRange {
+    range :: Co.KeySpaceRange,
     generation :: Int }
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 

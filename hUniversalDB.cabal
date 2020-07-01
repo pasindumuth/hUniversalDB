@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 734cf7d997d37902633613c76853748328d503edc829b6bf1c4bc748da5675f5
+-- hash: aa5467c8ebd10677c0d6acf790d899812e3933c73c3208c918de5e7497c98425
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -50,7 +50,6 @@ library
       Slave.Env
       Slave.Internal_DerivedState
       Slave.Internal_KeySpaceManager
-      Slave.KeySpaceManager
       Slave.SlaveInputHandler
       Slave.SlaveState
       Slave.Tablet.DerivedState

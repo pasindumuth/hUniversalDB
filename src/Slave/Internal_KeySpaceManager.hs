@@ -9,8 +9,11 @@ import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
 import qualified Proto.Common as Co
+import Infra.Lens
 
 data KeySpaceManager = KeySpaceManager {
-  ranges :: [Co.KeySpaceRange],
-  generation :: Int
+  _ranges :: [Co.KeySpaceRange],
+  _generation :: Int
 } deriving (Gn.Generic, Df.Default, Show)
+
+makeLenses ''KeySpaceManager
