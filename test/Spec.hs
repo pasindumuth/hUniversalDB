@@ -7,9 +7,9 @@
 
 import qualified Control.Monad as Mo
 import qualified Data.Default as Df
+import qualified Data.List as Li
 import qualified Data.Map as Mp
 import qualified Data.Set as St
-import qualified Data.Functor.Const
 import qualified Data.Sequence as Sq
 import qualified System.Random as Rn
 import Text.Pretty.Simple (pPrintNoColor)
@@ -115,7 +115,10 @@ runIAction eId iAction = do
 deliverMessage :: (Co.EndpointId, Co.EndpointId) -> ST GlobalState ()
 deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
-  runIAction toEId $ Ac.Receive fromEId msg
+  slaveEIds' <- getL $ slaveEIds
+  if Li.elem toEId slaveEIds'
+    then runIAction toEId $ Ac.Receive fromEId msg
+    else return ()
 
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
@@ -130,7 +133,8 @@ simulateOnce numMessages = do
       then do
         clockVal <- clocks . ix eId .^^.* (+1)
         asyncQueue <- getT $ asyncQueues . ix eId
-        let readyActions = U.s12 Sq.takeWhileL asyncQueue $ \(iAction, time) -> time == clockVal
+        let (readyActions, remainder) = asyncQueue & Sq.spanl (\(_, time) -> time == clockVal)
+        asyncQueues . ix eId .^^.* \_ -> remainder
         Mo.forM_ readyActions $ \(iAction, _) -> runIAction eId iAction
       else return ()
   -- Deliver `numMessages` messages
@@ -168,7 +172,7 @@ simulateAll = do
 addClientMsg :: Int -> Int -> ST GlobalState ()
 addClientMsg slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = Ms.MultiPaxosMessage $ PM.Insert $ PM.Write ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
+      msg = Ms.ClientRequest $ CM.WriteRequest ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   addMsg msg (clientEId, slaveEId)
   return ()
 
