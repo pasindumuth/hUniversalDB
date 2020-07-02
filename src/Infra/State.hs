@@ -10,10 +10,10 @@ import qualified Debug.Trace as Tr
 import Control.Lens (Lens', Traversal', (.~), (&), (^?!))
 
 import qualified Proto.Actions.Actions as Ac
-import qualified Proto.Messages.TraceMessages as TM
+import qualified Proto.Messages.TraceMessages as TrM
 import Infra.Internal_State
 
-type ST s a = STI ([Ac.OutputAction], Int, [TM.TraceMessage]) s a
+type ST s a = STI ([Ac.OutputAction], Int, [TrM.TraceMessage]) s a
 
 runST :: ST s a -> s -> (a, ([Ac.OutputAction], s))
 runST st s =
@@ -28,7 +28,7 @@ debugP message =  St.state $ \((as, cnt, trace), s) ->
 addA :: Ac.OutputAction -> ST s ()
 addA a = St.state $ \((as, cnt, trace), s) ->((), ((a:as, cnt, trace), s))
 
-trace :: TM.TraceMessage -> ST s ()
+trace :: TrM.TraceMessage -> ST s ()
 trace traceMsg =  St.state $ \((as, cnt, trace), s) ->((), ((as, cnt, traceMsg:trace), s))
 
 -- Dig, update state, and return the return value and actions. 

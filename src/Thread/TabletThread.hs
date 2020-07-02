@@ -9,6 +9,7 @@ import qualified Data.Maybe as Mb
 import qualified System.Random as Rn
 
 import qualified Net.Connections as Cn
+import qualified Paxos.MultiPaxosInstance as MP
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Slave.Tablet.TabletInputHandler as TIH
@@ -29,6 +30,7 @@ startTabletThread rg keySpaceRange iActionChan connM = do
   let g = Df.def & TS.env . En.rand .~ rg
                  & TS.env . En.slaveEIds .~ slaveEIds
                  & TS.range .~ keySpaceRange
+                 & TS.multiPaxosInstance . MP.paxosId .~ (show keySpaceRange)
   handlePaxosMessage g
   where
     handlePaxosMessage :: TS.TabletState -> IO ()

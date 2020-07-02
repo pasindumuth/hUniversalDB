@@ -13,6 +13,7 @@ import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.SlaveMessages as SM
+import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.DerivedState as DS
 import qualified Slave.Env as En
 import qualified Slave.SlaveState as SS
@@ -42,7 +43,8 @@ handleInputAction iAction =
   case iAction of
     Ac.Receive eId msg ->
       case msg of
-        Ms.ClientRequest request ->
+        Ms.ClientRequest request -> do
+          trace $ TrM.ClientRequestReceived request
           case request of
             CM.CreateDatabase _ _ -> handlingState .^ (PTM.handleTask $ createClientTask eId request)
             _ -> handleForwarding eId request
@@ -56,7 +58,9 @@ handleInputAction iAction =
               pl' <- getL $ SS.multiPaxosInstance.MP.paxosLog
               if (pl /= pl')
                 then do
-                  SS.derivedState .^ DS.handleDerivedState pl pl'
+                  addA $ Ac.Print $ show pl'
+                  paxosId <- getL $ SS.multiPaxosInstance.MP.paxosId
+                  SS.derivedState .^ DS.handleDerivedState paxosId pl pl'
                   handlingState .^ PTM.handleInsert
                 else return ()
         Ms.TabletMessage keySpaceRange _ -> do
@@ -85,7 +89,10 @@ createClientTask eId request =
     CM.CreateDatabase databaseId tableId ->
       let description = description
           tryHandling _ = do return False
-          done _ = addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Success
+          done _ = do
+            let response = CM.Success
+            trace $ TrM.ClientResponseSent response
+            addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry derivedState =
             let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
                 generation = (derivedState ^. IDS.keySpaceManager.IKSM.generation) + 1

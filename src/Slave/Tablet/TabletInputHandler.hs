@@ -18,6 +18,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TabletMessages as TM
+import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.MultiVersionKVStore as MS
 import qualified Slave.Tablet.Internal_DerivedState as DS
 import qualified Slave.Tablet.TabletState as TS
@@ -44,6 +45,7 @@ handleInputAction iAction =
     Ac.Receive eId msg ->
       case msg of
         Ms.ClientRequest request -> do
+          trace $ TrM.ClientRequestReceived request
           keySpaceRange <- getL TS.range
           handlingState .^ (PTM.handleTask $ createClientTask keySpaceRange eId request)
         Ms.TabletMessage keySpaceRange tabletMsg ->
@@ -57,7 +59,8 @@ handleInputAction iAction =
               if (pl /= pl')
                 then do
                   addA $ Ac.Print $ show pl'
-                  TS.derivedState .^ DS.handleDerivedState pl pl'
+                  paxosId <- getL $ TS.multiPaxosInstance.MP.paxosId
+                  TS.derivedState .^ DS.handleDerivedState paxosId pl pl'
                   handlingState .^ PTM.handleInsert
                 else return ()
     Ac.RetryInput counterValue ->
@@ -77,7 +80,9 @@ createClientTask keySpaceRange eId request =
               _ -> return False
           done derivedState = do
             let value = derivedState ^. DS.kvStore & MS.staticRead key timestamp
-            addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ReadResponse value
+                response = CM.ReadResponse value
+            trace $ TrM.ClientResponseSent response
+            addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet_Read key timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper
@@ -90,7 +95,9 @@ createClientTask keySpaceRange eId request =
                 return True
               _ -> return False
           done derivedState = do
-            addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.WriteResponse
+            let response = CM.WriteResponse
+            trace $ TrM.ClientResponseSent response
+            addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet_Write key value timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper

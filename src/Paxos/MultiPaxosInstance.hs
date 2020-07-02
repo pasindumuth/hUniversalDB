@@ -1,7 +1,7 @@
 module Paxos.MultiPaxosInstance (
   MP.MultiPaxosInstance,
   MP.paxosLog,
-  MP.id,
+  MP.paxosId,
   insertMultiPaxos,
   handleMultiPaxos,
 ) where

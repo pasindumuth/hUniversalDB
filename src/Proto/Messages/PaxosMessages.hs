@@ -39,6 +39,5 @@ data PaxosMessage =
   deriving (Gn.Generic, Bn.Binary, Show)
 
 data MultiPaxosMessage =
-  Insert { val :: PaxosLogEntry } |
   PaxosMessage { index :: IndexT, message :: PaxosMessage }
   deriving (Gn.Generic, Bn.Binary, Show)

@@ -12,10 +12,11 @@ import qualified GHC.Generics as Gn
 import qualified Paxos.PaxosInstance as PI
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Common as Co
 import Infra.Lens
 
 data MultiPaxosInstance = MultiPaxosInstance {
-  _id :: String,
+  _paxosId :: Co.PaxosId,
   _paxosInstances :: Mp.Map PM.IndexT PI.PaxosInstance,
   _paxosLog :: PL.PaxosLog
 } deriving (Gn.Generic, Df.Default, Show)
