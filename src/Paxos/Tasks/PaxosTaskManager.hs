@@ -22,7 +22,6 @@ import Infra.Lens
 import Infra.State
 
 type HandlingState derivedStateT = (
-  PL.PaxosLog,
   MP.MultiPaxosInstance,
   derivedStateT,
   PTM.PaxosTaskManager derivedStateT,
@@ -31,19 +30,19 @@ type HandlingState derivedStateT = (
 
 handleTask :: Ta.Task derivedStateT -> ST (HandlingState derivedStateT) ()
 handleTask task = do
-  derivedState <- getL $ _3
+  derivedState <- getL $ _2
   requestHandled <- lp0 .^ Ta.tryHandling task derivedState
   if requestHandled
     then return ()
     else do
-      taskQueue <- _4.PTM.taskQueue .^^. U.push task
+      taskQueue <- _3.PTM.taskQueue .^^. U.push task
       if Sq.length taskQueue == 1
         then handleNextTask
         else return ()
 
 handleNextTask :: ST (HandlingState derivedStateT) ()
 handleNextTask = do
-  taskQueue <- getL $ _4.PTM.taskQueue
+  taskQueue <- getL $ _3.PTM.taskQueue
   if Sq.length taskQueue > 0
     then do
       let task = U.peek taskQueue
@@ -52,29 +51,29 @@ handleNextTask = do
 
 pollAndNext :: ST (HandlingState derivedStateT) ()
 pollAndNext = do
-  _4 . PTM.taskQueue .^^ U.poll
+  _3 . PTM.taskQueue .^^ U.poll
   handleNextTask
 
 handleNextTask' :: Ta.Task derivedStateT -> ST (HandlingState derivedStateT) ()
 handleNextTask' task = do
-  _4.PTM.currentInsert .^^. \_ -> Nothing
-  derivedState <- getL $ _3
+  _3.PTM.currentInsert .^^. \_ -> Nothing
+  derivedState <- getL $ _2
   requestHandled <- lp0 .^ Ta.tryHandling task derivedState
   if requestHandled
     then pollAndNext
     else do
-      index <- _1 .^^^ PL.nextAvailableIndex
+      index <- _1.MP.paxosLog .^^^ PL.nextAvailableIndex
       let entry = Ta.createPLEntry task derivedState
-      _4.PTM.currentInsert .^^. \_ -> Just $ PTM.CurrentInsert index entry task
-      slaveEIds <- getL $ _6
-      lp3 (_2, _1, _5) .^ MP.insertMultiPaxos slaveEIds entry (Ta.msgWrapper task)
-      counterValue <- _4.PTM.counter .^^. (+1)
+      _3.PTM.currentInsert .^^. \_ -> Just $ PTM.CurrentInsert index entry task
+      slaveEIds <- getL $ _5
+      lp2 (_1, _4) .^ MP.insertMultiPaxos slaveEIds entry (Ta.msgWrapper task)
+      counterValue <- _3.PTM.counter .^^. (+1)
       addA $ Ac.RetryOutput counterValue
 
 handleRetry :: Int -> ST (HandlingState derivedStateT) ()
 handleRetry counterValue = do
-  currentInsertM <- getL $ _4.PTM.currentInsert
-  counter <- getL $ _4.PTM.counter
+  currentInsertM <- getL $ _3.PTM.currentInsert
+  counter <- getL $ _3.PTM.counter
   case currentInsertM of
     Just (PTM.CurrentInsert _ _ task ) | counter == counterValue -> do
       handleNextTask' task
@@ -82,17 +81,17 @@ handleRetry counterValue = do
 
 handleInsert :: ST (HandlingState derivedStateT) ()
 handleInsert = do
-  currentInsertM <- getL $ _4.PTM.currentInsert
+  currentInsertM <- getL $ _3.PTM.currentInsert
   case currentInsertM of
     Just (PTM.CurrentInsert index entry task) -> do
-      nextEntryM <- _1 .^^^ PL.getPLEntry index
+      nextEntryM <- _1.MP.paxosLog .^^^ PL.getPLEntry index
       case nextEntryM of
         Just nextEntry -> do
           if nextEntry == entry
             then do
-              derivedState <- getL $ _3
+              derivedState <- getL $ _2
               lp0 .^ Ta.done task derivedState
-              _4.PTM.currentInsert .^^. \_ -> Nothing
+              _3.PTM.currentInsert .^^. \_ -> Nothing
               pollAndNext
             else handleNextTask' task
         _ -> return ()

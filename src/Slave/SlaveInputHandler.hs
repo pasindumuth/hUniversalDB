@@ -22,15 +22,13 @@ import Infra.Lens
 import Infra.State
 
 handlingState :: Lens' SS.SlaveState (
-  PL.PaxosLog,
   MP.MultiPaxosInstance,
   DS.DerivedState,
   PTM.PaxosTaskManager DS.DerivedState,
   Rn.StdGen,
   [Co.EndpointId])
 handlingState =
-  (lp6 (
-    SS.paxosLog,
+  (lp5 (
     SS.multiPaxosInstance,
     SS.derivedState,
     SS.paxosTaskManager,
@@ -51,11 +49,11 @@ handleInputAction iAction =
         Ms.SlaveMessage slaveMsg ->
           case slaveMsg of
             SM.MultiPaxosMessage multiPaxosMsg -> do
-              pl <- getL SS.paxosLog
+              pl <- getL $ SS.multiPaxosInstance.MP.paxosLog
               slaveEIds <- getL $ SS.env.En.slaveEIds
-              lp3 (SS.multiPaxosInstance, SS.paxosLog, SS.env.En.rand)
+              lp2 (SS.multiPaxosInstance, SS.env.En.rand)
                 .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.SlaveMessage . SM.MultiPaxosMessage)
-              pl' <- getL SS.paxosLog
+              pl' <- getL $ SS.multiPaxosInstance.MP.paxosLog
               if (pl /= pl')
                 then do
                   SS.derivedState .^ DS.handleDerivedState pl pl'

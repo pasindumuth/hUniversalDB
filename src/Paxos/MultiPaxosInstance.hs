@@ -1,5 +1,7 @@
 module Paxos.MultiPaxosInstance (
   MP.MultiPaxosInstance,
+  MP.paxosLog,
+  MP.id,
   insertMultiPaxos,
   handleMultiPaxos,
 ) where
@@ -33,10 +35,10 @@ insertMultiPaxos
   :: [Co.EndpointId]
   -> PM.PaxosLogEntry
   -> (PM.MultiPaxosMessage -> Ms.Message)
-  -> ST (MP.MultiPaxosInstance, PL.PaxosLog, Rn.StdGen) ()
+  -> ST (MP.MultiPaxosInstance, Rn.StdGen) ()
 insertMultiPaxos slaveEIds entry msgWrapper = do
-  r <- _3 .^^ Rn.randomR (1, maxRndIncrease)
-  index <- _2 .^^^ PL.nextAvailableIndex
+  r <- _2 .^^ Rn.randomR (1, maxRndIncrease)
+  index <- _1.MP.paxosLog .^^^ PL.nextAvailableIndex
   paxosInstance <- _1 .^ getPaxosInstance index
   let nextRnd = case PI.maxProposalM paxosInstance of
                  Just (rnd, _) -> rnd + r
@@ -50,7 +52,7 @@ handleMultiPaxos
   -> [Co.EndpointId]
   -> PM.MultiPaxosMessage
   -> (PM.MultiPaxosMessage -> Ms.Message)
-  -> ST (MP.MultiPaxosInstance, PL.PaxosLog, Rn.StdGen) ()
+  -> ST (MP.MultiPaxosInstance, Rn.StdGen) ()
 handleMultiPaxos fromEId slaveEIds (PM.PaxosMessage index pMsg) msgWrapper = do
   _1 .^ getPaxosInstance index
   action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos pMsg)
@@ -58,6 +60,6 @@ handleMultiPaxos fromEId slaveEIds (PM.PaxosMessage index pMsg) msgWrapper = do
     PI.Reply paxosMessage -> addA $ Ac.Send [fromEId] $ msgWrapper $ PM.PaxosMessage index paxosMessage
     PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
     PI.Choose chosenValue -> do
-      _2 .^^. (PL.insert index chosenValue)
+      _1.MP.paxosLog .^^. (PL.insert index chosenValue)
       return ()
     _ -> return ()

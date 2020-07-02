@@ -23,15 +23,13 @@ import qualified Slave.Tablet.Internal_DerivedState as DS
 import qualified Slave.Tablet.TabletState as TS
 
 handlingState :: Lens' TS.TabletState (
-  PL.PaxosLog,
   MP.MultiPaxosInstance,
   DS.DerivedState,
   PTM.PaxosTaskManager DS.DerivedState,
   Rn.StdGen,
   [Co.EndpointId])
 handlingState =
-  (lp6 (
-    TS.paxosLog,
+  (lp5 (
     TS.multiPaxosInstance,
     TS.derivedState,
     TS.paxosTaskManager,
@@ -51,11 +49,11 @@ handleInputAction iAction =
         Ms.TabletMessage keySpaceRange tabletMsg ->
           case tabletMsg of
             TM.MultiPaxosMessage multiPaxosMsg -> do
-              pl <- getL TS.paxosLog
+              pl <- getL $ TS.multiPaxosInstance.MP.paxosLog
               slaveEIds <- getL $ TS.env.En.slaveEIds
-              lp3 (TS.multiPaxosInstance, TS.paxosLog, TS.env.En.rand)
+              lp2 (TS.multiPaxosInstance, TS.env.En.rand)
                 .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage)
-              pl' <- getL TS.paxosLog
+              pl' <- getL $ TS.multiPaxosInstance.MP.paxosLog
               if (pl /= pl')
                 then do
                   addA $ Ac.Print $ show pl'

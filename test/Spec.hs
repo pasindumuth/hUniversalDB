@@ -190,7 +190,7 @@ test2 = do
 
 mergePaxosLog :: TabletState -> Maybe (Mp.Map PM.IndexT PM.PaxosLogEntry)
 mergePaxosLog g =
-  let paxosLogs = g ^. slaveState & Mp.toList & map (^. _2 . TS.paxosLog)
+  let paxosLogs = g ^. slaveState & Mp.toList & map (^. _2 . TS.multiPaxosInstance.MP.paxosLog)
   in U.s31 foldl (Just Mp.empty) paxosLogs $
        \mergedLogM paxosLog ->
          case mergedLogM of
