@@ -16,13 +16,20 @@ import qualified Paxos.Tasks.Task as Ta
 import qualified Paxos.Tasks.Internal_PaxosTaskManager as PTM
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
+import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
 import Infra.Lens
 import Infra.State
 
-type HandlingState a = (PL.PaxosLog, MP.MultiPaxosInstance, a, PTM.PaxosTaskManager a, Rn.StdGen, [Co.EndpointId])
+type HandlingState derivedStateT = (
+  PL.PaxosLog,
+  MP.MultiPaxosInstance,
+  derivedStateT,
+  PTM.PaxosTaskManager derivedStateT,
+  Rn.StdGen,
+  [Co.EndpointId])
 
-handleTask :: Ta.Task a -> ST (HandlingState a) ()
+handleTask :: Ta.Task derivedStateT -> ST (HandlingState derivedStateT) ()
 handleTask task = do
   derivedState <- getL $ _3
   requestHandled <- lp0 .^ Ta.tryHandling task derivedState
@@ -34,7 +41,7 @@ handleTask task = do
         then handleNextTask
         else return ()
 
-handleNextTask :: ST (HandlingState a) ()
+handleNextTask :: ST (HandlingState derivedStateT) ()
 handleNextTask = do
   taskQueue <- getL $ _4.PTM.taskQueue
   if Sq.length taskQueue > 0
@@ -43,12 +50,12 @@ handleNextTask = do
       handleNextTask' task
     else return ()
 
-pollAndNext :: ST (HandlingState a) ()
+pollAndNext :: ST (HandlingState derivedStateT) ()
 pollAndNext = do
   _4 . PTM.taskQueue .^^ U.poll
   handleNextTask
 
-handleNextTask' :: Ta.Task a -> ST (HandlingState a) ()
+handleNextTask' :: Ta.Task derivedStateT -> ST (HandlingState derivedStateT) ()
 handleNextTask' task = do
   _4.PTM.currentInsert .^^. \_ -> Nothing
   derivedState <- getL $ _3
@@ -60,11 +67,11 @@ handleNextTask' task = do
       let entry = Ta.createPLEntry task derivedState
       _4.PTM.currentInsert .^^. \_ -> Just $ PTM.CurrentInsert index entry task
       slaveEIds <- getL $ _6
-      lp3 (_2, _1, _5) .^ MP.insertMultiPaxos slaveEIds entry
+      lp3 (_2, _1, _5) .^ MP.insertMultiPaxos slaveEIds entry (Ta.msgWrapper task)
       counterValue <- _4.PTM.counter .^^. (+1)
       addA $ Ac.RetryOutput counterValue
 
-handleRetry :: Int -> ST (HandlingState a) ()
+handleRetry :: Int -> ST (HandlingState derivedStateT) ()
 handleRetry counterValue = do
   currentInsertM <- getL $ _4.PTM.currentInsert
   counter <- getL $ _4.PTM.counter
@@ -73,7 +80,7 @@ handleRetry counterValue = do
       handleNextTask' task
     _ -> return ()
 
-handleInsert :: ST (HandlingState a) ()
+handleInsert :: ST (HandlingState derivedStateT) ()
 handleInsert = do
   currentInsertM <- getL $ _4.PTM.currentInsert
   case currentInsertM of

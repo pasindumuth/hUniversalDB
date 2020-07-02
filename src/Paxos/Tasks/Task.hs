@@ -5,15 +5,17 @@
 
 module Paxos.Tasks.Task where
 
+import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
 import Infra.State
 
-data Task a = Task {
+data Task derivedStateT = Task {
   description :: String,
-  tryHandling :: a -> ST () Bool,
-  done :: a -> ST () (),
-  createPLEntry :: a -> PM.PaxosLogEntry
+  tryHandling :: derivedStateT -> ST () Bool,
+  done :: derivedStateT -> ST () (),
+  createPLEntry :: derivedStateT -> PM.PaxosLogEntry,
+  msgWrapper :: (PM.MultiPaxosMessage -> Ms.Message)
 }
 
-instance Show (Task a) where
-  show (Task description _ _ _) = description
+instance Show (Task derivedStateT) where
+  show (Task description _ _ _ _) = description

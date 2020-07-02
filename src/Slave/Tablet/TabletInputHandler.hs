@@ -17,8 +17,10 @@ import qualified Paxos.Tasks.Task as Ta
 import qualified Proto.Common as Co
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages.TabletMessages as TM
 import qualified Slave.Tablet.MultiVersionKVStore as MS
 import qualified Slave.Tablet.Internal_DerivedState as DS
+import qualified Slave.Tablet.TabletState as TS
 
 handlingState :: Lens' TS.TabletState (
   PL.PaxosLog,
@@ -43,26 +45,31 @@ handleInputAction iAction =
   case iAction of
     Ac.Receive eId msg ->
       case msg of
-        Ms.ClientRequest request -> handlingState .^ (PTM.handleTask $ createClientTask eId request)
-        Ms.MultiPaxosMessage multiPaxosMsg -> do
-          pl <- getL TS.paxosLog
-          slaveEIds <- getL $ TS.env.En.slaveEIds
-          lp3 (TS.multiPaxosInstance, TS.paxosLog, TS.env.En.rand) .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg
-          pl' <- getL TS.paxosLog
-          if (pl /= pl')
-            then do
-              addA $ Ac.Print $ show pl'
-              TS.derivedState .^ DS.handleDerivedState pl pl'
-              handlingState .^ PTM.handleInsert
-            else return ()
+        Ms.ClientRequest request -> do
+          keySpaceRange <- getL TS.range
+          handlingState .^ (PTM.handleTask $ createClientTask keySpaceRange eId request)
+        Ms.TabletMessage keySpaceRange tabletMsg ->
+          case tabletMsg of
+            TM.MultiPaxosMessage multiPaxosMsg -> do
+              pl <- getL TS.paxosLog
+              slaveEIds <- getL $ TS.env.En.slaveEIds
+              lp3 (TS.multiPaxosInstance, TS.paxosLog, TS.env.En.rand)
+                .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage)
+              pl' <- getL TS.paxosLog
+              if (pl /= pl')
+                then do
+                  addA $ Ac.Print $ show pl'
+                  TS.derivedState .^ DS.handleDerivedState pl pl'
+                  handlingState .^ PTM.handleInsert
+                else return ()
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
-createClientTask :: Co.EndpointId -> CM.ClientRequest -> Ta.Task DS.DerivedState
-createClientTask eId request =
+createClientTask :: Co.KeySpaceRange -> Co.EndpointId -> CM.ClientRequest -> Ta.Task DS.DerivedState
+createClientTask keySpaceRange eId request =
   let description = show (eId, request)
   in case request of
-    (CM.ReadRequest key timestamp) ->
+    (CM.ReadRequest _ _ key timestamp) ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
@@ -74,8 +81,9 @@ createClientTask eId request =
             let value = derivedState ^. DS.kvStore & MS.staticRead key timestamp
             addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ReadResponse value
           createPLEntry _ = PM.Tablet_Read key timestamp
-      in Ta.Task description tryHandling done createPLEntry
-    (CM.WriteRequest key value timestamp) ->
+          msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
+      in Ta.Task description tryHandling done createPLEntry msgWrapper
+    (CM.WriteRequest _ _ key value timestamp) ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
@@ -86,4 +94,5 @@ createClientTask eId request =
           done derivedState = do
             addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.WriteResponse
           createPLEntry _ = PM.Tablet_Write key value timestamp
-      in Ta.Task description tryHandling done createPLEntry
+          msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
+      in Ta.Task description tryHandling done createPLEntry msgWrapper

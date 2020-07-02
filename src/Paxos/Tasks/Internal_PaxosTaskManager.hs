@@ -13,15 +13,15 @@ import qualified Paxos.Tasks.Task as Ta
 import qualified Proto.Messages.PaxosMessages as PM
 import Infra.Lens
 
-data CurrentInsert a = CurrentInsert {
+data CurrentInsert derivedStateT = CurrentInsert {
   _index :: Int,
   _entry :: PM.PaxosLogEntry,
-  _task :: Ta.Task a
+  _task :: Ta.Task derivedStateT
 } deriving (Show)
 
-data PaxosTaskManager a = PaxosTaskManager {
-  _currentInsert :: Maybe (CurrentInsert a),
-  _taskQueue :: Sq.Seq (Ta.Task a),
+data PaxosTaskManager derivedStateT = PaxosTaskManager {
+  _currentInsert :: Maybe (CurrentInsert derivedStateT),
+  _taskQueue :: Sq.Seq (Ta.Task derivedStateT),
   _counter :: Int
 } deriving (Gn.Generic, Df.Default, Show)
 

@@ -1,5 +1,6 @@
 module Slave.SlaveInputHandler where
 
+import qualified Data.List as Li
 import qualified System.Random as Rn
 
 import qualified Paxos.MultiPaxosInstance as MP
@@ -11,6 +12,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages.SlaveMessages as SM
 import qualified Slave.DerivedState as DS
 import qualified Slave.Env as En
 import qualified Slave.SlaveState as SS
@@ -45,16 +47,38 @@ handleInputAction iAction =
         Ms.ClientRequest request ->
           case request of
             CM.CreateDatabase _ _ -> handlingState .^ (PTM.handleTask $ createClientTask eId request)
-        Ms.MultiPaxosMessage multiPaxosMsg -> do
-          pl <- getL SS.paxosLog
-          slaveEIds <- getL $ SS.env.En.slaveEIds
-          lp3 (SS.multiPaxosInstance, SS.paxosLog, SS.env.En.rand) .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg
-          pl' <- getL SS.paxosLog
-          if (pl /= pl')
-            then do
-              SS.derivedState .^ DS.handleDerivedState pl pl'
-              handlingState .^ PTM.handleInsert
+            _ -> handleForwarding eId request
+        Ms.SlaveMessage slaveMsg ->
+          case slaveMsg of
+            SM.MultiPaxosMessage multiPaxosMsg -> do
+              pl <- getL SS.paxosLog
+              slaveEIds <- getL $ SS.env.En.slaveEIds
+              lp3 (SS.multiPaxosInstance, SS.paxosLog, SS.env.En.rand)
+                .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.SlaveMessage . SM.MultiPaxosMessage)
+              pl' <- getL SS.paxosLog
+              if (pl /= pl')
+                then do
+                  SS.derivedState .^ DS.handleDerivedState pl pl'
+                  handlingState .^ PTM.handleInsert
+                else return ()
+        Ms.TabletMessage keySpaceRange _ -> do
+          ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
+          if Li.elem keySpaceRange ranges
+            then addA $ Ac.Slave_Forward keySpaceRange eId msg
             else return ()
+    Ac.RetryInput counterValue ->
+      handlingState .^ PTM.handleRetry counterValue
+
+handleForwarding :: Co.EndpointId -> CM.ClientRequest -> ST SS.SlaveState ()
+handleForwarding eId request = do
+  let range = case request of
+                CM.ReadRequest databaseId tableId _ _ -> Co.KeySpaceRange databaseId tableId Nothing Nothing
+                CM.WriteRequest databaseId tableId _ _ _ -> Co.KeySpaceRange databaseId tableId Nothing Nothing
+  ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
+  if Li.elem range ranges
+    then addA $ Ac.Slave_Forward range eId $ Ms.ClientRequest request
+    -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
+    else addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Error "the (database, table) doesn't exist"
 
 createClientTask :: Co.EndpointId -> CM.ClientRequest -> Ta.Task DS.DerivedState
 createClientTask eId request =
@@ -63,9 +87,10 @@ createClientTask eId request =
     CM.CreateDatabase databaseId tableId ->
       let description = description
           tryHandling _ = do return False
-          done _ = do return ()
+          done _ = addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Success
           createPLEntry derivedState =
             let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
                 generation = (derivedState ^. IDS.keySpaceManager.IKSM.generation) + 1
             in PM.Slave_AddRange range generation
-      in Ta.Task description tryHandling done createPLEntry
+          msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
+      in Ta.Task description tryHandling done createPLEntry msgWrapper

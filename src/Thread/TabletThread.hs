@@ -10,6 +10,7 @@ import qualified System.Random as Rn
 
 import qualified Net.Connections as Cn
 import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Common as Co
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.Env as En
 import qualified Slave.Tablet.TabletState as TS
@@ -20,11 +21,14 @@ slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7
 
 startTabletThread
   :: Rn.StdGen
+  -> Co.KeySpaceRange
   -> Ct.Chan (Ac.InputAction)
   -> MV.MVar Cn.Connections
   -> IO ()
-startTabletThread rg iActionChan connM = do
-  let g = Df.def & TS.env . En.rand .~ rg & TS.env . En.slaveEIds .~ slaveEIds
+startTabletThread rg keySpaceRange iActionChan connM = do
+  let g = Df.def & TS.env . En.rand .~ rg
+                 & TS.env . En.slaveEIds .~ slaveEIds
+                 & TS.range .~ keySpaceRange
   handlePaxosMessage g
   where
     handlePaxosMessage :: TS.TabletState -> IO ()

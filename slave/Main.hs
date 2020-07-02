@@ -24,6 +24,7 @@ import qualified Proto.Messages as Ms
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.Env as En
 import qualified Slave.Tablet.TabletState as TS
+import qualified Thread.SlaveThread as ST
 import Infra.Lens
 import Infra.State
 
@@ -84,32 +85,6 @@ handleReceive receiveChan iActionChan = do
     (eId, msg) <- Ct.readChan receiveChan
     Ct.writeChan iActionChan $ Ac.Receive eId msg
 
-handleMultiPaxosThread
-  :: Rn.StdGen
-  -> Ct.Chan (Ac.InputAction)
-  -> MV.MVar Cn.Connections -> IO ()
-handleMultiPaxosThread rg iActionChan connM = do
-  let g = Df.def & TS.env . En.rand .~ rg & TS.env . En.slaveEIds .~ slaveEIds
-  handlePaxosMessage g
-  where
-    handlePaxosMessage :: TS.TabletState -> IO ()
-    handlePaxosMessage g = do
-      iAction <- Ct.readChan iActionChan
-      let (_, (oActions, g')) = runST (TIH.handleInputAction iAction) g
-      conn <- MV.readMVar connM
-      Mo.forM_ (reverse oActions) $ \action ->
-        case action of
-          Ac.Send eIds msg -> Mo.forM_ eIds $
-            \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-          Ac.RetryOutput counterValue -> do
-            Ct.forkIO $ do
-              Ct.threadDelay 100000
-              Ct.writeChan iActionChan $ Ac.RetryInput counterValue
-            return ()
-          Ac.Print message -> do
-            print message
-      handlePaxosMessage g'
-
 startSlave :: [String] -> IO ()
 startSlave (seedStr:curIP:otherIPs) = do
   Lg.infoM Lg.main "Start slave"
@@ -139,7 +114,7 @@ startSlave (seedStr:curIP:otherIPs) = do
   -- Start Paxos handling thread
   let seed = read seedStr :: Int
       rg = Rn.mkStdGen seed
-  handleMultiPaxosThread rg iActionChan connM
+  ST.startSlaveThread rg iActionChan connM
 
 main :: IO ()
 main = do

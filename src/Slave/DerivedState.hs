@@ -18,4 +18,5 @@ handleDerivedState pl pl' = do
     case plEntry of
       PM.Slave_AddRange newRange generation -> do
         IDS.keySpaceManager.IKSM.ranges .^^. (newRange:)
+        IDS.keySpaceManager.IKSM.generation .^^. \_ -> generation
         addA $ Ac.Slave_CreateTablet newRange

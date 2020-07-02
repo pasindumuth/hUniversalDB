@@ -32,8 +32,9 @@ getPaxosInstance index = do
 insertMultiPaxos
   :: [Co.EndpointId]
   -> PM.PaxosLogEntry
+  -> (PM.MultiPaxosMessage -> Ms.Message)
   -> ST (MP.MultiPaxosInstance, PL.PaxosLog, Rn.StdGen) ()
-insertMultiPaxos slaveEIds entry = do
+insertMultiPaxos slaveEIds entry msgWrapper = do
   r <- _3 .^^ Rn.randomR (1, maxRndIncrease)
   index <- _2 .^^^ PL.nextAvailableIndex
   paxosInstance <- _1 .^ getPaxosInstance index
@@ -42,19 +43,20 @@ insertMultiPaxos slaveEIds entry = do
                  Nothing -> r
   action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos $ PM.Propose nextRnd entry)
   case action of
-    PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
+    PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
 
 handleMultiPaxos
   :: Co.EndpointId
   -> [Co.EndpointId]
   -> PM.MultiPaxosMessage
+  -> (PM.MultiPaxosMessage -> Ms.Message)
   -> ST (MP.MultiPaxosInstance, PL.PaxosLog, Rn.StdGen) ()
-handleMultiPaxos fromEId slaveEIds (PM.PaxosMessage index pMsg) = do
+handleMultiPaxos fromEId slaveEIds (PM.PaxosMessage index pMsg) msgWrapper = do
   _1 .^ getPaxosInstance index
   action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos pMsg)
   case action of
-    PI.Reply paxosMessage -> addA $ Ac.Send [fromEId] $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
-    PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ Ms.MultiPaxosMessage $ PM.PaxosMessage index paxosMessage
+    PI.Reply paxosMessage -> addA $ Ac.Send [fromEId] $ msgWrapper $ PM.PaxosMessage index paxosMessage
+    PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
     PI.Choose chosenValue -> do
       _2 .^^. (PL.insert index chosenValue)
       return ()

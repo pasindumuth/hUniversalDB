@@ -172,7 +172,7 @@ simulateAll = do
 addClientMsg :: Int -> Int -> ST TabletState ()
 addClientMsg slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = Ms.ClientRequest $ CM.WriteRequest ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
+      msg = Ms.ClientRequest $ CM.WriteRequest "d" "t" ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   addMsg msg (clientEId, slaveEId)
   return ()
 

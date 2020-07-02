@@ -15,7 +15,10 @@ import qualified Net.Connections as Cn
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientMessages as CM
 
--- Example commands: r k 0, w k v 0
+-- Example commands:
+-- r d t k 0
+-- w d t k v 0
+-- c d t
 startClient :: [String] -> IO ()
 startClient (ip:message) = do
   Lg.infoM Lg.main "Starting client"
@@ -27,10 +30,12 @@ startClient (ip:message) = do
     Mo.forever $ do
       line <- getLine
       case words line of
-        ["r", key, timestamp] -> do
-          Cn.sendMessage socket $ Ms.ClientRequest $ CM.ReadRequest key (read timestamp)
-        ["w", key, value, timestamp] -> do
-          Cn.sendMessage socket $ Ms.ClientRequest $ CM.WriteRequest key value (read timestamp)
+        ["r", databaseId, tableId, key, timestamp] -> do
+          Cn.sendMessage socket $ Ms.ClientRequest $ CM.ReadRequest databaseId tableId key (read timestamp)
+        ["w", databaseId, tableId, key, value, timestamp] -> do
+          Cn.sendMessage socket $ Ms.ClientRequest $ CM.WriteRequest databaseId tableId key value (read timestamp)
+        ["c", databaseId, tableId] -> do
+          Cn.sendMessage socket $ Ms.ClientRequest $ CM.CreateDatabase databaseId tableId
         _ -> print "Unrecognized command or number of arguments"
 
 main :: IO ()
