@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3d778c9113e9ff61c7a66eacc7db54902184c55f42535cf342369ba28ec92464
+-- hash: 73e10f3fd6fc566bf1afa073215009e338704d06bbd36e06744b53b84b05135c
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      Infra.Internal_State
       Infra.Lens
       Infra.Logging
       Infra.State
