@@ -219,13 +219,14 @@ type TestPaxosLogs = Mp.Map Co.PaxosId TestPaxosLog
 
 addMsgs
  :: Co.PaxosId
- -> Int
- -> Mp.Map Int PM.PaxosLogEntry
+ -> TrM.PaxosType
+ -> PM.IndexT
+ -> Mp.Map PM.IndexT PM.PaxosLogEntry
  -> [TrM.TraceMessage]
- -> (Int, [TrM.TraceMessage])
-addMsgs paxosId i m msgs =
+ -> (PM.IndexT, [TrM.TraceMessage])
+addMsgs paxosId paxosType i m msgs =
   case Mp.lookup i m of
-    Just v -> addMsgs paxosId (i + 1) m (TrM.PaxosInsertion paxosId i v : msgs)
+    Just v -> addMsgs paxosId paxosType (i + 1) m (TrM.PaxosInsertion paxosId paxosType i v : msgs)
     Nothing -> (i, msgs)
 
 -- This list of trace messages includes all events across all slaves.
@@ -239,7 +240,7 @@ verifyTrace msgs = do
           case paxosLogsM of
             Just (paxosLogs, modMsgs) ->
               case msg of
-                TrM.PaxosInsertion paxosId index entry ->
+                TrM.PaxosInsertion paxosId paxosType index entry ->
                   case paxosLogs ^. at paxosId of
                     Just paxosLog ->
                       case paxosLog ^. plog . at index of
@@ -249,13 +250,13 @@ verifyTrace msgs = do
                             else Nothing
                         _ ->
                           let plog' = paxosLog ^. plog & at index ?~ entry
-                              (nextIdx', modMsgs') = addMsgs paxosId (paxosLog ^. nextIdx) plog' modMsgs
+                              (nextIdx', modMsgs') = addMsgs paxosId paxosType (paxosLog ^. nextIdx) plog' modMsgs
                               paxosLog' = TestPaxosLog plog' nextIdx'
                               paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
                           in Just (paxosLogs', modMsgs')
                     Nothing ->
                       let plog' = Mp.empty & at index ?~ entry
-                          (nextIdx', modMsgs') = addMsgs paxosId 0 plog' modMsgs
+                          (nextIdx', modMsgs') = addMsgs paxosId paxosType 0 plog' modMsgs
                           paxosLog' = TestPaxosLog plog' nextIdx'
                           paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
                       in Just (paxosLogs', modMsgs')

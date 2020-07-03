@@ -17,7 +17,7 @@ import Infra.State
 handleDerivedState :: Co.PaxosId -> PL.PaxosLog -> PL.PaxosLog -> ST IDS.DerivedState ()
 handleDerivedState paxosId pl pl' = do
   Mo.forM_ (PL.newlyAddedEntries pl pl') $ \(index, plEntry) -> do
-    trace $ TrM.PaxosInsertion paxosId index plEntry
+    trace $ TrM.PaxosInsertion paxosId TrM.Slave index plEntry
     case plEntry of
       PM.Slave_AddRange newRange generation -> do
         IDS.keySpaceManager.IKSM.ranges .^^. (newRange:)
