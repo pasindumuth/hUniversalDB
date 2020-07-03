@@ -36,7 +36,7 @@ startSlaveThread rg iActionChan connM = do
     handlePaxosMessage :: SS.SlaveState -> TabletMap -> IO ()
     handlePaxosMessage g tabletMap = do
       iAction <- Ct.readChan iActionChan
-      let (_, (oActions, g')) = runST (SIH.handleInputAction iAction) g
+      let (_, (oActions, _, g')) = runST (SIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
       (g'', tabletMap') <- U.s31 Mo.foldM (g', tabletMap) (reverse oActions) $ \(g', tabletMap) action ->
         case action of

@@ -46,7 +46,7 @@ handleInputAction iAction =
         Ms.ClientRequest request -> do
           trace $ TrM.ClientRequestReceived request
           case request of
-            CM.CreateDatabase _ _ -> handlingState .^ (PTM.handleTask $ createClientTask eId request)
+            CM.CreateDatabase _ _ _ -> handlingState .^ (PTM.handleTask $ createClientTask eId request)
             _ -> handleForwarding eId request
         Ms.SlaveMessage slaveMsg ->
           case slaveMsg of
@@ -73,24 +73,24 @@ handleInputAction iAction =
 
 handleForwarding :: Co.EndpointId -> CM.ClientRequest -> ST SS.SlaveState ()
 handleForwarding eId request = do
-  let range = case request of
-                CM.ReadRequest databaseId tableId _ _ -> Co.KeySpaceRange databaseId tableId Nothing Nothing
-                CM.WriteRequest databaseId tableId _ _ _ -> Co.KeySpaceRange databaseId tableId Nothing Nothing
+  let (requestId, range) = case request of
+                CM.ReadRequest requestId databaseId tableId _ _ -> (requestId, Co.KeySpaceRange databaseId tableId Nothing Nothing)
+                CM.WriteRequest requestId databaseId tableId _ _ _ -> (requestId, Co.KeySpaceRange databaseId tableId Nothing Nothing)
   ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
   if Li.elem range ranges
     then addA $ Ac.Slave_Forward range eId $ Ms.ClientRequest request
     -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
-    else addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Error "the (database, table) doesn't exist"
+    else addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Error requestId "the (database, table) doesn't exist"
 
 createClientTask :: Co.EndpointId -> CM.ClientRequest -> Ta.Task DS.DerivedState
 createClientTask eId request =
   let description = show (eId, request)
   in case request of
-    CM.CreateDatabase databaseId tableId ->
+    CM.CreateDatabase requestId databaseId tableId ->
       let description = description
           tryHandling _ = do return False
           done _ = do
-            let response = CM.Success
+            let response = CM.Success requestId
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry derivedState =

@@ -36,7 +36,7 @@ startTabletThread rg keySpaceRange iActionChan connM = do
     handlePaxosMessage :: TS.TabletState -> IO ()
     handlePaxosMessage g = do
       iAction <- Ct.readChan iActionChan
-      let (_, (oActions, g')) = runST (TIH.handleInputAction iAction) g
+      let (_, (oActions, _, g')) = runST (TIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
       Mo.forM_ (reverse oActions) $ \action ->
         case action of

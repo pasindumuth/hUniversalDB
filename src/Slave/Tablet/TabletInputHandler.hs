@@ -70,32 +70,32 @@ createClientTask :: Co.KeySpaceRange -> Co.EndpointId -> CM.ClientRequest -> Ta.
 createClientTask keySpaceRange eId request =
   let description = show (eId, request)
   in case request of
-    (CM.ReadRequest _ _ key timestamp) ->
+    (CM.ReadRequest requestId _ _ key timestamp) ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
-                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ReadResponse $ MS.staticRead key timestamp (derivedState ^. DS.kvStore)
+                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ReadResponse requestId $ MS.staticRead key timestamp (derivedState ^. DS.kvStore)
                 return True
               _ -> return False
           done derivedState = do
             let value = derivedState ^. DS.kvStore & MS.staticRead key timestamp
-                response = CM.ReadResponse value
+                response = CM.ReadResponse requestId value
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet_Read key timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper
-    (CM.WriteRequest _ _ key value timestamp) ->
+    (CM.WriteRequest requestId _ _ key value timestamp) ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
-                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Error "Attempting to write into the past."
+                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Error requestId "Attempting to write into the past."
                 return True
               _ -> return False
           done derivedState = do
-            let response = CM.WriteResponse
+            let response = CM.WriteResponse requestId
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet_Write key value timestamp

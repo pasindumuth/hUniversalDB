@@ -15,10 +15,10 @@ import Infra.Internal_State
 
 type ST s a = STI ([Ac.OutputAction], Int, [TrM.TraceMessage]) s a
 
-runST :: ST s a -> s -> (a, ([Ac.OutputAction], s))
+runST :: ST s a -> s -> (a, ([Ac.OutputAction], [TrM.TraceMessage], s))
 runST st s =
-  let (ret, ((actions, _, _), state')) = St.runState st (([], 0, []), s)
-  in (ret, (actions, state'))
+  let (ret, ((actions, _, traceMsgs), state')) = St.runState st (([], 0, []), s)
+  in (ret, (actions, traceMsgs, state'))
 
 debugP :: String -> ST s ()
 debugP message =  St.state $ \((as, cnt, trace), s) ->

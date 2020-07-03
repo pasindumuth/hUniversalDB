@@ -22,16 +22,17 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.Env as En
 import qualified Slave.Tablet.TabletState as TS
-import Infra.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), at, ix, lp2, lp3, _1, _2,)
+import Infra.Lens
 import Infra.State
 
 type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
 type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)
 
-data TabletState = TabletState {
+data GlobalState = GlobalState {
   _slaveEIds :: [Co.EndpointId], -- EndpointIds for all slaves in the system
   _clientEIds :: [Co.EndpointId], -- EndpointIds for all client's we use for testing
   -- `queues` contains 2 queues (in for each direction) for every pair of
@@ -49,12 +50,12 @@ data TabletState = TabletState {
   _clocks :: Mp.Map Co.EndpointId Int
 } deriving (Show)
 
-makeLenses ''TabletState
+makeLenses ''GlobalState
 
 mkSlaveEId i = "s" ++ show i
 mkClientEId i = "c" ++ show i
 
-createGlobalState :: Int -> Int -> Int -> TabletState
+createGlobalState :: Int -> Int -> Int -> GlobalState
 createGlobalState seed numSlaves numClients =
   let slaveEIds = U.for [0..(numSlaves - 1)] $ mkSlaveEId
       clientEIds = U.for [0..(numClients - 1)] $ mkClientEId
@@ -72,7 +73,7 @@ createGlobalState seed numSlaves numClients =
       slaveState = Mp.fromList slaves
       asyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Sq.empty)
       clocks = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, 0)
-  in TabletState {
+  in GlobalState {
       _slaveEIds = slaveEIds,
       _clientEIds = clientEIds,
       _queues = queues,
@@ -83,7 +84,7 @@ createGlobalState seed numSlaves numClients =
       _clocks = clocks
     }
 
-addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST TabletState ()
+addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST GlobalState ()
 addMsg msg (fromEId, toEId) = do
   queue <- queues . ix fromEId . ix toEId .^^.* U.push msg
   if Sq.length queue == 1
@@ -91,7 +92,7 @@ addMsg msg (fromEId, toEId) = do
     else nonemptyQueues .^^. id
   return ()
 
-pollMsg :: (Co.EndpointId, Co.EndpointId) -> ST TabletState Ms.Message
+pollMsg :: (Co.EndpointId, Co.EndpointId) -> ST GlobalState Ms.Message
 pollMsg (fromEId, toEId) = do
   msg <- queues . ix fromEId . ix toEId .^^* U.poll
   queueLength <- queues . ix fromEId . ix toEId .^^^* Sq.length
@@ -100,7 +101,7 @@ pollMsg (fromEId, toEId) = do
     else nonemptyQueues .^^. id
   return msg
 
-runIAction :: Co.EndpointId -> Ac.InputAction -> ST TabletState ()
+runIAction :: Co.EndpointId -> Ac.InputAction -> ST GlobalState ()
 runIAction eId iAction = do
   (_, msgsO) <- runT (slaveState . ix eId) (TIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
@@ -112,7 +113,7 @@ runIAction eId iAction = do
         return ()
       _ -> return ()
 
-deliverMessage :: (Co.EndpointId, Co.EndpointId) -> ST TabletState ()
+deliverMessage :: (Co.EndpointId, Co.EndpointId) -> ST GlobalState ()
 deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
   slaveEIds' <- getL $ slaveEIds
@@ -123,7 +124,7 @@ deliverMessage (fromEId, toEId) = do
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
 -- `numMessages` number of messages.
-simulateOnce :: Int -> ST TabletState ()
+simulateOnce :: Int -> ST GlobalState ()
 simulateOnce numMessages = do
   -- increment each slave's clocks and run async tasks that are now ready
   eIds <- getL slaveEIds
@@ -148,14 +149,14 @@ simulateOnce numMessages = do
         deliverMessage queueId
 
 -- Simulate `n` milliseconds of execution
-simulateN :: Int -> ST TabletState ()
+simulateN :: Int -> ST GlobalState ()
 simulateN n = do
   numChans <- lp2 (slaveEIds, clientEIds) .^^^ \(s, c) -> (length s) + (length c)
   Mo.forM_ [1..n] $ \_ -> simulateOnce (numChans * (numChans + 1) `div` 2)
 
 -- Simulate execution until there are no more messages in any channel
 -- or any asyncQueue.
-simulateAll :: ST TabletState ()
+simulateAll :: ST GlobalState ()
 simulateAll = do
   numChans <- lp2 (slaveEIds, clientEIds) .^^^ \(s, c) -> (length s) + (length c)
   let simulate =
@@ -169,18 +170,18 @@ simulateAll = do
             else return ()
   simulate
 
-addClientMsg :: Int -> Int -> ST TabletState ()
+addClientMsg :: Int -> Int -> ST GlobalState ()
 addClientMsg slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = Ms.ClientRequest $ CM.WriteRequest "d" "t" ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
+      msg = Ms.ClientRequest $ CM.WriteRequest "uid" "d" "t" ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   addMsg msg (clientEId, slaveEId)
   return ()
 
-test1 :: ST TabletState ()
+test1 :: ST GlobalState ()
 test1 = do
   addClientMsg 0 0; simulateAll
 
-test2 :: ST TabletState ()
+test2 :: ST GlobalState ()
 test2 = do
   addClientMsg 0 0; simulateN 2
   addClientMsg 1 1; simulateN 2
@@ -188,7 +189,7 @@ test2 = do
   addClientMsg 3 3; simulateN 2
   addClientMsg 4 4; simulateN 2
 
-mergePaxosLog :: TabletState -> Maybe (Mp.Map PM.IndexT PM.PaxosLogEntry)
+mergePaxosLog :: GlobalState -> Maybe (Mp.Map PM.IndexT PM.PaxosLogEntry)
 mergePaxosLog g =
   let paxosLogs = g ^. slaveState & Mp.toList & map (^. _2 . TS.multiPaxosInstance.MP.paxosLog)
   in U.s31 foldl (Just Mp.empty) paxosLogs $
@@ -207,10 +208,74 @@ mergePaxosLog g =
                                           then mergedLogM
                                           else Nothing
 
-driveTest :: Int -> ST TabletState () -> IO ()
+data TestPaxosLog = TestPaxosLog {
+  _plog :: Mp.Map PM.IndexT PM.PaxosLogEntry,
+  _nextIdx :: PM.IndexT
+}
+
+makeLenses ''TestPaxosLog
+
+type TestPaxosLogs = Mp.Map Co.PaxosId TestPaxosLog
+
+addMsgs
+ :: Co.PaxosId
+ -> Int
+ -> Mp.Map Int PM.PaxosLogEntry
+ -> [TrM.TraceMessage]
+ -> (Int, [TrM.TraceMessage])
+addMsgs paxosId i m msgs =
+  case Mp.lookup i m of
+    Just v -> addMsgs paxosId (i + 1) m (TrM.PaxosInsertion paxosId i v : msgs)
+    Nothing -> (i, msgs)
+
+-- This list of trace messages includes all events across all slaves.
+verifyTrace :: [TrM.TraceMessage] -> IO ()
+verifyTrace msgs = do
+  -- First, we restructure the messages so that PaxosInsertions happen in order of
+  -- ascending index, as soon as possible. We also check to make sure that PaxosLog
+  -- entries are consistent.
+  let paxosLogsM :: Maybe (TestPaxosLogs, [TrM.TraceMessage]) =
+        U.s31 foldl (Just (Mp.empty, [])) msgs $ \paxosLogsM msg ->
+          case paxosLogsM of
+            Just (paxosLogs, modMsgs) ->
+              case msg of
+                TrM.PaxosInsertion paxosId index entry ->
+                  case paxosLogs ^. at paxosId of
+                    Just paxosLog ->
+                      case paxosLog ^. plog . at index of
+                        Just entry' ->
+                          if entry' == entry
+                            then paxosLogsM
+                            else Nothing
+                        _ ->
+                          let plog' = paxosLog ^. plog & at index ?~ entry
+                              (nextIdx', modMsgs') = addMsgs paxosId (paxosLog ^. nextIdx) plog' modMsgs
+                              paxosLog' = TestPaxosLog plog' nextIdx'
+                              paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
+                          in Just (paxosLogs', modMsgs')
+                    Nothing ->
+                      let plog' = Mp.empty & at index ?~ entry
+                          (nextIdx', modMsgs') = addMsgs paxosId 0 plog' modMsgs
+                          paxosLog' = TestPaxosLog plog' nextIdx'
+                          paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
+                      in Just (paxosLogs', modMsgs')
+                _ -> Just (paxosLogs, (msg:modMsgs))
+            _ -> Nothing
+
+  -- Next, we construct the mvkvs and ensure that the responses made to each client
+  -- request are correct (at the time the responses are issued).
+  case paxosLogsM of
+    Just (_, msgs) -> pPrintNoColor $ reverse msgs
+    Nothing -> print "Failed!"
+
+driveTest :: Int -> ST GlobalState () -> IO ()
 driveTest testNum test = do
   let g = createGlobalState 0 5 1
-      (_, (oActions, g')) = runST test g
+      (_, (oActions, traceMsgs, g')) = runST test g
+  -- We must reverse traceMsgs since that's created in reverse order,
+  -- with the most recent message first
+  verifyTrace $ reverse traceMsgs
+--  pPrintNoColor traceMsgs
   Mo.forM_ (reverse oActions) $ \action ->
     case action of
       Ac.Print message -> do
