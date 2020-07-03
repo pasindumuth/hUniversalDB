@@ -220,14 +220,13 @@ type TestPaxosLogs = Mp.Map Co.PaxosId TestPaxosLog
 
 addMsgs
  :: Co.PaxosId
- -> TrM.PaxosType
  -> PM.IndexT
  -> Mp.Map PM.IndexT PM.PaxosLogEntry
  -> [TrM.TraceMessage]
  -> (PM.IndexT, [TrM.TraceMessage])
-addMsgs paxosId paxosType i m msgs =
+addMsgs paxosId i m msgs =
   case Mp.lookup i m of
-    Just v -> addMsgs paxosId paxosType (i + 1) m (TrM.PaxosInsertion paxosId paxosType i v : msgs)
+    Just v -> addMsgs paxosId (i + 1) m (TrM.PaxosInsertion paxosId i v : msgs)
     Nothing -> (i, msgs)
 
 -- This functions restructures the messages so that PaxosInsertions occur in
@@ -239,7 +238,7 @@ refineTrace msgs =
     let paxosLogsE = U.s31 Mo.foldM (Mp.empty, []) msgs $
           \(paxosLogs, modMsgs) msg ->
             case msg of
-              TrM.PaxosInsertion paxosId paxosType index entry ->
+              TrM.PaxosInsertion paxosId index entry ->
                 case paxosLogs ^. at paxosId of
                   Just paxosLog ->
                     case paxosLog ^. plog . at index of
@@ -247,16 +246,16 @@ refineTrace msgs =
                         if entry' == entry
                           then Right (paxosLogs, modMsgs)
                           else Left $ "A PaxosLog entry mismatch occurred at: " ++
-                                      "PaxosId = " ++ show paxosId ++ ", paxosType = " ++ show paxosType
+                                      "PaxosId = " ++ show paxosId ++ ", Entry: " ++ show entry
                       _ ->
                         let plog' = paxosLog ^. plog & at index ?~ entry
-                            (nextIdx', modMsgs') = addMsgs paxosId paxosType (paxosLog ^. nextIdx) plog' modMsgs
+                            (nextIdx', modMsgs') = addMsgs paxosId (paxosLog ^. nextIdx) plog' modMsgs
                             paxosLog' = TestPaxosLog plog' nextIdx'
                             paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
                         in Right (paxosLogs', modMsgs')
                   Nothing ->
                     let plog' = Mp.empty & at index ?~ entry
-                        (nextIdx', modMsgs') = addMsgs paxosId paxosType 0 plog' modMsgs
+                        (nextIdx', modMsgs') = addMsgs paxosId 0 plog' modMsgs
                         paxosLog' = TestPaxosLog plog' nextIdx'
                         paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
                     in Right (paxosLogs', modMsgs')
@@ -273,8 +272,8 @@ type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
 --  let res = U.s31 Mo.foldM (Mp.empty, Mp.empty) msgs $
 --        \(requestMap, tables) msg ->
 --          case msg of
---            TrM.PaxosInsertion _ paxosType index entry ->
---              case paxosType of
+--            TrM.PaxosInsertion _ index entry ->
+--              case of
 --                TrM.Tablet ->
 --                  case entry of
 --                    PM.

@@ -12,12 +12,9 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.ClientMessages as CM
 
-data PaxosType = Tablet | Slave deriving (Gn.Generic, Bn.Binary, Show)
-
 data TraceMessage =
   PaxosInsertion {
     paxosId :: Co.PaxosId,
-    paxosType :: PaxosType,
     index :: PM.IndexT,
     entry :: PM.PaxosLogEntry } |
   ClientRequestReceived CM.ClientRequest |

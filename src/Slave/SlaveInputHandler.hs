@@ -74,8 +74,8 @@ handleInputAction iAction =
 handleForwarding :: Co.EndpointId -> CM.ClientRequest -> ST SS.SlaveState ()
 handleForwarding eId request = do
   let (requestId, range) = case request of
-                CM.ReadRequest requestId databaseId tableId _ _ -> (requestId, Co.KeySpaceRange databaseId tableId Nothing Nothing)
-                CM.WriteRequest requestId databaseId tableId _ _ _ -> (requestId, Co.KeySpaceRange databaseId tableId Nothing Nothing)
+        CM.ReadRequest requestId databaseId tableId _ _ -> (requestId, Co.KeySpaceRange databaseId tableId Nothing Nothing)
+        CM.WriteRequest requestId databaseId tableId _ _ _ -> (requestId, Co.KeySpaceRange databaseId tableId Nothing Nothing)
   ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
   if Li.elem range ranges
     then addA $ Ac.Slave_Forward range eId $ Ms.ClientRequest request
@@ -96,6 +96,6 @@ createClientTask eId request =
           createPLEntry derivedState =
             let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
                 generation = (derivedState ^. IDS.keySpaceManager.IKSM.generation) + 1
-            in PM.Slave_AddRange range generation
+            in PM.Slave $ PM.AddRange range generation
           msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper

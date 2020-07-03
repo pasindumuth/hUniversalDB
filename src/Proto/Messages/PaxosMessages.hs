@@ -11,19 +11,29 @@ import qualified GHC.Generics as Gn
 
 import qualified Proto.Common as Co
 
-data PaxosLogEntry =
-  -- Tablet
-  Tablet_Read {
+data Tablet_Entry =
+  Read {
     key :: String,
     timestamp :: Int } |
-  Tablet_Write {
+  Write {
     key :: String,
     value :: String,
-    timestamp :: Int } |
-  -- Slave
-  Slave_AddRange {
+    timestamp :: Int }
+  deriving (Gn.Generic, Bn.Binary, Show, Eq)
+
+data Slave_Entry =
+  AddRange {
     range :: Co.KeySpaceRange,
     generation :: Int }
+  deriving (Gn.Generic, Bn.Binary, Show, Eq)
+
+-- Todo: maybe it's better to namespace these PaxosLogEntries,
+-- since we have Tablet and Slave in TraceMessages which are there
+-- precisely to differentiate between different paxos logs for when
+-- we reconstruct data from the trace messages for testing.
+data PaxosLogEntry =
+  Tablet Tablet_Entry |
+  Slave Slave_Entry
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
 type IndexT = Int

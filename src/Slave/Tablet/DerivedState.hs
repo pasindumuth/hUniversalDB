@@ -16,10 +16,10 @@ import Infra.State
 handleDerivedState :: Co.PaxosId -> PL.PaxosLog -> PL.PaxosLog -> ST DS.DerivedState ()
 handleDerivedState paxosId pl pl' = do
   Mo.forM_ (PL.newlyAddedEntries pl pl') $ \(index, plEntry) -> do
-    trace $ TrM.PaxosInsertion paxosId TrM.Tablet index plEntry
+    trace $ TrM.PaxosInsertion paxosId index plEntry
     case plEntry of
-      PM.Tablet_Read key timestamp -> do
+      PM.Tablet (PM.Read key timestamp) -> do
         DS.kvStore .^^ MS.read key timestamp
         return ()
-      PM.Tablet_Write key value timestamp -> do
+      PM.Tablet (PM.Write key value timestamp) -> do
         DS.kvStore .^^ MS.write key value timestamp
