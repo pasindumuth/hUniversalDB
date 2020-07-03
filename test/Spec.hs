@@ -24,6 +24,7 @@ import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.TabletInputHandler as TIH
+import qualified Slave.Tablet.Internal_MultiVersionKVStore as IMS
 import qualified Slave.Tablet.Env as En
 import qualified Slave.Tablet.TabletState as TS
 import Infra.Lens
@@ -229,45 +230,70 @@ addMsgs paxosId paxosType i m msgs =
     Just v -> addMsgs paxosId paxosType (i + 1) m (TrM.PaxosInsertion paxosId paxosType i v : msgs)
     Nothing -> (i, msgs)
 
+-- This functions restructures the messages so that PaxosInsertions occur in
+-- order of their index, where the occur as early as they are first seen. This function
+-- also checks if the PaxosLogInsertion are consistent (i.e. the entry for a PaxosLogInsertion
+-- at a given PaxosId and Index are the same).
+refineTrace :: [TrM.TraceMessage] -> Either Co.ErrorMsg [TrM.TraceMessage]
+refineTrace msgs =
+    let paxosLogsE = U.s31 Mo.foldM (Mp.empty, []) msgs $
+          \(paxosLogs, modMsgs) msg ->
+            case msg of
+              TrM.PaxosInsertion paxosId paxosType index entry ->
+                case paxosLogs ^. at paxosId of
+                  Just paxosLog ->
+                    case paxosLog ^. plog . at index of
+                      Just entry' ->
+                        if entry' == entry
+                          then Right (paxosLogs, modMsgs)
+                          else Left $ "A PaxosLog entry mismatch occurred at: " ++
+                                      "PaxosId = " ++ show paxosId ++ ", paxosType = " ++ show paxosType
+                      _ ->
+                        let plog' = paxosLog ^. plog & at index ?~ entry
+                            (nextIdx', modMsgs') = addMsgs paxosId paxosType (paxosLog ^. nextIdx) plog' modMsgs
+                            paxosLog' = TestPaxosLog plog' nextIdx'
+                            paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
+                        in Right (paxosLogs', modMsgs')
+                  Nothing ->
+                    let plog' = Mp.empty & at index ?~ entry
+                        (nextIdx', modMsgs') = addMsgs paxosId paxosType 0 plog' modMsgs
+                        paxosLog' = TestPaxosLog plog' nextIdx'
+                        paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
+                    in Right (paxosLogs', modMsgs')
+              _ -> Right (paxosLogs, (msg:modMsgs))
+    in case paxosLogsE of
+      Right (paxosLogs, modMsgs) -> Right modMsgs
+      Left errMsg -> Left errMsg
+
+type RequestMap = Mp.Map Co.RequestId CM.ClientRequest
+type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
+
+--checkResponses :: [TrM.TraceMessage] -> IO ()
+--checkResponses msgs = do
+--  let res = U.s31 Mo.foldM (Mp.empty, Mp.empty) msgs $
+--        \(requestMap, tables) msg ->
+--          case msg of
+--            TrM.PaxosInsertion _ paxosType index entry ->
+--              case paxosType of
+--                TrM.Tablet ->
+--                  case entry of
+--                    PM.
+--                TrM.Slave -> error "Not handling Slaves yet."
+--
+
+
 -- This list of trace messages includes all events across all slaves.
 verifyTrace :: [TrM.TraceMessage] -> IO ()
 verifyTrace msgs = do
   -- First, we restructure the messages so that PaxosInsertions happen in order of
-  -- ascending index, as soon as possible. We also check to make sure that PaxosLog
-  -- entries are consistent.
-  let paxosLogsM :: Maybe (TestPaxosLogs, [TrM.TraceMessage]) =
-        U.s31 foldl (Just (Mp.empty, [])) msgs $ \paxosLogsM msg ->
-          case paxosLogsM of
-            Just (paxosLogs, modMsgs) ->
-              case msg of
-                TrM.PaxosInsertion paxosId paxosType index entry ->
-                  case paxosLogs ^. at paxosId of
-                    Just paxosLog ->
-                      case paxosLog ^. plog . at index of
-                        Just entry' ->
-                          if entry' == entry
-                            then paxosLogsM
-                            else Nothing
-                        _ ->
-                          let plog' = paxosLog ^. plog & at index ?~ entry
-                              (nextIdx', modMsgs') = addMsgs paxosId paxosType (paxosLog ^. nextIdx) plog' modMsgs
-                              paxosLog' = TestPaxosLog plog' nextIdx'
-                              paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
-                          in Just (paxosLogs', modMsgs')
-                    Nothing ->
-                      let plog' = Mp.empty & at index ?~ entry
-                          (nextIdx', modMsgs') = addMsgs paxosId paxosType 0 plog' modMsgs
-                          paxosLog' = TestPaxosLog plog' nextIdx'
-                          paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
-                      in Just (paxosLogs', modMsgs')
-                _ -> Just (paxosLogs, (msg:modMsgs))
-            _ -> Nothing
+  -- ascending index, ensuring that the entries are all consistent.
+  let paxosLogsE = refineTrace msgs
 
   -- Next, we construct the mvkvs and ensure that the responses made to each client
   -- request are correct (at the time the responses are issued).
-  case paxosLogsM of
-    Just (_, msgs) -> pPrintNoColor $ reverse msgs
-    Nothing -> print "Failed!"
+  case paxosLogsE of
+    Right (msgs) -> pPrintNoColor $ reverse msgs
+    Left errMsg -> print $ "Failed!: " ++ errMsg
 
 driveTest :: Int -> ST GlobalState () -> IO ()
 driveTest testNum test = do

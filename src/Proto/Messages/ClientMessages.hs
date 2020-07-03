@@ -9,21 +9,23 @@ import qualified Data.Binary as Bn
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
+import qualified Proto.Common as Co
+
 data ClientRequest =
   CreateDatabase {
-    requestId :: String,
-    databaseId :: String,
-    tableId :: String } |
+    requestId :: Co.RequestId,
+    databaseId :: Co.DatabaseId,
+    tableId :: Co.TableId } |
   ReadRequest {
-    requestId :: String,
-    databaseId :: String,
-    tableId :: String,
+    requestId :: Co.RequestId,
+    databaseId :: Co.DatabaseId,
+    tableId :: Co.TableId,
     key :: String,
     timestamp :: Int } |
   WriteRequest {
-    requestId :: String,
-    databaseId :: String,
-    tableId :: String,
+    requestId :: Co.RequestId,
+    databaseId :: Co.DatabaseId,
+    tableId :: Co.TableId,
     key :: String,
     value :: String,
     timestamp :: Int }
@@ -31,13 +33,13 @@ data ClientRequest =
 
 data ClientResponse =
   Error {
-    requestId :: String,
+    requestId :: Co.RequestId,
     message :: String } |
   ReadResponse {
-    requestId :: String,
+    requestId :: Co.RequestId,
     value :: Maybe String } |
   WriteResponse {
-    requestId :: String } |
+    requestId :: Co.RequestId } |
   Success {
-    requestId :: String }
+    requestId :: Co.RequestId }
   deriving (Gn.Generic, Bn.Binary, Show)

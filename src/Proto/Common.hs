@@ -12,6 +12,12 @@ import qualified GHC.Generics as Gn
 type EndpointId = String
 type PaxosId = String
 
+type RequestId = String
+type DatabaseId = String
+type TableId = String
+
+type ErrorMsg = String
+
 data KeySpaceRange = KeySpaceRange {
   databaseId :: String,
   tableId :: String,
