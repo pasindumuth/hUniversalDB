@@ -21,7 +21,7 @@ import Infra.State
 
 slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
 
-type TabletMap = Mp.Map Co.KeySpaceRange (Ct.Chan Ac.InputAction)
+type TabletMap = Mp.Map Co.KeySpaceRange (Ct.Chan Ac.TabletInputAction)
 
 startSlaveThread
   :: Rn.StdGen
@@ -58,8 +58,8 @@ startSlaveThread rg iActionChan connM = do
             tabletIActionChan <- Ct.newChan
             Ct.forkIO $ TT.startTabletThread tabletRand range tabletIActionChan connM
             return (g'', tabletMap & Mp.insert range tabletIActionChan)
-          Ac.Slave_Forward range eId msg -> do
+          Ac.TabletForward range eId msg -> do
             let tabletIActionChan = tabletMap ^?! ix range
-            Ct.writeChan tabletIActionChan $ Ac.Receive eId msg
+            Ct.writeChan tabletIActionChan $ Ac.TabletReceive eId msg
             return (g', tabletMap)
       handlePaxosMessage g'' tabletMap'

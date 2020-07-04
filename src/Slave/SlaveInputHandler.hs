@@ -14,6 +14,7 @@ import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.SlaveMessages as SM
+import qualified Proto.Messages.TabletMessages as TM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.DerivedState as DS
 import qualified Slave.Env as En
@@ -47,17 +48,25 @@ handleInputAction iAction =
     Ac.Receive eId msg ->
       case msg of
         Ms.ClientRequest request -> do
+          let requestId = (request ^. CRq.meta.CRq.requestId)
           trace $ TrM.ClientRequestReceived request
           case request ^. CRq.payload of
             CRq.CreateDatabase databaseId tableId -> do
               let description = show (eId, request)
-                  requestId = (request ^. CRq.meta.CRq.requestId)
-                  task = createCreateDBTask eId description requestId (databaseId, tableId)
+                  task = createCreateDBTask eId requestId (databaseId, tableId) description
               handlingState .^ (PTM.handleTask task)
-            CRq.ReadRequest databaseId tableId _ _ ->
-              handleForwarding eId (databaseId, tableId) request
-            CRq.WriteRequest databaseId tableId _ _ _ ->
-              handleForwarding eId (databaseId, tableId) request
+            CRq.ReadRequest databaseId tableId key timestamp -> do
+              let forwardedRequest =
+                    TM.ClientRequest
+                      (TM.RequestMeta requestId)
+                      (TM.ReadRequest key timestamp)
+              handleForwarding eId requestId (databaseId, tableId) forwardedRequest
+            CRq.WriteRequest databaseId tableId key value timestamp -> do
+              let forwardedRequest =
+                    TM.ClientRequest
+                      (TM.RequestMeta requestId)
+                      (TM.WriteRequest key value timestamp)
+              handleForwarding eId requestId (databaseId, tableId) forwardedRequest
         Ms.SlaveMessage slaveMsg ->
           case slaveMsg of
             SM.MultiPaxosMessage multiPaxosMsg -> do
@@ -73,38 +82,39 @@ handleInputAction iAction =
                   SS.derivedState .^ DS.handleDerivedState paxosId pl pl'
                   handlingState .^ PTM.handleInsert
                 else return ()
-        Ms.TabletMessage keySpaceRange _ -> do
+        Ms.TabletMessage keySpaceRange tabletMsg -> do
           ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
           if Li.elem keySpaceRange ranges
-            then addA $ Ac.Slave_Forward keySpaceRange eId msg
+            then addA $ Ac.TabletForward keySpaceRange eId tabletMsg
             else return ()
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
 handleForwarding
   :: Co.EndpointId
+  -> String
   -> (String, String)
-  -> CRq.ClientRequest
+  -> TM.ClientRequest
   -> ST SS.SlaveState ()
-handleForwarding eId (databaseId, tableId) request = do
+handleForwarding eId requestId (databaseId, tableId) request = do
   let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
   ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
   if Li.elem range ranges
-    then addA $ Ac.Slave_Forward range eId $ Ms.ClientRequest request
+    then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest request
     -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
     else addA $ Ac.Send [eId] $
           Ms.ClientResponse
             (CRs.ClientResponse
-              (CRs.ResponseMeta (request ^. CRq.meta.CRq.requestId))
+              (CRs.ResponseMeta requestId)
               (CRs.Error dbTableDNE))
 
 createCreateDBTask
   :: Co.EndpointId
   -> String
-  -> String
   -> (String, String)
+  -> String
   -> Ta.Task DS.DerivedState
-createCreateDBTask eId description requestId (databaseId, tableId) =
+createCreateDBTask eId requestId (databaseId, tableId) description =
   let tryHandling _ = do return False
       done _ = do
         let response =

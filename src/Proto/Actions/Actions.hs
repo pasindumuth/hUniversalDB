@@ -11,10 +11,17 @@ import qualified GHC.Generics as Gn
 
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
+import qualified Proto.Messages.TabletMessages as TM
 
 data InputAction =
   Receive { eId :: Co.EndpointId, msg :: Ms.Message } |
   RetryInput { counterValue :: Int }
+  deriving (Gn.Generic, Bn.Binary, Show)
+
+-- TODO: should we create TabletActions.hs? If so, do we also make TabletOutputAction?
+data TabletInputAction =
+  TabletReceive { eId :: Co.EndpointId, tabletMsg :: TM.TabletMessage } |
+  TabletRetryInput { counterValue :: Int }
   deriving (Gn.Generic, Bn.Binary, Show)
 
 data OutputAction =
@@ -22,4 +29,5 @@ data OutputAction =
   RetryOutput { counterValue :: Int } |
   Print { message :: String } |
   Slave_CreateTablet { range :: Co.KeySpaceRange } |
-  Slave_Forward { range :: Co.KeySpaceRange, eId :: Co.EndpointId, msg :: Ms.Message }
+  TabletForward { range :: Co.KeySpaceRange, eId :: Co.EndpointId, tabletMsg :: TM.TabletMessage }
+  deriving (Gn.Generic, Bn.Binary, Show)

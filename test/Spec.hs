@@ -23,6 +23,7 @@ import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages.TabletMessages as TM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.MultiVersionKVStore as MS
@@ -50,7 +51,7 @@ data GlobalState = GlobalState {
 
   -- The following are everything related to asynchronous computation
   -- done at a node.
-  _asyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (Ac.InputAction, Int)),
+  _asyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (Ac.TabletInputAction, Int)),
   _clocks :: Mp.Map Co.EndpointId Int
 } deriving (Show)
 
@@ -105,7 +106,7 @@ pollMsg (fromEId, toEId) = do
     else nonemptyQueues .^^. id
   return msg
 
-runIAction :: Co.EndpointId -> Ac.InputAction -> ST GlobalState ()
+runIAction :: Co.EndpointId -> Ac.TabletInputAction -> ST GlobalState ()
 runIAction eId iAction = do
   (_, msgsO) <- runT (slaveState . ix eId) (TIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
@@ -113,7 +114,7 @@ runIAction eId iAction = do
       Ac.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
       Ac.RetryOutput counterValue -> do
         currentTime <- getT $ clocks . ix eId
-        asyncQueues . ix eId .^^.* U.push (Ac.RetryInput counterValue, currentTime + 100)
+        asyncQueues . ix eId .^^.* U.push (Ac.TabletRetryInput counterValue, currentTime + 100)
         return ()
       _ -> return ()
 
@@ -122,7 +123,25 @@ deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
   slaveEIds' <- getL $ slaveEIds
   if Li.elem toEId slaveEIds'
-    then runIAction toEId $ Ac.Receive fromEId msg
+    then do
+      tabletMsg <-
+        case msg of
+          Ms.ClientRequest request -> do
+            trace $ TrM.ClientRequestReceived request
+            let requestId = request ^. CRq.meta.CRq.requestId        
+            case request ^. CRq.payload of
+              CRq.ReadRequest _ _ key timestamp ->
+                return $ TM.ForwardedClientRequest
+                          (TM.ClientRequest
+                            (TM.RequestMeta requestId)
+                            (TM.ReadRequest key timestamp))
+              CRq.WriteRequest _ _ key value timestamp ->
+                return $ TM.ForwardedClientRequest
+                           (TM.ClientRequest
+                             (TM.RequestMeta requestId)
+                             (TM.WriteRequest key value timestamp))
+          Ms.TabletMessage _ tabletMsg -> return tabletMsg
+      runIAction toEId $ Ac.TabletReceive fromEId tabletMsg
     else return ()
 
 -- Simulate one millisecond of execution. This involves incrementing the slave's
@@ -190,7 +209,7 @@ addClientMsg uid slaveId cliengMsgId = do
                   ("key " ++ show cliengMsgId)
                   ("value " ++ show cliengMsgId)
                   1))
-    
+
   addMsg msg (clientEId, slaveEId)
   return ()
 

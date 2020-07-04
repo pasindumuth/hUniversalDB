@@ -10,8 +10,13 @@ import qualified GHC.Generics as Gn
 
 import qualified Proto.Common as Co
 import qualified Proto.Messages.PaxosMessages as PM
+import Infra.Lens
 
-data ForwardedClientRequest =
+data RequestMeta = RequestMeta {
+  _requestId :: Co.RequestId
+} deriving (Gn.Generic, Bn.Binary, Show)
+
+data RequestPayload =
   ReadRequest {
     key :: String,
     timestamp :: Int } |
@@ -21,7 +26,15 @@ data ForwardedClientRequest =
     timestamp :: Int }
   deriving (Gn.Generic, Bn.Binary, Show)
 
+data ClientRequest = ClientRequest {
+  _meta :: RequestMeta,
+  _payload :: RequestPayload
+} deriving (Gn.Generic, Bn.Binary, Show)
+
+makeLenses ''RequestMeta
+makeLenses ''ClientRequest
+
 data TabletMessage =
-  ForwardedClientRequest ForwardedClientRequest |
+  ForwardedClientRequest ClientRequest |
   MultiPaxosMessage PM.MultiPaxosMessage
   deriving (Gn.Generic, Bn.Binary, Show)

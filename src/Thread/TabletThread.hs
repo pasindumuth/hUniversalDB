@@ -23,7 +23,7 @@ slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7
 startTabletThread
   :: Rn.StdGen
   -> Co.KeySpaceRange
-  -> Ct.Chan (Ac.InputAction)
+  -> Ct.Chan (Ac.TabletInputAction)
   -> MV.MVar Cn.Connections
   -> IO ()
 startTabletThread rg keySpaceRange iActionChan connM = do
@@ -45,7 +45,7 @@ startTabletThread rg keySpaceRange iActionChan connM = do
           Ac.RetryOutput counterValue -> do
             Ct.forkIO $ do
               Ct.threadDelay 100000
-              Ct.writeChan iActionChan $ Ac.RetryInput counterValue
+              Ct.writeChan iActionChan $ Ac.TabletRetryInput counterValue
             return ()
           Ac.Print message -> do
             print message
