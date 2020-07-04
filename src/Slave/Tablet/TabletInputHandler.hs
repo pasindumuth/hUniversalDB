@@ -37,6 +37,8 @@ handlingState =
     TS.env.En.rand,
     TS.env.En.slaveEIds))
 
+pastWriteAttempt = "Attempting to write into the past."
+
 handleInputAction
   :: Ac.InputAction
   -> ST TS.TabletState ()
@@ -67,35 +69,36 @@ handleInputAction iAction =
       handlingState .^ PTM.handleRetry counterValue
 
 createClientTask :: Co.KeySpaceRange -> Co.EndpointId -> CM.ClientRequest -> Ta.Task DS.DerivedState
-createClientTask keySpaceRange eId request =
+createClientTask keySpaceRange eId request@(CM.ClientRequest (CM.RequestMeta requestId) payload) =
   let description = show (eId, request)
-  in case request of
-    (CM.ReadRequest requestId _ _ key timestamp) ->
+  in case payload of
+    (CM.ReadRequest _ _ key timestamp) ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
-                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ReadResponse requestId $ MS.staticRead key timestamp (derivedState ^. DS.kvStore)
+                let value = MS.staticRead key timestamp (derivedState ^. DS.kvStore)
+                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ClientResponse (CM.ResponseMeta requestId) $ CM.ReadResponse value
                 return True
               _ -> return False
           done derivedState = do
             let value = derivedState ^. DS.kvStore & MS.staticRead key timestamp
-                response = CM.ReadResponse requestId value
+                response = CM.ClientResponse (CM.ResponseMeta requestId) $ CM.ReadResponse value
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Read key timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper
-    (CM.WriteRequest requestId _ _ key value timestamp) ->
+    (CM.WriteRequest _ _ key value timestamp) ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
-                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.Error requestId "Attempting to write into the past."
+                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ClientResponse (CM.ResponseMeta requestId) $ CM.Error pastWriteAttempt
                 return True
               _ -> return False
           done derivedState = do
-            let response = CM.WriteResponse requestId
+            let response = CM.ClientResponse (CM.ResponseMeta requestId) $ CM.WriteResponse
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Write key value timestamp

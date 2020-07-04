@@ -28,6 +28,7 @@ import qualified Slave.Tablet.MultiVersionKVStore as MS
 import qualified Slave.Tablet.Internal_MultiVersionKVStore as IMS
 import qualified Slave.Tablet.Env as En
 import qualified Slave.Tablet.TabletState as TS
+import qualified Slave.SlaveInputHandler as SIH
 import Infra.Lens
 import Infra.State
 
@@ -176,24 +177,24 @@ simulateAll = do
 defaultDatabaseId = "d"
 defaultTableId = "t"
 
-addClientMsg :: Int -> Int -> ST GlobalState ()
-addClientMsg slaveId cliengMsgId = do
+addClientMsg :: String -> Int -> Int -> ST GlobalState ()
+addClientMsg uid slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = Ms.ClientRequest $ CM.WriteRequest "uid" defaultDatabaseId defaultTableId ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
+      msg = Ms.ClientRequest $ CM.ClientRequest (CM.RequestMeta uid) $ CM.WriteRequest defaultDatabaseId defaultTableId ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   addMsg msg (clientEId, slaveEId)
   return ()
 
 test1 :: ST GlobalState ()
 test1 = do
-  addClientMsg 0 0; simulateAll
+  addClientMsg "0" 0 0; simulateAll
 
 test2 :: ST GlobalState ()
 test2 = do
-  addClientMsg 0 0; simulateN 2
-  addClientMsg 1 1; simulateN 2
-  addClientMsg 2 2; simulateN 2
-  addClientMsg 3 3; simulateN 2
-  addClientMsg 4 4; simulateN 2
+  addClientMsg "4" 0 0; simulateN 2
+  addClientMsg "3" 1 1; simulateN 2
+  addClientMsg "2" 2 2; simulateN 2
+  addClientMsg "1" 3 3; simulateN 2
+  addClientMsg "0" 4 4; simulateN 2
 
 mergePaxosLog :: GlobalState -> Maybe (Mp.Map PM.IndexT PM.PaxosLogEntry)
 mergePaxosLog g =
@@ -266,71 +267,104 @@ refineTrace msgs =
                     in Right (paxosLogs', modMsgs')
               _ -> Right (paxosLogs, (msg:modMsgs))
     in case paxosLogsE of
-      Right (paxosLogs, modMsgs) -> Right modMsgs
+      Right (paxosLogs, modMsgs) -> Right $ reverse modMsgs
       Left errMsg -> Left errMsg
 
-type RequestMap = Mp.Map Co.RequestId CM.ClientRequest
+type RequestMap = Mp.Map Co.RequestId CM.RequestPayload
 type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
 
----- TODO: We should be able to construct the (databaseId, tabletId)
----- from the Slave messages. We'll do that later when we handle Slave messages.
---checkResponses :: [TrM.TraceMessage] -> IO ()
---checkResponses msgs = do
---  let tables = Mp.empty & Mp.insert (defaultDatabaseId, defaultTableId) Mp.empty
---  let res = U.s31 Mo.foldM (Mp.empty, tables) msgs $
---        \(requestMap, tables) msg ->
---          case msg of
---            TrM.PaxosInsertion _ _ entry ->
---              case entry of
---                PM.Tablet entry ->
---                  let (_, tables') =
---                        case entry of
---                          PM.Read key timestamp ->
---                            tables %^~* (ix (defaultDatabaseId, defaultTableId)) $ MS.read key timestamp
---                          PM.Write key value timestamp ->
---                            tables %^~* (ix (defaultDatabaseId, defaultTableId)) $ MS.write key value timestamp
---                  in (requestMap, tables')
---            TrM.ClientRequestReceived request ->
---              let requestId =
---                    case request of
---                      CM.CreateDatabase requestId _ _ -> requestId
---                      CM.ReadRequest requestId _ _ _ _ -> requestId
---                      CM.WriteRequest requestId _ _ _ _ _ -> requestId
---              in
---  return ()
+-- TODO: We should be able to construct the (databaseId, tabletId)
+-- from the Slave messages. We'll do that later when we handle Slave messages.
+-- TODO: Implement lenses for client messages, and use them.
+checkResponses :: [TrM.TraceMessage] -> Either String ()
+checkResponses msgs =
+  let tables = Mp.empty & Mp.insert (defaultDatabaseId, defaultTableId) Mp.empty
+      genericError response payload = "Response " ++ show response ++ " is the wrong response to Request " ++ show payload
+      testRes = U.s31 Mo.foldM (Mp.empty, tables) msgs $
+        \(requestMap, tables) msg ->
+          case msg of
+            TrM.PaxosInsertion _ _ entry ->
+              case entry of
+                PM.Tablet entry ->
+                  case entry of
+                    PM.Read key timestamp ->
+                      -- TODO: use the paxosId to figure out which table this entry belongs to.
+                      let (_, tables') = tables %^~* (ix (defaultDatabaseId, defaultTableId)) $ MS.read key timestamp
+                      in Right (requestMap, tables')
+                    PM.Write key value timestamp ->
+                      -- TODO: check for the case where the lat would fail due to the lat
+                      let (_, tables') = tables %^~* (ix (defaultDatabaseId, defaultTableId)) $ MS.write key value timestamp
+                      in Right (requestMap, tables')
+            TrM.ClientRequestReceived request@(CM.ClientRequest (CM.RequestMeta requestId) payload) ->
+              Right (requestMap & Mp.insert requestId payload, tables)
+            TrM.ClientResponseSent response@(CM.ClientResponse (CM.ResponseMeta requestId) responsePayload) ->
+              case requestMap ^. at requestId of
+                Nothing -> Left $ "Response " ++ show response ++ " has no corresponding request."
+                Just payload ->
+                  case payload of
+                    -- TODO: deal with CreateDatabase
+                    CM.ReadRequest databaseId tableId key timestamp ->
+                      case tables ^. at (databaseId, tableId) of
+                        Just table ->
+                          case responsePayload of
+                            CM.ReadResponse val | val == (MS.staticRead key timestamp table) -> Right (requestMap, tables)
+                            _ -> Left $ genericError response payload
+                        Nothing ->
+                          case responsePayload of
+                            CM.Error msg | msg == SIH.dbTableDNE -> Right (requestMap, tables)
+                            _ -> Left $ genericError response payload
+                    CM.WriteRequest databaseId tableId key value timestamp ->
+                      case tables ^. at (databaseId, tableId) of
+                        Just table ->
+                          case MS.staticReadLat key table of
+                            Just lat ->
+                              case responsePayload of
+                                -- The lat should be equal to timestamp. This is because by this point in
+                                -- the trace messages, the write PaxosLogEntry should have been encoutered.
+                                -- TODO: it's possible that the `lat` was already here when the WriteRequest was received
+                                -- but that we're accidentally returning a `WriteResponse` instead of an error. We must
+                                -- figure out how to handle this issue.
+                                CM.WriteResponse | lat == timestamp -> Right (requestMap, tables)
+                                CM.Error msg | msg == TIH.pastWriteAttempt -> Right (requestMap, tables)
+                                _ -> Left $ genericError response payload
+                            Nothing -> Left $ genericError response payload
+                        Nothing ->
+                          case responsePayload of
+                            CM.Error msg | msg == SIH.dbTableDNE -> Right (requestMap, tables)
+                            _ -> Left $ genericError response payload
+  in case testRes of
+    Right _ -> Right ()
+    Left errMsg -> Left errMsg
 
 
 -- This list of trace messages includes all events across all slaves.
-verifyTrace :: [TrM.TraceMessage] -> IO ()
-verifyTrace msgs = do
+verifyTrace :: [TrM.TraceMessage] -> Either String ()
+verifyTrace msgs =
   -- First, we restructure the messages so that PaxosInsertions happen in order of
   -- ascending index, ensuring that the entries are all consistent.
   let paxosLogsE = refineTrace msgs
-
-  -- Next, we construct the mvkvs and ensure that the responses made to each client
-  -- request are correct (at the time the responses are issued).
-  case paxosLogsE of
-    Right (msgs) -> pPrintNoColor $ reverse msgs
-    Left errMsg -> print $ "Failed!: " ++ errMsg
+  in case paxosLogsE of
+    Left errMsg -> Left errMsg
+    Right msgs ->
+      -- Next, we construct the mvkvs and ensure that the responses made to each client
+      -- request are correct (at the time the responses are issued).
+      let responseCheck = checkResponses msgs
+      in case responseCheck of
+        Left errMsg -> Left errMsg
+        Right _ -> Right ()
 
 driveTest :: Int -> ST GlobalState () -> IO ()
 driveTest testNum test = do
   let g = createGlobalState 0 5 1
       (_, (oActions, traceMsgs, g')) = runST test g
-  -- We must reverse traceMsgs since that's created in reverse order,
-  -- with the most recent message first
-  verifyTrace $ reverse traceMsgs
+      -- We must reverse traceMsgs since that's created in reverse order,
+      -- with the most recent message first
+      testMsg =
+        case verifyTrace $ reverse traceMsgs of
+          Left errMsg -> "Test " ++ (show testNum) ++ " Failed! Error: " ++ errMsg
+          Right _ -> "Test " ++ (show testNum) ++ " Passed! " ++ (show $ Li.length traceMsgs) ++ " trace messages."
+  print testMsg
 --  pPrintNoColor traceMsgs
-  Mo.forM_ (reverse oActions) $ \action ->
-    case action of
-      Ac.Print message -> do
-        print message
-      _ -> return ()
-  case mergePaxosLog g' of
-    Just mergedLog -> print $
-      "Test " ++ (show testNum) ++ " Passed! " ++ (show $ Mp.size mergedLog) ++ " entries."
-    Nothing -> print $
-      "Test " ++ (show testNum) ++ " Failed!"
   return ()
 
 testDriver :: IO ()
