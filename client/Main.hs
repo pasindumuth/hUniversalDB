@@ -13,7 +13,7 @@ import qualified System.Environment as SE
 import qualified Infra.Logging as Lg
 import qualified Net.Connections as Cn
 import qualified Proto.Messages as Ms
-import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages.ClientRequests as CRq
 
 -- Example commands:
 -- r d t k 0
@@ -31,11 +31,11 @@ startClient (ip:message) = do
       line <- getLine
       case words line of
         ["r", databaseId, tableId, key, timestamp] -> do
-          Cn.sendMessage socket $ Ms.ClientRequest $ CM.ClientRequest (CM.RequestMeta "uid") $ CM.ReadRequest databaseId tableId key (read timestamp)
+          Cn.sendMessage socket $ Ms.ClientRequest $ CRq.ClientRequest (CRq.RequestMeta "uid") $ CRq.ReadRequest databaseId tableId key (read timestamp)
         ["w", databaseId, tableId, key, value, timestamp] -> do
-          Cn.sendMessage socket $ Ms.ClientRequest $ CM.ClientRequest (CM.RequestMeta "uid") $ CM.WriteRequest databaseId tableId key value (read timestamp)
+          Cn.sendMessage socket $ Ms.ClientRequest $ CRq.ClientRequest (CRq.RequestMeta "uid") $ CRq.WriteRequest databaseId tableId key value (read timestamp)
         ["c", databaseId, tableId] -> do
-          Cn.sendMessage socket $ Ms.ClientRequest $ CM.ClientRequest (CM.RequestMeta "uid") $ CM.CreateDatabase databaseId tableId
+          Cn.sendMessage socket $ Ms.ClientRequest $ CRq.ClientRequest (CRq.RequestMeta "uid") $ CRq.CreateDatabase databaseId tableId
         _ -> print "Unrecognized command or number of arguments"
 
 main :: IO ()

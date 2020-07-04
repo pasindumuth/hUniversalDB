@@ -3,7 +3,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Proto.Messages.ClientMessages where
+module Proto.Messages.ClientRequests where
 
 import qualified Data.Binary as Bn
 import qualified Data.Default as Df
@@ -13,7 +13,7 @@ import qualified Proto.Common as Co
 import Infra.Lens
 
 data RequestMeta = RequestMeta {
-  requestId :: Co.RequestId
+  _requestId :: Co.RequestId
 } deriving (Gn.Generic, Bn.Binary, Show)
 
 data RequestPayload =
@@ -34,22 +34,9 @@ data RequestPayload =
   deriving (Gn.Generic, Bn.Binary, Show)
 
 data ClientRequest = ClientRequest {
-  requestMeta :: RequestMeta,
-  requestPayload :: RequestPayload
+  _meta :: RequestMeta,
+  _payload :: RequestPayload
 } deriving (Gn.Generic, Bn.Binary, Show)
 
-data ResponseMeta = ResponseMeta {
-  requestId :: Co.RequestId
-} deriving (Gn.Generic, Bn.Binary, Show)
-
-data ResponsePayload =
-  Error { message :: String } |
-  ReadResponse { value :: Maybe String } |
-  WriteResponse |
-  Success
-  deriving (Gn.Generic, Bn.Binary, Show)
-
-data ClientResponse = ClientResponse {
-  responseMeta :: ResponseMeta,
-  responsePayload :: ResponsePayload
-} deriving (Gn.Generic, Bn.Binary, Show)
+makeLenses ''RequestMeta
+makeLenses '' ClientRequest

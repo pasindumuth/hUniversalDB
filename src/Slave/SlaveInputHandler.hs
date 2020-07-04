@@ -10,7 +10,8 @@ import qualified Paxos.Tasks.Task as Ta
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
-import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages.ClientRequests as CRq
+import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.SlaveMessages as SM
 import qualified Proto.Messages.TraceMessages as TrM
@@ -47,9 +48,16 @@ handleInputAction iAction =
       case msg of
         Ms.ClientRequest request -> do
           trace $ TrM.ClientRequestReceived request
-          case request of
-            CM.ClientRequest _ (CM.CreateDatabase _ _) -> handlingState .^ (PTM.handleTask $ createClientTask eId request)
-            _ -> handleForwarding eId request
+          case request ^. CRq.payload of
+            CRq.CreateDatabase databaseId tableId -> do
+              let description = show (eId, request)
+                  requestId = (request ^. CRq.meta.CRq.requestId)
+                  task = createCreateDBTask eId description requestId (databaseId, tableId)
+              handlingState .^ (PTM.handleTask task)
+            CRq.ReadRequest databaseId tableId _ _ ->
+              handleForwarding eId (databaseId, tableId) request
+            CRq.WriteRequest databaseId tableId _ _ _ ->
+              handleForwarding eId (databaseId, tableId) request
         Ms.SlaveMessage slaveMsg ->
           case slaveMsg of
             SM.MultiPaxosMessage multiPaxosMsg -> do
@@ -73,31 +81,41 @@ handleInputAction iAction =
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
-handleForwarding :: Co.EndpointId -> CM.ClientRequest -> ST SS.SlaveState ()
-handleForwarding eId request@(CM.ClientRequest (CM.RequestMeta requestId) payload) = do
-  let range = case payload of
-        CM.ReadRequest databaseId tableId _ _ -> Co.KeySpaceRange databaseId tableId Nothing Nothing
-        CM.WriteRequest databaseId tableId _ _ _ -> Co.KeySpaceRange databaseId tableId Nothing Nothing
+handleForwarding
+  :: Co.EndpointId
+  -> (String, String)
+  -> CRq.ClientRequest
+  -> ST SS.SlaveState ()
+handleForwarding eId (databaseId, tableId) request = do
+  let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
   ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
   if Li.elem range ranges
     then addA $ Ac.Slave_Forward range eId $ Ms.ClientRequest request
     -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
-    else addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ClientResponse (CM.ResponseMeta requestId) $ CM.Error dbTableDNE
+    else addA $ Ac.Send [eId] $
+          Ms.ClientResponse
+            (CRs.ClientResponse
+              (CRs.ResponseMeta (request ^. CRq.meta.CRq.requestId))
+              (CRs.Error dbTableDNE))
 
-createClientTask :: Co.EndpointId -> CM.ClientRequest -> Ta.Task DS.DerivedState
-createClientTask eId request@(CM.ClientRequest (CM.RequestMeta requestId) payload) =
-  let description = show (eId, request)
-  in case payload of
-    CM.CreateDatabase databaseId tableId ->
-      let description = description
-          tryHandling _ = do return False
-          done _ = do
-            let response = CM.ClientResponse (CM.ResponseMeta requestId) CM.Success  
-            trace $ TrM.ClientResponseSent response
-            addA $ Ac.Send [eId] $ Ms.ClientResponse response
-          createPLEntry derivedState =
-            let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
-                generation = (derivedState ^. IDS.keySpaceManager.IKSM.generation) + 1
-            in PM.Slave $ PM.AddRange range generation
-          msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
-      in Ta.Task description tryHandling done createPLEntry msgWrapper
+createCreateDBTask
+  :: Co.EndpointId
+  -> String
+  -> String
+  -> (String, String)
+  -> Ta.Task DS.DerivedState
+createCreateDBTask eId description requestId (databaseId, tableId) =
+  let tryHandling _ = do return False
+      done _ = do
+        let response =
+              CRs.ClientResponse
+                (CRs.ResponseMeta requestId)
+                (CRs.Success)
+        trace $ TrM.ClientResponseSent response
+        addA $ Ac.Send [eId] $ Ms.ClientResponse response
+      createPLEntry derivedState =
+        let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
+            generation = (derivedState ^. IDS.keySpaceManager.IKSM.generation) + 1
+        in PM.Slave $ PM.AddRange range generation
+      msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
+  in Ta.Task description tryHandling done createPLEntry msgWrapper

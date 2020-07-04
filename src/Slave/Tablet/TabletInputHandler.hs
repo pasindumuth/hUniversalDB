@@ -15,7 +15,8 @@ import qualified System.Random as Rn
 
 import qualified Paxos.Tasks.Task as Ta
 import qualified Proto.Common as Co
-import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages.ClientRequests as CRq
+import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TabletMessages as TM
 import qualified Proto.Messages.TraceMessages as TrM
@@ -68,37 +69,37 @@ handleInputAction iAction =
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
-createClientTask :: Co.KeySpaceRange -> Co.EndpointId -> CM.ClientRequest -> Ta.Task DS.DerivedState
-createClientTask keySpaceRange eId request@(CM.ClientRequest (CM.RequestMeta requestId) payload) =
+createClientTask :: Co.KeySpaceRange -> Co.EndpointId -> CRq.ClientRequest -> Ta.Task DS.DerivedState
+createClientTask keySpaceRange eId request@(CRq.ClientRequest (CRq.RequestMeta requestId) payload) =
   let description = show (eId, request)
   in case payload of
-    (CM.ReadRequest _ _ key timestamp) ->
+    (CRq.ReadRequest _ _ key timestamp) ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 let value = MS.staticRead key timestamp (derivedState ^. DS.kvStore)
-                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ClientResponse (CM.ResponseMeta requestId) $ CM.ReadResponse value
+                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CRs.ClientResponse (CRs.ResponseMeta requestId) $ CRs.ReadResponse value
                 return True
               _ -> return False
           done derivedState = do
             let value = derivedState ^. DS.kvStore & MS.staticRead key timestamp
-                response = CM.ClientResponse (CM.ResponseMeta requestId) $ CM.ReadResponse value
+                response = CRs.ClientResponse (CRs.ResponseMeta requestId) $ CRs.ReadResponse value
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Read key timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper
-    (CM.WriteRequest _ _ key value timestamp) ->
+    (CRq.WriteRequest _ _ key value timestamp) ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
-                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CM.ClientResponse (CM.ResponseMeta requestId) $ CM.Error pastWriteAttempt
+                addA $ Ac.Send [eId] $ Ms.ClientResponse $ CRs.ClientResponse (CRs.ResponseMeta requestId) $ CRs.Error pastWriteAttempt
                 return True
               _ -> return False
           done derivedState = do
-            let response = CM.ClientResponse (CM.ResponseMeta requestId) $ CM.WriteResponse
+            let response = CRs.ClientResponse (CRs.ResponseMeta requestId) $ CRs.WriteResponse
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Write key value timestamp

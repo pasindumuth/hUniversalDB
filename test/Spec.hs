@@ -20,7 +20,8 @@ import qualified Paxos.PaxosLog as PL
 import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
-import qualified Proto.Messages.ClientMessages as CM
+import qualified Proto.Messages.ClientRequests as CRq
+import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.TabletInputHandler as TIH
@@ -180,7 +181,16 @@ defaultTableId = "t"
 addClientMsg :: String -> Int -> Int -> ST GlobalState ()
 addClientMsg uid slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = Ms.ClientRequest $ CM.ClientRequest (CM.RequestMeta uid) $ CM.WriteRequest defaultDatabaseId defaultTableId ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
+      msg = Ms.ClientRequest
+              (CRq.ClientRequest
+                (CRq.RequestMeta uid)
+                (CRq.WriteRequest
+                  defaultDatabaseId
+                  defaultTableId
+                  ("key " ++ show cliengMsgId)
+                  ("value " ++ show cliengMsgId)
+                  1))
+    
   addMsg msg (clientEId, slaveEId)
   return ()
 
@@ -270,7 +280,7 @@ refineTrace msgs =
       Right (paxosLogs, modMsgs) -> Right $ reverse modMsgs
       Left errMsg -> Left errMsg
 
-type RequestMap = Mp.Map Co.RequestId CM.RequestPayload
+type RequestMap = Mp.Map Co.RequestId CRq.RequestPayload
 type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
 
 -- TODO: We should be able to construct the (databaseId, tabletId)
@@ -295,25 +305,25 @@ checkResponses msgs =
                       -- TODO: check for the case where the lat would fail due to the lat
                       let (_, tables') = tables %^~* (ix (defaultDatabaseId, defaultTableId)) $ MS.write key value timestamp
                       in Right (requestMap, tables')
-            TrM.ClientRequestReceived request@(CM.ClientRequest (CM.RequestMeta requestId) payload) ->
+            TrM.ClientRequestReceived request@(CRq.ClientRequest (CRq.RequestMeta requestId) payload) ->
               Right (requestMap & Mp.insert requestId payload, tables)
-            TrM.ClientResponseSent response@(CM.ClientResponse (CM.ResponseMeta requestId) responsePayload) ->
+            TrM.ClientResponseSent response@(CRs.ClientResponse (CRs.ResponseMeta requestId) responsePayload) ->
               case requestMap ^. at requestId of
                 Nothing -> Left $ "Response " ++ show response ++ " has no corresponding request."
                 Just payload ->
                   case payload of
                     -- TODO: deal with CreateDatabase
-                    CM.ReadRequest databaseId tableId key timestamp ->
+                    CRq.ReadRequest databaseId tableId key timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case responsePayload of
-                            CM.ReadResponse val | val == (MS.staticRead key timestamp table) -> Right (requestMap, tables)
+                            CRs.ReadResponse val | val == (MS.staticRead key timestamp table) -> Right (requestMap, tables)
                             _ -> Left $ genericError response payload
                         Nothing ->
                           case responsePayload of
-                            CM.Error msg | msg == SIH.dbTableDNE -> Right (requestMap, tables)
+                            CRs.Error msg | msg == SIH.dbTableDNE -> Right (requestMap, tables)
                             _ -> Left $ genericError response payload
-                    CM.WriteRequest databaseId tableId key value timestamp ->
+                    CRq.WriteRequest databaseId tableId key value timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case MS.staticReadLat key table of
@@ -324,13 +334,13 @@ checkResponses msgs =
                                 -- TODO: it's possible that the `lat` was already here when the WriteRequest was received
                                 -- but that we're accidentally returning a `WriteResponse` instead of an error. We must
                                 -- figure out how to handle this issue.
-                                CM.WriteResponse | lat == timestamp -> Right (requestMap, tables)
-                                CM.Error msg | msg == TIH.pastWriteAttempt -> Right (requestMap, tables)
+                                CRs.WriteResponse | lat == timestamp -> Right (requestMap, tables)
+                                CRs.Error msg | msg == TIH.pastWriteAttempt -> Right (requestMap, tables)
                                 _ -> Left $ genericError response payload
                             Nothing -> Left $ genericError response payload
                         Nothing ->
                           case responsePayload of
-                            CM.Error msg | msg == SIH.dbTableDNE -> Right (requestMap, tables)
+                            CRs.Error msg | msg == SIH.dbTableDNE -> Right (requestMap, tables)
                             _ -> Left $ genericError response payload
   in case testRes of
     Right _ -> Right ()
