@@ -24,6 +24,7 @@ import qualified Proto.Messages.ClientMessages as CM
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.TabletInputHandler as TIH
+import qualified Slave.Tablet.MultiVersionKVStore as MS
 import qualified Slave.Tablet.Internal_MultiVersionKVStore as IMS
 import qualified Slave.Tablet.Env as En
 import qualified Slave.Tablet.TabletState as TS
@@ -171,10 +172,14 @@ simulateAll = do
             else return ()
   simulate
 
+
+defaultDatabaseId = "d"
+defaultTableId = "t"
+
 addClientMsg :: Int -> Int -> ST GlobalState ()
 addClientMsg slaveId cliengMsgId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
-      msg = Ms.ClientRequest $ CM.WriteRequest "uid" "d" "t" ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
+      msg = Ms.ClientRequest $ CM.WriteRequest "uid" defaultDatabaseId defaultTableId ("key " ++ show cliengMsgId) ("value " ++ show cliengMsgId) 1
   addMsg msg (clientEId, slaveEId)
   return ()
 
@@ -267,18 +272,32 @@ refineTrace msgs =
 type RequestMap = Mp.Map Co.RequestId CM.ClientRequest
 type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
 
+---- TODO: We should be able to construct the (databaseId, tabletId)
+---- from the Slave messages. We'll do that later when we handle Slave messages.
 --checkResponses :: [TrM.TraceMessage] -> IO ()
 --checkResponses msgs = do
---  let res = U.s31 Mo.foldM (Mp.empty, Mp.empty) msgs $
+--  let tables = Mp.empty & Mp.insert (defaultDatabaseId, defaultTableId) Mp.empty
+--  let res = U.s31 Mo.foldM (Mp.empty, tables) msgs $
 --        \(requestMap, tables) msg ->
 --          case msg of
---            TrM.PaxosInsertion _ index entry ->
---              case of
---                TrM.Tablet ->
---                  case entry of
---                    PM.
---                TrM.Slave -> error "Not handling Slaves yet."
---
+--            TrM.PaxosInsertion _ _ entry ->
+--              case entry of
+--                PM.Tablet entry ->
+--                  let (_, tables') =
+--                        case entry of
+--                          PM.Read key timestamp ->
+--                            tables %^~* (ix (defaultDatabaseId, defaultTableId)) $ MS.read key timestamp
+--                          PM.Write key value timestamp ->
+--                            tables %^~* (ix (defaultDatabaseId, defaultTableId)) $ MS.write key value timestamp
+--                  in (requestMap, tables')
+--            TrM.ClientRequestReceived request ->
+--              let requestId =
+--                    case request of
+--                      CM.CreateDatabase requestId _ _ -> requestId
+--                      CM.ReadRequest requestId _ _ _ _ -> requestId
+--                      CM.WriteRequest requestId _ _ _ _ _ -> requestId
+--              in
+--  return ()
 
 
 -- This list of trace messages includes all events across all slaves.

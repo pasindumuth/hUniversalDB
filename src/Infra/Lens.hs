@@ -8,6 +8,8 @@ module Infra.Lens (
   (&),
   (?~),
   (^?!),
+  (%^~),
+  (%^~*),
   Lens',
   at,
   ix,
@@ -15,8 +17,10 @@ module Infra.Lens (
   _1, _2, _3, _4, _5, _6,
 ) where
 
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), (^?!), Lens', _1, _2, _3, _4, _5, _6, ALens', (^#), (<&>), (#~))
+import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), (^?!), Lens', Traversal', _1, _2, _3, _4, _5, _6, ALens', ASetter, (^#), (<&>), (#~))
 import Control.Lens.At (at, ix)
+
+infixr 4 %^~
 
 lp0 :: Lens' s ()
 lp0 f s =
@@ -41,3 +45,13 @@ lp5 (l1, l2, l3, l4, l5) f s =
 lp6 :: (ALens' s a1, ALens' s a2, ALens' s a3, ALens' s a4, ALens' s a5, ALens' s a6) -> Lens' s (a1, a2, a3, a4, a5, a6)
 lp6 (l1, l2, l3, l4, l5, l6) f s =
     f (s ^# l1, s ^# l2, s ^# l3, s ^# l4, s ^# l5, s ^# l6) <&> \(a1, a2, a3, a4, a5, a6) -> s & l1 #~ a1 & l2 #~ a2 & l3 #~ a3 & l4 #~ a4 & l5 #~ a5 & l6 #~ a6
+
+(%^~) :: s -> Lens' s a -> (a -> (r, a)) -> (r, s)
+(%^~) state lens f =
+  let (ret, state') = f (state ^?! lens)
+  in (ret, state & lens .~ state')
+
+(%^~*) :: s -> Traversal' s a -> (a -> (r, a)) -> (r, s)
+(%^~*) state traversal f =
+  let (ret, state') = f (state ^?! traversal)
+  in (ret, state & traversal .~ state')
