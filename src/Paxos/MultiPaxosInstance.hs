@@ -1,5 +1,6 @@
 module Paxos.MultiPaxosInstance (
   MP.MultiPaxosInstance,
+  MP.constructor,
   MP.paxosLog,
   MP.paxosId,
   insertMultiPaxos,

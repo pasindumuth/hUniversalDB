@@ -79,8 +79,7 @@ createGlobalState seed numSlaves numClients =
       (slaves, rand') = U.s31 foldl ([], rand) slaveEIds $
         \(slaves, rand) eId ->
           let (r, rand')  = Rn.random rand
-              -- TODO: Create a constructor for this too and remove the default construction.
-              g = Df.def & SS.env . En.rand .~ (Rn.mkStdGen r) & SS.env . En.slaveEIds .~ slaveEIds
+              g = SS.constructor "" (Rn.mkStdGen r) slaveEIds
           in ((eId, g):slaves, rand')
       slaveState = Mp.fromList slaves
       tabletStates = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
@@ -146,10 +145,7 @@ runIAction eId iAction = do
       Ac.Slave_CreateTablet range -> do
         r <- slaveState . ix eId . SS.env . En.rand .^^* Rn.random
         slaveEIds <- getL $ slaveEIds
-        let tabletState = Df.def & TS.env . TEn.rand .~ (Rn.mkStdGen r)
-                                 & TS.env . TEn.slaveEIds .~ slaveEIds
-                                 & TS.range .~ range
-                                 & TS.multiPaxosInstance . MP.paxosId .~ (show range)
+        let tabletState = TS.constructor (show range) (Rn.mkStdGen r) slaveEIds range
         tabletStates . ix eId .^^.* Mp.insert range tabletState
         return ()
       Ac.TabletForward range clientEId tabletMsg -> do

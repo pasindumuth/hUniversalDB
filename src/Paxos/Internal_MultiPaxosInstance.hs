@@ -19,6 +19,13 @@ data MultiPaxosInstance = MultiPaxosInstance {
   _paxosId :: Co.PaxosId,
   _paxosInstances :: Mp.Map PM.IndexT PI.PaxosInstance,
   _paxosLog :: PL.PaxosLog
-} deriving (Gn.Generic, Df.Default, Show)
+} deriving (Gn.Generic, Show)
 
 makeLenses ''MultiPaxosInstance
+
+constructor :: Co.PaxosId -> MultiPaxosInstance
+constructor paxosId = MultiPaxosInstance {
+  _paxosId = paxosId,
+  _paxosInstances = Df.def,
+  _paxosLog = Df.def
+}

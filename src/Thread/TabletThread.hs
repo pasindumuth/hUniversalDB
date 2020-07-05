@@ -27,10 +27,7 @@ startTabletThread
   -> MV.MVar Cn.Connections
   -> IO ()
 startTabletThread rg keySpaceRange iActionChan connM = do
-  let g = Df.def & TS.env . En.rand .~ rg
-                 & TS.env . En.slaveEIds .~ slaveEIds
-                 & TS.range .~ keySpaceRange
-                 & TS.multiPaxosInstance . MP.paxosId .~ (show keySpaceRange)
+  let g = TS.constructor (show keySpaceRange) rg slaveEIds keySpaceRange
   handlePaxosMessage g
   where
     handlePaxosMessage :: TS.TabletState -> IO ()
