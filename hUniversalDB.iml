@@ -74,8 +74,7 @@
     <orderEntry type="library" name="primitive-0.7.0.1" level="project" />
     <orderEntry type="library" name="semigroups-0.19.1" level="project" />
     <orderEntry type="library" name="void-0.7.3" level="project" />
-    <orderEntry type="library" name="pretty-simple-3.2.3.0" level="project" />
-    <orderEntry type="library" name="ansi-terminal-0.10.3" level="project" />
-    <orderEntry type="library" name="colour-2.3.5" level="project" />
+    <orderEntry type="library" name="pretty-show-1.10" level="project" />
+    <orderEntry type="library" name="haskell-lexer-1.1" level="project" />
   </component>
 </module>

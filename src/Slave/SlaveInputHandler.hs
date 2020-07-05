@@ -24,6 +24,8 @@ import qualified Slave.Internal_KeySpaceManager as IKSM
 import Infra.Lens
 import Infra.State
 
+dbTableDNE = "The (database, table) doesn't exist."
+
 handlingState :: Lens' SS.SlaveState (
   MP.MultiPaxosInstance,
   DS.DerivedState,
@@ -38,8 +40,6 @@ handlingState =
     SS.env.En.rand,
     SS.env.En.slaveEIds))
 
-dbTableDNE = "The (database, table) doesn't exist."
-
 handleInputAction
   :: Ac.InputAction
   -> ST SS.SlaveState ()
@@ -48,7 +48,7 @@ handleInputAction iAction =
     Ac.Receive eId msg ->
       case msg of
         Ms.ClientRequest request -> do
-          let requestId = (request ^. CRq.meta.CRq.requestId)
+          let requestId = (request ^. CRq.meta . CRq.requestId)
           trace $ TrM.ClientRequestReceived request
           case request ^. CRq.payload of
             CRq.CreateDatabase databaseId tableId -> do
@@ -86,10 +86,7 @@ handleInputAction iAction =
           ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
           if Li.elem keySpaceRange ranges
             then addA $ Ac.TabletForward keySpaceRange eId tabletMsg
-            -- TODO: once we get tablet message forwarding, turn this back to return ().
-            -- I've made too many bugs where throwing an error here would have revealed it
-            -- immediately.
-            else error "shouldn't get here"
+            else return ()
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
@@ -105,11 +102,13 @@ handleForwarding eId requestId (databaseId, tableId) request = do
   if Li.elem range ranges
     then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest request
     -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
-    else addA $ Ac.Send [eId] $
-          Ms.ClientResponse
+    else do
+      let response =
             (CRs.ClientResponse
               (CRs.ResponseMeta requestId)
               (CRs.Error dbTableDNE))
+      trace $ TrM.ClientResponseSent response
+      addA $ Ac.Send [eId] $ Ms.ClientResponse response
 
 createCreateDBTask
   :: Co.EndpointId
