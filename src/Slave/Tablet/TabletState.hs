@@ -16,6 +16,8 @@ import qualified Slave.Tablet.Internal_DerivedState as DS
 import qualified Slave.Tablet.Env as En
 import Infra.Lens
 
+-- TODO: Evidently, we shouldn't have a default way of constructing this, or at leat it
+-- should be private somehow. I've made the mistake of incorrect instantiation twice now. 
 data TabletState = TabletState {
   _range :: Co.KeySpaceRange,
   _multiPaxosInstance :: MP.MultiPaxosInstance,

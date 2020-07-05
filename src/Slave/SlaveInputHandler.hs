@@ -86,7 +86,10 @@ handleInputAction iAction =
           ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
           if Li.elem keySpaceRange ranges
             then addA $ Ac.TabletForward keySpaceRange eId tabletMsg
-            else return ()
+            -- TODO: once we get tablet message forwarding, turn this back to return ().
+            -- I've made too many bugs where throwing an error here would have revealed it
+            -- immediately.
+            else error "shouldn't get here"
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 

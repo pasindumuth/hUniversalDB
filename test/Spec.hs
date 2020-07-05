@@ -25,10 +25,13 @@ import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TabletMessages as TM
 import qualified Proto.Messages.TraceMessages as TrM
-import qualified Slave.Tablet.TabletInputHandler as TIH
-import qualified Slave.Tablet.MultiVersionKVStore as MS
+import qualified Slave.Env as En
+import qualified Slave.SlaveInputHandler as SIH
+import qualified Slave.SlaveState as SS
+import qualified Slave.Tablet.Env as TEn
 import qualified Slave.Tablet.Internal_MultiVersionKVStore as IMS
-import qualified Slave.Tablet.Env as En
+import qualified Slave.Tablet.MultiVersionKVStore as MS
+import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.TabletState as TS
 import qualified Slave.SlaveInputHandler as SIH
 import Infra.Lens
@@ -37,6 +40,7 @@ import Infra.State
 type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
 type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)
 
+-- TODO Move this it's own file and isolate the simulation code.
 data GlobalState = GlobalState {
   _slaveEIds :: [Co.EndpointId], -- EndpointIds for all slaves in the system
   _clientEIds :: [Co.EndpointId], -- EndpointIds for all client's we use for testing
@@ -46,12 +50,14 @@ data GlobalState = GlobalState {
   -- We use pairs of endpoints as identifiers of a queue. `nonemptyQueues`
   -- contain all queue IDs where the queue is non-empty
   _nonemptyQueues :: NonemptyQueues,
-  _slaveState :: Mp.Map Co.EndpointId TS.TabletState,
+  _slaveState :: Mp.Map Co.EndpointId SS.SlaveState,
+  _tabletStates :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange TS.TabletState),
   _rand :: Rn.StdGen, -- Random Number Generator for simulation
 
   -- The following are everything related to asynchronous computation
   -- done at a node.
-  _asyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (Ac.TabletInputAction, Int)),
+  _asyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (Ac.InputAction, Int)),
+  _tabletAsyncQueues :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange (Sq.Seq (Ac.TabletInputAction, Int))),
   _clocks :: Mp.Map Co.EndpointId Int
 } deriving (Show)
 
@@ -65,18 +71,21 @@ createGlobalState seed numSlaves numClients =
   let slaveEIds = U.for [0..(numSlaves - 1)] $ mkSlaveEId
       clientEIds = U.for [0..(numClients - 1)] $ mkClientEId
       eIds = slaveEIds ++ clientEIds
-      queues = Mp.fromList $ U.for eIds $ \eid1 ->
-        (eid1, Mp.fromList $ U.for eIds $ \eid2 ->
-        (eid2, Sq.empty))
+      queues = Mp.fromList $ U.for eIds $ \eId1 ->
+        (eId1, Mp.fromList $ U.for eIds $ \eId2 ->
+        (eId2, Sq.empty))
       nonemptyQueues = St.empty
       rand = Rn.mkStdGen seed
       (slaves, rand') = U.s31 foldl ([], rand) slaveEIds $
         \(slaves, rand) eId ->
           let (r, rand')  = Rn.random rand
-              g = Df.def & TS.env . En.rand .~ (Rn.mkStdGen r) & TS.env . En.slaveEIds .~ slaveEIds
+              -- TODO: Create a constructor for this too and remove the default construction.
+              g = Df.def & SS.env . En.rand .~ (Rn.mkStdGen r) & SS.env . En.slaveEIds .~ slaveEIds
           in ((eId, g):slaves, rand')
       slaveState = Mp.fromList slaves
+      tabletStates = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
       asyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Sq.empty)
+      tabletAsyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
       clocks = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, 0)
   in GlobalState {
       _slaveEIds = slaveEIds,
@@ -84,8 +93,10 @@ createGlobalState seed numSlaves numClients =
       _queues = queues,
       _nonemptyQueues = nonemptyQueues,
       _slaveState = slaveState,
+      _tabletStates = tabletStates,
       _rand = rand',
       _asyncQueues = asyncQueues,
+      _tabletAsyncQueues = tabletAsyncQueues,
       _clocks = clocks
     }
 
@@ -106,16 +117,43 @@ pollMsg (fromEId, toEId) = do
     else nonemptyQueues .^^. id
   return msg
 
-runIAction :: Co.EndpointId -> Ac.TabletInputAction -> ST GlobalState ()
-runIAction eId iAction = do
-  (_, msgsO) <- runT (slaveState . ix eId) (TIH.handleInputAction iAction)
+runTabletIAction
+  :: Co.EndpointId
+  -> Co.KeySpaceRange
+  -> Ac.TabletInputAction
+  -> ST GlobalState ()
+runTabletIAction eId range iAction = do
+  (_, msgsO) <- runT (tabletStates . ix eId . ix range) (TIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
     case msgO of
       Ac.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
       Ac.RetryOutput counterValue -> do
         currentTime <- getT $ clocks . ix eId
-        asyncQueues . ix eId .^^.* U.push (Ac.TabletRetryInput counterValue, currentTime + 100)
+        tabletAsyncQueues . ix eId . ix range .^^.* U.push (Ac.TabletRetryInput counterValue, currentTime + 100)
         return ()
+      _ -> return ()
+
+runIAction :: Co.EndpointId -> Ac.InputAction -> ST GlobalState ()
+runIAction eId iAction = do
+  (_, msgsO) <- runT (slaveState . ix eId) (SIH.handleInputAction iAction)
+  Mo.forM_ msgsO $ \msgO -> do
+    case msgO of
+      Ac.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
+      Ac.RetryOutput counterValue -> do
+        currentTime <- getT $ clocks . ix eId
+        asyncQueues . ix eId .^^.* U.push (Ac.RetryInput counterValue, currentTime + 100)
+        return ()
+      Ac.Slave_CreateTablet range -> do
+        r <- slaveState . ix eId . SS.env . En.rand .^^* Rn.random
+        slaveEIds <- getL $ slaveEIds
+        let tabletState = Df.def & TS.env . TEn.rand .~ (Rn.mkStdGen r)
+                                 & TS.env . TEn.slaveEIds .~ slaveEIds
+                                 & TS.range .~ range
+                                 & TS.multiPaxosInstance . MP.paxosId .~ (show range)
+        tabletStates . ix eId .^^.* Mp.insert range tabletState
+        return ()
+      Ac.TabletForward range clientEId tabletMsg -> do
+        runTabletIAction eId range (Ac.TabletReceive clientEId tabletMsg)
       _ -> return ()
 
 deliverMessage :: (Co.EndpointId, Co.EndpointId) -> ST GlobalState ()
@@ -123,25 +161,7 @@ deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
   slaveEIds' <- getL $ slaveEIds
   if Li.elem toEId slaveEIds'
-    then do
-      tabletMsg <-
-        case msg of
-          Ms.ClientRequest request -> do
-            trace $ TrM.ClientRequestReceived request
-            let requestId = request ^. CRq.meta.CRq.requestId        
-            case request ^. CRq.payload of
-              CRq.ReadRequest _ _ key timestamp ->
-                return $ TM.ForwardedClientRequest
-                          (TM.ClientRequest
-                            (TM.RequestMeta requestId)
-                            (TM.ReadRequest key timestamp))
-              CRq.WriteRequest _ _ key value timestamp ->
-                return $ TM.ForwardedClientRequest
-                           (TM.ClientRequest
-                             (TM.RequestMeta requestId)
-                             (TM.WriteRequest key value timestamp))
-          Ms.TabletMessage _ tabletMsg -> return tabletMsg
-      runIAction toEId $ Ac.TabletReceive fromEId tabletMsg
+    then runIAction toEId $ Ac.Receive fromEId msg
     else return ()
 
 -- Simulate one millisecond of execution. This involves incrementing the slave's
@@ -155,11 +175,19 @@ simulateOnce numMessages = do
     randPercent :: Int <- rand .^^ Rn.randomR (1, 100)
     if randPercent <= 95
       then do
+        -- Increment clock
         clockVal <- clocks . ix eId .^^.* (+1)
+        -- Process slave async messages
         asyncQueue <- getT $ asyncQueues . ix eId
         let (readyActions, remainder) = asyncQueue & Sq.spanl (\(_, time) -> time == clockVal)
         asyncQueues . ix eId .^^.* \_ -> remainder
         Mo.forM_ readyActions $ \(iAction, _) -> runIAction eId iAction
+        -- Process tablet async messages
+        queuesRanges <- tabletAsyncQueues . ix eId .^^^* Mp.toList
+        Mo.forM_ queuesRanges $ \(range, asyncQueue) -> do
+          let (readyActions, remainder) = asyncQueue & Sq.spanl (\(_, time) -> time == clockVal)
+          tabletAsyncQueues . ix eId . ix range .^^.* \_ -> remainder
+          Mo.forM_ readyActions $ \(iAction, _) -> runTabletIAction eId range iAction
       else return ()
   -- Deliver `numMessages` messages
   Mo.forM_ [1..numMessages] $ \_ -> do
@@ -185,8 +213,9 @@ simulateAll = do
   let simulate =
         do
           length <- nonemptyQueues .^^^ St.size
-          anyTasks <- asyncQueues .^^^ any (\q -> Sq.length q > 0)
-          if length > 0 || anyTasks
+          anySlaveTasks <- asyncQueues .^^^ any (\q -> Sq.length q > 0)
+          anyTabletTasks <- tabletAsyncQueues .^^^ any (\tablets -> tablets & any (\q -> Sq.length q > 0))
+          if length > 0 || anySlaveTasks || anyTabletTasks
             then do
               simulateOnce (numChans * (numChans + 1) `div` 2)
               simulate
@@ -197,8 +226,8 @@ simulateAll = do
 defaultDatabaseId = "d"
 defaultTableId = "t"
 
-addClientMsg :: String -> Int -> Int -> ST GlobalState ()
-addClientMsg uid slaveId cliengMsgId = do
+addClientMsg :: String -> Int -> ST GlobalState ()
+addClientMsg uid slaveId = do
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
       msg = Ms.ClientRequest
               (CRq.ClientRequest
@@ -206,43 +235,41 @@ addClientMsg uid slaveId cliengMsgId = do
                 (CRq.WriteRequest
                   defaultDatabaseId
                   defaultTableId
-                  ("key " ++ show cliengMsgId)
-                  ("value " ++ show cliengMsgId)
+                  ("key " ++ show uid)
+                  ("value " ++ show uid)
                   1))
+
+  addMsg msg (clientEId, slaveEId)
+  return ()
+
+-- TODO: This is seriously not good. Do all of this properly. Figure out
+-- suitable semantics for createDB in our half-backed dbms,
+addCreateDBClientMsg :: String -> Int -> ST GlobalState ()
+addCreateDBClientMsg uid slaveId = do
+  let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
+      msg = Ms.ClientRequest
+              (CRq.ClientRequest
+                (CRq.RequestMeta uid)
+                (CRq.CreateDatabase
+                  defaultDatabaseId
+                  defaultTableId))
 
   addMsg msg (clientEId, slaveEId)
   return ()
 
 test1 :: ST GlobalState ()
 test1 = do
-  addClientMsg "0" 0 0; simulateAll
+  addCreateDBClientMsg "0" 0; simulateAll
+  addClientMsg "1" 1; simulateAll
 
 test2 :: ST GlobalState ()
 test2 = do
-  addClientMsg "4" 0 0; simulateN 2
-  addClientMsg "3" 1 1; simulateN 2
-  addClientMsg "2" 2 2; simulateN 2
-  addClientMsg "1" 3 3; simulateN 2
-  addClientMsg "0" 4 4; simulateN 2
-
-mergePaxosLog :: GlobalState -> Maybe (Mp.Map PM.IndexT PM.PaxosLogEntry)
-mergePaxosLog g =
-  let paxosLogs = g ^. slaveState & Mp.toList & map (^. _2 . TS.multiPaxosInstance.MP.paxosLog)
-  in U.s31 foldl (Just Mp.empty) paxosLogs $
-       \mergedLogM paxosLog ->
-         case mergedLogM of
-           Nothing -> Nothing
-           _ ->
-             U.s31 Mp.foldlWithKey mergedLogM (paxosLog & PL.plog) $
-               \mergedLogM index value ->
-                 case mergedLogM of
-                   Nothing -> Nothing
-                   Just mergedLog ->
-                     case mergedLog ^. at index of
-                       Nothing -> Just $ mergedLog & at index ?~ value
-                       Just curValue -> if value == curValue
-                                          then mergedLogM
-                                          else Nothing
+  addCreateDBClientMsg "0" 0; simulateN 2
+  addClientMsg "1" 1; simulateN 2
+  addClientMsg "2" 2; simulateN 2
+  addClientMsg "3" 3; simulateN 2
+  addClientMsg "4" 4; simulateN 2
+  addClientMsg "5" 0; simulateN 2
 
 data TestPaxosLog = TestPaxosLog {
   _plog :: Mp.Map PM.IndexT PM.PaxosLogEntry,
@@ -308,7 +335,7 @@ type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
 checkResponses :: [TrM.TraceMessage] -> Either String ()
 checkResponses msgs =
   let tables = Mp.empty & Mp.insert (defaultDatabaseId, defaultTableId) Mp.empty
-      genericError response payload = "Response " ++ show response ++ " is the wrong response to Request " ++ show payload
+      genericError response payload = Left $ "Response " ++ show response ++ " is the wrong response to Request " ++ show payload
       testRes = U.s31 Mo.foldM (Mp.empty, tables) msgs $
         \(requestMap, tables) msg ->
           case msg of
@@ -324,24 +351,31 @@ checkResponses msgs =
                       -- TODO: check for the case where the lat would fail due to the lat
                       let (_, tables') = tables %^~* (ix (defaultDatabaseId, defaultTableId)) $ MS.write key value timestamp
                       in Right (requestMap, tables')
+                PM.Slave _ ->
+                  -- TODO: for now, we ignore the AddRange PaxosLogEntry, since we don't need it yet
+                  return (requestMap, tables)
             TrM.ClientRequestReceived request@(CRq.ClientRequest (CRq.RequestMeta requestId) payload) ->
               Right (requestMap & Mp.insert requestId payload, tables)
             TrM.ClientResponseSent response@(CRs.ClientResponse (CRs.ResponseMeta requestId) responsePayload) ->
               case requestMap ^. at requestId of
                 Nothing -> Left $ "Response " ++ show response ++ " has no corresponding request."
-                Just payload ->
+                Just payload -> do
+                  let genericSuccess = Right (requestMap & Mp.delete requestId, tables)
                   case payload of
-                    -- TODO: deal with CreateDatabase
+                    CRq.CreateDatabase databaseId tableId ->
+                      case responsePayload of
+                        CRs.Success -> genericSuccess
+                        _ -> genericError response payload
                     CRq.ReadRequest databaseId tableId key timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case responsePayload of
-                            CRs.ReadResponse val | val == (MS.staticRead key timestamp table) -> Right (requestMap, tables)
-                            _ -> Left $ genericError response payload
+                            CRs.ReadResponse val | val == (MS.staticRead key timestamp table) -> genericSuccess
+                            _ -> genericError response payload
                         Nothing ->
                           case responsePayload of
-                            CRs.Error msg | msg == SIH.dbTableDNE -> Right (requestMap, tables)
-                            _ -> Left $ genericError response payload
+                            CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
+                            _ -> genericError response payload
                     CRq.WriteRequest databaseId tableId key value timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
@@ -353,18 +387,20 @@ checkResponses msgs =
                                 -- TODO: it's possible that the `lat` was already here when the WriteRequest was received
                                 -- but that we're accidentally returning a `WriteResponse` instead of an error. We must
                                 -- figure out how to handle this issue.
-                                CRs.WriteResponse | lat == timestamp -> Right (requestMap, tables)
-                                CRs.Error msg | msg == TIH.pastWriteAttempt -> Right (requestMap, tables)
-                                _ -> Left $ genericError response payload
-                            Nothing -> Left $ genericError response payload
+                                CRs.WriteResponse | lat == timestamp -> genericSuccess
+                                CRs.Error msg | msg == TIH.pastWriteAttempt -> genericSuccess
+                                _ -> genericError response payload
+                            Nothing -> genericError response payload
                         Nothing ->
                           case responsePayload of
-                            CRs.Error msg | msg == SIH.dbTableDNE -> Right (requestMap, tables)
-                            _ -> Left $ genericError response payload
+                            CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
+                            _ -> genericError response payload
   in case testRes of
-    Right _ -> Right ()
+    Right (requestMap, tables) ->
+      if Mp.size requestMap > 0
+        then Left $ "The following requests went unanswered: " ++ show requestMap
+        else Right ()
     Left errMsg -> Left errMsg
-
 
 -- This list of trace messages includes all events across all slaves.
 verifyTrace :: [TrM.TraceMessage] -> Either String ()
@@ -393,7 +429,6 @@ driveTest testNum test = do
           Left errMsg -> "Test " ++ (show testNum) ++ " Failed! Error: " ++ errMsg
           Right _ -> "Test " ++ (show testNum) ++ " Passed! " ++ (show $ Li.length traceMsgs) ++ " trace messages."
   print testMsg
---  pPrintNoColor traceMsgs
   return ()
 
 testDriver :: IO ()
