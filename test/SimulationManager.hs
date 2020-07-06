@@ -135,6 +135,18 @@ deliverMessage (fromEId, toEId) = do
       Tt.clientResponses . ix toEId .^^.* (msg:)
       return ()
 
+dropMessages :: Int -> ST Tt.TestState ()
+dropMessages numMessages = do
+  Mo.forM_ [1..numMessages] $ \_ -> do
+    length <- Tt.nonemptyQueues .^^^ St.size
+    if length == 0
+      then return ()
+      else do
+        randQueueIndex <- Tt.rand .^^ Rn.randomR (0, length - 1)
+        queueId <- Tt.nonemptyQueues .^^^  St.elemAt randQueueIndex
+        pollMsg queueId
+        return ()
+
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
 -- `numMessages` number of messages.

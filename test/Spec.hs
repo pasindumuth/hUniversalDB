@@ -41,11 +41,6 @@ import Infra.State
 --    of requests that were already sent. However, we add a slight bit of noise to this
 --    to simulate sending requests to the past (which sometimes we expect the system
 --    to reply with an error).
---
--- TODO: We must incorporate message dropping.  In the test
--- code, decide when to fire a request, how to drop messages,
--- and how many simulation cycles we should perform. We can also
--- use this to gather statistics about the responses.
 generateRequest :: ST Tt.TestState ()
 generateRequest = do
   numTables <- Tt.numTableKeys .^^^ Mp.size
@@ -124,12 +119,16 @@ test2 = do
   SM.addClientMsg 4 (CRq.WriteRequest "d" "t" "key4" "value4" 4); SM.simulateN 2
   SM.addClientMsg 0 (CRq.WriteRequest "d" "t" "key5" "value5" 5); SM.simulateAll
 
+-- TODO: I want more monitoring of what happens during a test. Maybe
+-- I need message-drop stats.
 test3 :: ST Tt.TestState ()
 test3 = do
-  Mo.forM_ [1..25] $
+  Mo.forM_ [1..50] $
     \_ -> do
       generateRequest
-      SM.simulateAll
+      SM.simulateN 2
+      SM.dropMessages 1
+  SM.simulateAll
   analyzeResponses
 
 data TestPaxosLog = TestPaxosLog {
