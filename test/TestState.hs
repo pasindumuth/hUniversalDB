@@ -22,9 +22,13 @@ type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
 type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)
 
 data RequestStats = RequestStats {
-  _numCreateDBs :: Int,
-  _numWrites :: Int,
-  _numReads :: Int
+  _numCreateDBRqs :: Int,
+  _numReadRqs :: Int,
+  _numWriteRqs :: Int,
+  _numErrRss :: Int,
+  _numReadRss :: Int,
+  _numWriteRss :: Int,
+  _numSuccessRss :: Int
 } deriving (Show)
 
 makeLenses ''RequestStats
@@ -51,7 +55,8 @@ data TestState = TestState {
   _nextUid :: Int,
   _trueTimestamp :: Int,
   _numTableKeys :: Mp.Map Int Int,
-  _requestStats :: RequestStats
+  _requestStats :: RequestStats,
+  _clientResponses :: Mp.Map Co.EndpointId [Ms.Message]
 } deriving (Show)
 
 makeLenses ''TestState

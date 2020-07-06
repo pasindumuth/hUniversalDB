@@ -45,6 +45,7 @@ createTestState seed numSlaves numClients =
       asyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Sq.empty)
       tabletAsyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
       clocks = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, 0)
+      clientResponses = Mp.fromList $ U.for clientEIds $ \eId -> (eId, [])
   in Tt.TestState {
       Tt._rand = rand',
       Tt._slaveEIds = slaveEIds,
@@ -60,10 +61,15 @@ createTestState seed numSlaves numClients =
       Tt._trueTimestamp = 0,
       Tt._numTableKeys = Mp.empty,
       Tt._requestStats = Tt.RequestStats {
-        Tt._numCreateDBs = 0,
-        Tt._numWrites = 0,
-        Tt._numReads = 0
-      }
+        Tt._numCreateDBRqs = 0,
+        Tt._numReadRqs = 0,
+        Tt._numWriteRqs = 0,
+        Tt._numErrRss = 0,
+        Tt._numReadRss = 0,
+        Tt._numWriteRss = 0,
+        Tt._numSuccessRss = 0
+      },
+      Tt._clientResponses = clientResponses
     }
 
 addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST Tt.TestState ()
@@ -125,7 +131,9 @@ deliverMessage (fromEId, toEId) = do
   slaveEIds' <- getL $ Tt.slaveEIds
   if Li.elem toEId slaveEIds'
     then runIAction toEId $ Ac.Receive fromEId msg
-    else return ()
+    else do
+      Tt.clientResponses . ix toEId .^^.* (msg:)
+      return ()
 
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging

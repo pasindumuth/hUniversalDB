@@ -11,6 +11,7 @@ import Text.Show.Pretty (ppShow)
 
 import qualified Infra.Utils as U
 import qualified Proto.Common as Co
+import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.PaxosMessages as PM
@@ -41,12 +42,10 @@ import Infra.State
 --    to simulate sending requests to the past (which sometimes we expect the system
 --    to reply with an error).
 --
--- TODO: we need to collect statistics about how many of what requests
--- were sent, and then print them out at the end. We must createdbs, reads,
--- and writes sent. We should also number of success and failures.
 -- TODO: We must incorporate message dropping.  In the test
 -- code, decide when to fire a request, how to drop messages,
--- and how many simulation cycles we should perform.
+-- and how many simulation cycles we should perform. We can also
+-- use this to gather statistics about the responses.
 generateRequest :: ST Tt.TestState ()
 generateRequest = do
   numTables <- Tt.numTableKeys .^^^ Mp.size
@@ -56,7 +55,7 @@ generateRequest = do
     0 -> do
       let tableId = "t" ++ show numTables
       SM.addClientMsg slaveId (CRq.CreateDatabase "d" tableId)
-      Tt.requestStats.Tt.numCreateDBs .^^. (+1)
+      Tt.requestStats.Tt.numCreateDBRqs .^^. (+1)
       Tt.numTableKeys .^^. Mp.insert numTables 0
       return ()
     _ | requestType == 1 || requestType == 2 -> do
@@ -91,11 +90,22 @@ generateRequest = do
         1 -> do
           let value = "v" ++ show keyIdx
           SM.addClientMsg slaveId (CRq.WriteRequest "d" tableId key value timestamp)
-          Tt.requestStats.Tt.numWrites .^^. (+1)
+          Tt.requestStats.Tt.numWriteRqs .^^. (+1)
         2 -> do
           SM.addClientMsg slaveId (CRq.ReadRequest "d" tableId key timestamp)
-          Tt.requestStats.Tt.numReads .^^. (+1)
+          Tt.requestStats.Tt.numReadRqs .^^. (+1)
       return ()
+
+analyzeResponses :: ST Tt.TestState ()
+analyzeResponses = do
+  clientResponses <- Tt.clientResponses .^^^ Mp.toList
+  Mo.forM_ clientResponses $ \(_, responses) ->
+    Mo.forM_ responses $ \(Ms.ClientResponse response) -> do
+      case response ^. CRs.responsePayload of
+        CRs.Error _ -> Tt.requestStats.Tt.numErrRss .^^. (+1)
+        CRs.ReadResponse _ -> Tt.requestStats.Tt.numReadRss .^^. (+1)
+        CRs.WriteResponse -> Tt.requestStats.Tt.numWriteRss .^^. (+1)
+        CRs.Success -> Tt.requestStats.Tt.numSuccessRss .^^. (+1)
 
 test1 :: ST Tt.TestState ()
 test1 = do
@@ -120,6 +130,7 @@ test3 = do
     \_ -> do
       generateRequest
       SM.simulateAll
+  analyzeResponses
 
 data TestPaxosLog = TestPaxosLog {
   _plog :: Mp.Map PM.IndexT PM.PaxosLogEntry,
