@@ -21,7 +21,17 @@ import Infra.State
 type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
 type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)
 
+data RequestStats = RequestStats {
+  _numCreateDBs :: Int,
+  _numWrites :: Int,
+  _numReads :: Int
+} deriving (Show)
+
+makeLenses ''RequestStats
+
 data TestState = TestState {
+  -- General
+  _rand :: Rn.StdGen,
   _slaveEIds :: [Co.EndpointId], -- EndpointIds for all slaves in the system
   _clientEIds :: [Co.EndpointId], -- EndpointIds for all client's we use for testing
   -- `queues` contains 2 queues (in for each direction) for every pair of
@@ -39,8 +49,9 @@ data TestState = TestState {
   _clocks :: Mp.Map Co.EndpointId Int,
   -- Fields for usage by the client
   _nextUid :: Int,
-  -- General
-  _rand :: Rn.StdGen
+  _trueTimestamp :: Int,
+  _numTableKeys :: Mp.Map Int Int,
+  _requestStats :: RequestStats
 } deriving (Show)
 
 makeLenses ''TestState

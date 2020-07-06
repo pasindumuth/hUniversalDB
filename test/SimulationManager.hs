@@ -46,6 +46,7 @@ createTestState seed numSlaves numClients =
       tabletAsyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
       clocks = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, 0)
   in Tt.TestState {
+      Tt._rand = rand',
       Tt._slaveEIds = slaveEIds,
       Tt._clientEIds = clientEIds,
       Tt._queues = queues,
@@ -56,7 +57,13 @@ createTestState seed numSlaves numClients =
       Tt._tabletAsyncQueues = tabletAsyncQueues,
       Tt._clocks = clocks,
       Tt._nextUid = 0,
-      Tt._rand = rand'
+      Tt._trueTimestamp = 0,
+      Tt._numTableKeys = Mp.empty,
+      Tt._requestStats = Tt.RequestStats {
+        Tt._numCreateDBs = 0,
+        Tt._numWrites = 0,
+        Tt._numReads = 0
+      }
     }
 
 addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST Tt.TestState ()

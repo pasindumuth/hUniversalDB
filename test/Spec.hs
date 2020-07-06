@@ -4,7 +4,6 @@
 module Main where
 
 import qualified Control.Monad as Mo
-import qualified Data.List as Li
 import qualified Data.Map as Mp
 import qualified Data.Set as St
 import qualified System.Random as Rn
@@ -43,51 +42,60 @@ import Infra.State
 --    to reply with an error).
 --
 -- TODO: we need to collect statistics about how many of what requests
--- were sent, and then print them out at the end.
-generateRequests :: Int -> ST Tt.TestState ()
-generateRequests numMsgs = do
-  U.s31 Mo.foldM Mp.empty [0..numMsgs] $ \numTableKeys i -> do
-    let numTables = Mp.size numTableKeys
-    slaveId :: Int <- Tt.rand .^^ Rn.randomR (0, 4)
-    requestType :: Int <- Tt.rand .^^ Rn.randomR (0, 2)
-    case requestType of
-      0 -> do
-        let tableId = "t" ++ show numTables
-        SM.addClientMsg slaveId (CRq.CreateDatabase "d" tableId)
-        SM.simulateAll
-        return $ numTableKeys & Mp.insert numTables 0
-      _ | requestType == 1 || requestType == 2 -> do
-        newTableProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
-        (tableIdx, keyIdx, numTableKeys') <-
-          if newTableProb >= 75
-            then return (numTables, 0, numTableKeys)
-            else do
-              tableIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numTables - 1)
-              (keyIdx, numTableKeys') <-
-                case Mp.lookup tableIdx numTableKeys of
-                  Just numKeys | numKeys > 0 -> do
-                    newKeyProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
-                    if newKeyProb >= 75
-                      then return (numKeys, numTableKeys & Mp.insert tableIdx (numKeys + 1))
-                      else do
-                        keyIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numKeys - 1)
-                        return (keyIdx, numTableKeys)
-                  _ -> return (0, numTableKeys & Mp.insert tableIdx 1)
-              return (tableIdx, keyIdx, numTableKeys')
-        let tableId = "t" ++ show tableIdx
-            key = "k" ++ show keyIdx
-        noise <- Tt.rand .^^ Rn.randomR (-2, 2)
-        let timestamp = i + noise
-        case requestType of
-          1 -> do
-            let value = "v" ++ show keyIdx
-            SM.addClientMsg slaveId (CRq.WriteRequest "d" tableId key value timestamp)
-            SM.simulateAll
-          2 -> do
-            SM.addClientMsg slaveId (CRq.ReadRequest "d" tableId key timestamp)
-            SM.simulateAll
-        return numTableKeys'
-  return ()
+-- were sent, and then print them out at the end. We must createdbs, reads,
+-- and writes sent. We should also number of success and failures.
+-- TODO: We must incorporate message dropping.  In the test
+-- code, decide when to fire a request, how to drop messages,
+-- and how many simulation cycles we should perform.
+generateRequest :: ST Tt.TestState ()
+generateRequest = do
+  numTables <- Tt.numTableKeys .^^^ Mp.size
+  slaveId :: Int <- Tt.rand .^^ Rn.randomR (0, 4)
+  requestType :: Int <- Tt.rand .^^ Rn.randomR (0, 2)
+  case requestType of
+    0 -> do
+      let tableId = "t" ++ show numTables
+      SM.addClientMsg slaveId (CRq.CreateDatabase "d" tableId)
+      Tt.requestStats.Tt.numCreateDBs .^^. (+1)
+      Tt.numTableKeys .^^. Mp.insert numTables 0
+      return ()
+    _ | requestType == 1 || requestType == 2 -> do
+      newTableProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
+      (tableIdx, keyIdx) <-
+        if newTableProb >= 75
+          then return (numTables, 0)
+          else do
+            tableIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numTables - 1)
+            keyIdx <- do
+              res <- Tt.numTableKeys .^^^ Mp.lookup tableIdx
+              case res of
+                Just numKeys | numKeys > 0 -> do
+                  newKeyProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
+                  if newKeyProb >= 75
+                    then do
+                      Tt.numTableKeys .^^. Mp.insert tableIdx (numKeys + 1)
+                      return numKeys
+                    else do
+                      keyIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numKeys - 1)
+                      return keyIdx
+                _ -> do
+                  Tt.numTableKeys .^^. Mp.insert tableIdx 1
+                  return 0
+            return (tableIdx, keyIdx)
+      let tableId = "t" ++ show tableIdx
+          key = "k" ++ show keyIdx
+      noise <- Tt.rand .^^ Rn.randomR (-2, 2)
+      trueTimestamp <- getL $ Tt.trueTimestamp
+      let timestamp = trueTimestamp + noise
+      case requestType of
+        1 -> do
+          let value = "v" ++ show keyIdx
+          SM.addClientMsg slaveId (CRq.WriteRequest "d" tableId key value timestamp)
+          Tt.requestStats.Tt.numWrites .^^. (+1)
+        2 -> do
+          SM.addClientMsg slaveId (CRq.ReadRequest "d" tableId key timestamp)
+          Tt.requestStats.Tt.numReads .^^. (+1)
+      return ()
 
 test1 :: ST Tt.TestState ()
 test1 = do
@@ -107,7 +115,11 @@ test2 = do
   SM.addClientMsg 0 (CRq.WriteRequest "d" "t" "key5" "value5" 5); SM.simulateAll
 
 test3 :: ST Tt.TestState ()
-test3 = generateRequests 15
+test3 = do
+  Mo.forM_ [1..25] $
+    \_ -> do
+      generateRequest
+      SM.simulateAll
 
 data TestPaxosLog = TestPaxosLog {
   _plog :: Mp.Map PM.IndexT PM.PaxosLogEntry,
@@ -273,8 +285,10 @@ driveTest testNum test = do
       testMsg =
         case verifyTrace $ reverse traceMsgs of
           Left errMsg -> "Test " ++ (show testNum) ++ " Failed! Error: " ++ errMsg
-          Right _ -> "Test " ++ (show testNum) ++ " Passed! " ++ (show $ Li.length traceMsgs) ++ " trace messages."
+          Right _ -> "Test " ++ (show testNum) ++ " Passed! " ++ (show $ length traceMsgs) ++ " trace messages."
+  putStrLn $ ppShow $ g' ^. Tt.requestStats
   putStrLn testMsg
+  putStrLn ""
   return ()
 
 testDriver :: IO ()
