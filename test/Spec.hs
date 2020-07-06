@@ -3,6 +3,7 @@
 
 module Main where
 
+import qualified Debug.Trace as DTr
 import qualified Control.Monad as Mo
 import qualified Data.Map as Mp
 import qualified Data.Set as St
@@ -128,6 +129,17 @@ test3 = do
       generateRequest
       SM.simulateN 2
       SM.dropMessages 1
+  SM.simulateAll
+  analyzeResponses
+
+test4 :: ST Tt.TestState ()
+test4 = do
+  Mo.forM_ [1..20] $
+    \_ -> do
+      Mo.forM_ [1..5] $
+        \_ -> generateRequest
+      SM.simulateN 2
+      SM.dropMessages 2
   SM.simulateAll
   analyzeResponses
 
@@ -258,7 +270,11 @@ checkResponses msgs =
                                 -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
                                 CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
                                 _ -> genericError response payload
-                            Nothing -> genericError response payload
+                            Nothing -> do
+                              -- TODO: this case should result in a genericError when the datamasters are set up
+                              case responsePayload of
+                                CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
+                                _ -> genericError response payload
                         Nothing ->
                           case responsePayload of
                             CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
@@ -306,6 +322,7 @@ testDriver = do
   driveTest 1 test1
   driveTest 2 test2
   driveTest 3 test3
+  driveTest 4 test4
 
 main :: IO ()
 main = testDriver
