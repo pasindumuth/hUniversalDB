@@ -32,16 +32,15 @@ data TestState = TestState {
   _nonemptyQueues :: NonemptyQueues,
   _slaveState :: Mp.Map Co.EndpointId SS.SlaveState,
   _tabletStates :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange TS.TabletState),
-  _rand :: Rn.StdGen, -- Random Number Generator for simulation
-
   -- The following are everything related to asynchronous computation
   -- done at a node.
   _slaveAsyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (Ac.InputAction, Int)),
   _tabletAsyncQueues :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange (Sq.Seq (Ac.TabletInputAction, Int))),
   _clocks :: Mp.Map Co.EndpointId Int,
-  
   -- Fields for usage by the client
-  _nextUid :: Int
+  _nextUid :: Int,
+  -- General
+  _rand :: Rn.StdGen
 } deriving (Show)
 
 makeLenses ''TestState

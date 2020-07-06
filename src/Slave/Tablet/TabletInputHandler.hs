@@ -81,11 +81,12 @@ createClientTask keySpaceRange eId request =
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 let value = MS.staticRead key timestamp (derivedState ^. DS.kvStore)
-                addA $ Ac.Send [eId] $
-                  Ms.ClientResponse
-                    (CRs.ClientResponse
-                      (CRs.ResponseMeta requestId)
-                      (CRs.ReadResponse value))
+                    response =
+                      (CRs.ClientResponse
+                        (CRs.ResponseMeta requestId)
+                        (CRs.ReadResponse value))
+                trace $ TrM.ClientResponseSent response
+                addA $ Ac.Send [eId] $ Ms.ClientResponse response
                 return True
               _ -> return False
           done derivedState = do
@@ -104,11 +105,12 @@ createClientTask keySpaceRange eId request =
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
-                addA $ Ac.Send [eId] $
-                  Ms.ClientResponse
-                    (CRs.ClientResponse
-                      (CRs.ResponseMeta requestId)
-                      (CRs.Error pastWriteAttempt))
+                let response =
+                      (CRs.ClientResponse
+                        (CRs.ResponseMeta requestId)
+                        (CRs.Error pastWriteAttempt))
+                trace $ TrM.ClientResponseSent response
+                addA $ Ac.Send [eId] $ Ms.ClientResponse response
                 return True
               _ -> return False
           done derivedState = do

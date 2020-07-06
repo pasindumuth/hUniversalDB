@@ -1,10 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
 import qualified Control.Monad as Mo
 import qualified Data.List as Li
 import qualified Data.Map as Mp
+import qualified Data.Set as St
+import qualified System.Random as Rn
 import Text.Show.Pretty (ppShow)
 
 import qualified Infra.Utils as U
@@ -22,10 +25,77 @@ import qualified SimulationManager as SM
 import Infra.Lens
 import Infra.State
 
+
+-- We pass in a number of requests to send. There is a for loop.
+-- On each iteration, we randomly selects the type of request to send.
+--
+-- 1. We keep track of the (database, table) we've issued CreateDatabase
+--    requests to so far. This way, we can make sure to always issue non-duplicate
+--    CreateDatabase requests.
+--
+-- 2. We keep track of keys that have been written to. This is useful for selecting
+--    when to try overwriting a key and when to try writing a new key. Similarly,
+--    for selecting when to try reading an existing key or a non-existant key.
+--
+-- 3. On every request, we select the timestamp approximately equal to the number
+--    of requests that were already sent. However, we add a slight bit of noise to this
+--    to simulate sending requests to the past (which sometimes we expect the system
+--    to reply with an error).
+--
+-- TODO: we need to collect statistics about how many of what requests
+-- were sent, and then print them out at the end.
+generateRequests :: Int -> ST Tt.TestState ()
+generateRequests numMsgs = do
+  U.s31 Mo.foldM Mp.empty [0..numMsgs] $ \numTableKeys i -> do
+    let numTables = Mp.size numTableKeys
+    slaveId :: Int <- Tt.rand .^^ Rn.randomR (0, 4)
+    requestType :: Int <- Tt.rand .^^ Rn.randomR (0, 2)
+    case requestType of
+      0 -> do
+        let tableId = "t" ++ show numTables
+        SM.addClientMsg slaveId (CRq.CreateDatabase "d" tableId)
+        SM.simulateAll
+        return $ numTableKeys & Mp.insert numTables 0
+      _ | requestType == 1 || requestType == 2 -> do
+        newTableProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
+        (tableIdx, keyIdx, numTableKeys') <-
+          if newTableProb >= 75
+            then return (numTables, 0, numTableKeys)
+            else do
+              tableIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numTables - 1)
+              (keyIdx, numTableKeys') <-
+                case Mp.lookup tableIdx numTableKeys of
+                  Just numKeys | numKeys > 0 -> do
+                    newKeyProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
+                    if newKeyProb >= 75
+                      then return (numKeys, numTableKeys & Mp.insert tableIdx (numKeys + 1))
+                      else do
+                        keyIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numKeys - 1)
+                        return (keyIdx, numTableKeys)
+                  _ -> return (0, numTableKeys & Mp.insert tableIdx 1)
+              return (tableIdx, keyIdx, numTableKeys')
+        let tableId = "t" ++ show tableIdx
+            key = "k" ++ show keyIdx
+        noise <- Tt.rand .^^ Rn.randomR (-2, 2)
+        let timestamp = i + noise
+        case requestType of
+          1 -> do
+            let value = "v" ++ show keyIdx
+            SM.addClientMsg slaveId (CRq.WriteRequest "d" tableId key value timestamp)
+            SM.simulateAll
+          2 -> do
+            SM.addClientMsg slaveId (CRq.ReadRequest "d" tableId key timestamp)
+            SM.simulateAll
+        return numTableKeys'
+  return ()
+
 test1 :: ST Tt.TestState ()
 test1 = do
   SM.addClientMsg 0 (CRq.CreateDatabase "d" "t"); SM.simulateAll
   SM.addClientMsg 1 (CRq.WriteRequest "d" "t" "key1" "value1" 1); SM.simulateAll
+  SM.addClientMsg 2 (CRq.ReadRequest "d" "t" "key1" 3); SM.simulateAll
+  SM.addClientMsg 3 (CRq.WriteRequest "d" "t" "key1" "value1" 2); SM.simulateAll
+  SM.addClientMsg 2 (CRq.ReadRequest "d" "t" "key2" 3); SM.simulateAll
 
 test2 :: ST Tt.TestState ()
 test2 = do
@@ -35,6 +105,9 @@ test2 = do
   SM.addClientMsg 3 (CRq.WriteRequest "d" "t" "key3" "value3" 3); SM.simulateN 2
   SM.addClientMsg 4 (CRq.WriteRequest "d" "t" "key4" "value4" 4); SM.simulateN 2
   SM.addClientMsg 0 (CRq.WriteRequest "d" "t" "key5" "value5" 5); SM.simulateAll
+
+test3 :: ST Tt.TestState ()
+test3 = generateRequests 15
 
 data TestPaxosLog = TestPaxosLog {
   _plog :: Mp.Map PM.IndexT PM.PaxosLogEntry,
@@ -208,6 +281,7 @@ testDriver :: IO ()
 testDriver = do
   driveTest 1 test1
   driveTest 2 test2
+  driveTest 3 test3
 
 main :: IO ()
 main = testDriver

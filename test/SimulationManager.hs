@@ -52,11 +52,11 @@ createTestState seed numSlaves numClients =
       Tt._nonemptyQueues = nonemptyQueues,
       Tt._slaveState = slaveState,
       Tt._tabletStates = tabletStates,
-      Tt._rand = rand',
       Tt._slaveAsyncQueues = asyncQueues,
       Tt._tabletAsyncQueues = tabletAsyncQueues,
       Tt._clocks = clocks,
-      Tt._nextUid = 0
+      Tt._nextUid = 0,
+      Tt._rand = rand'
     }
 
 addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST Tt.TestState ()
