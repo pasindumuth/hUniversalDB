@@ -34,19 +34,19 @@ startClient (ip:message) = do
           Cn.sendMessage socket $
             Ms.ClientRequest 
               (CRq.ClientRequest
-                (CRq.RequestMeta "uid")
-                (CRq.ReadRequest databaseId tableId key (read timestamp)))
+                (CRq.Meta "uid")
+                (CRq.Read databaseId tableId key (read timestamp)))
         ["w", databaseId, tableId, key, value, timestamp] -> do
           Cn.sendMessage socket $
             Ms.ClientRequest 
               (CRq.ClientRequest
-                (CRq.RequestMeta "uid")
-                (CRq.WriteRequest databaseId tableId key value (read timestamp)))
+                (CRq.Meta "uid")
+                (CRq.Write databaseId tableId key value (read timestamp)))
         ["c", databaseId, tableId] -> do
           Cn.sendMessage socket $
             Ms.ClientRequest
               (CRq.ClientRequest
-                (CRq.RequestMeta "uid")
+                (CRq.Meta "uid")
                 (CRq.CreateDatabase databaseId tableId))
         _ -> print "Unrecognized command or number of arguments"
 

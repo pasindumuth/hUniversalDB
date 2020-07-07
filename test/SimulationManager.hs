@@ -207,14 +207,14 @@ simulateAll = do
 
 addClientMsg
   :: Int
-  -> CRq.RequestPayload
+  -> CRq.Payload
   -> ST Tt.TestState ()
 addClientMsg slaveId payload = do
   uid <- Tt.nextUid .^^. (+1)
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
       msg = Ms.ClientRequest
               (CRq.ClientRequest
-                (CRq.RequestMeta (show uid))
+                (CRq.Meta (show uid))
                 payload)
   addMsg msg (clientEId, slaveEId)
   return ()

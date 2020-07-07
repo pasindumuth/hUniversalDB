@@ -85,10 +85,10 @@ generateRequest = do
       case requestType of
         1 -> do
           let value = "v" ++ show keyIdx
-          SM.addClientMsg slaveId (CRq.WriteRequest "d" tableId key value timestamp)
+          SM.addClientMsg slaveId (CRq.Write "d" tableId key value timestamp)
           Tt.requestStats.Tt.numWriteRqs .^^. (+1)
         2 -> do
-          SM.addClientMsg slaveId (CRq.ReadRequest "d" tableId key timestamp)
+          SM.addClientMsg slaveId (CRq.Read "d" tableId key timestamp)
           Tt.requestStats.Tt.numReadRqs .^^. (+1)
       return ()
 
@@ -99,26 +99,26 @@ analyzeResponses = do
     Mo.forM_ responses $ \(Ms.ClientResponse response) -> do
       case response ^. CRs.responsePayload of
         CRs.Error _ -> Tt.requestStats.Tt.numErrRss .^^. (+1)
-        CRs.ReadResponse _ -> Tt.requestStats.Tt.numReadRss .^^. (+1)
-        CRs.WriteResponse -> Tt.requestStats.Tt.numWriteRss .^^. (+1)
+        CRs.Read _ -> Tt.requestStats.Tt.numReadRss .^^. (+1)
+        CRs.Write -> Tt.requestStats.Tt.numWriteRss .^^. (+1)
         CRs.Success -> Tt.requestStats.Tt.numSuccessRss .^^. (+1)
 
 test1 :: ST Tt.TestState ()
 test1 = do
   SM.addClientMsg 0 (CRq.CreateDatabase "d" "t"); SM.simulateAll
-  SM.addClientMsg 1 (CRq.WriteRequest "d" "t" "key1" "value1" 1); SM.simulateAll
-  SM.addClientMsg 2 (CRq.ReadRequest "d" "t" "key1" 3); SM.simulateAll
-  SM.addClientMsg 3 (CRq.WriteRequest "d" "t" "key1" "value1" 2); SM.simulateAll
-  SM.addClientMsg 2 (CRq.ReadRequest "d" "t" "key2" 3); SM.simulateAll
+  SM.addClientMsg 1 (CRq.Write "d" "t" "key1" "value1" 1); SM.simulateAll
+  SM.addClientMsg 2 (CRq.Read "d" "t" "key1" 3); SM.simulateAll
+  SM.addClientMsg 3 (CRq.Write "d" "t" "key1" "value1" 2); SM.simulateAll
+  SM.addClientMsg 2 (CRq.Read "d" "t" "key2" 3); SM.simulateAll
 
 test2 :: ST Tt.TestState ()
 test2 = do
   SM.addClientMsg 0 (CRq.CreateDatabase "d" "t"); SM.simulateN 2
-  SM.addClientMsg 1 (CRq.WriteRequest "d" "t" "key1" "value1" 1); SM.simulateN 2
-  SM.addClientMsg 2 (CRq.WriteRequest "d" "t" "key2" "value2" 2); SM.simulateN 2
-  SM.addClientMsg 3 (CRq.WriteRequest "d" "t" "key3" "value3" 3); SM.simulateN 2
-  SM.addClientMsg 4 (CRq.WriteRequest "d" "t" "key4" "value4" 4); SM.simulateN 2
-  SM.addClientMsg 0 (CRq.WriteRequest "d" "t" "key5" "value5" 5); SM.simulateAll
+  SM.addClientMsg 1 (CRq.Write "d" "t" "key1" "value1" 1); SM.simulateN 2
+  SM.addClientMsg 2 (CRq.Write "d" "t" "key2" "value2" 2); SM.simulateN 2
+  SM.addClientMsg 3 (CRq.Write "d" "t" "key3" "value3" 3); SM.simulateN 2
+  SM.addClientMsg 4 (CRq.Write "d" "t" "key4" "value4" 4); SM.simulateN 2
+  SM.addClientMsg 0 (CRq.Write "d" "t" "key5" "value5" 5); SM.simulateAll
 
 -- TODO: I want more monitoring of what happens during a test. Maybe
 -- I need message-drop stats.
@@ -198,7 +198,7 @@ refineTrace msgs =
       Right (_, modMsgs) -> Right $ reverse modMsgs
       Left errMsg -> Left errMsg
 
-type RequestMap = Mp.Map Co.RequestId CRq.RequestPayload
+type RequestMap = Mp.Map Co.RequestId CRq.Payload
 -- The range of `RangeMap` should always be the domain of `Tables`
 type RangeMap = Mp.Map Co.PaxosId (Co.DatabaseId, Co.TableId)
 type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
@@ -230,9 +230,9 @@ checkResponses msgs =
                       let rangeMap' = rangeMap & at (show range) ?~ (databaseId, tableId)
                           tables' = tables & at (databaseId, tableId) ?~ Mp.empty
                       in Right (requestMap, rangeMap', tables')
-            TrM.ClientRequestReceived (CRq.ClientRequest (CRq.RequestMeta requestId) payload) ->
+            TrM.ClientRequestReceived (CRq.ClientRequest (CRq.Meta requestId) payload) ->
               Right (requestMap & at requestId ?~ payload, rangeMap, tables)
-            TrM.ClientResponseSent response@(CRs.ClientResponse (CRs.ResponseMeta requestId) responsePayload) ->
+            TrM.ClientResponseSent response@(CRs.ClientResponse (CRs.Meta requestId) responsePayload) ->
               case requestMap ^. at requestId of
                 Nothing -> Left $ "Response " ++ show response ++ " has no corresponding request."
                 Just payload -> do
@@ -242,11 +242,11 @@ checkResponses msgs =
                       case responsePayload of
                         CRs.Success -> genericSuccess
                         _ -> genericError response payload
-                    CRq.ReadRequest databaseId tableId key timestamp ->
+                    CRq.Read databaseId tableId key timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case responsePayload of
-                            CRs.ReadResponse val | val == (MS.staticRead key timestamp table) -> genericSuccess
+                            CRs.Read val | val == (MS.staticRead key timestamp table) -> genericSuccess
                             -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
                             CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
                             _ -> genericError response payload
@@ -254,7 +254,7 @@ checkResponses msgs =
                           case responsePayload of
                             CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
                             _ -> genericError response payload
-                    CRq.WriteRequest databaseId tableId key value timestamp ->
+                    CRq.Write databaseId tableId key value timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case MS.staticReadLat key table of
@@ -262,10 +262,10 @@ checkResponses msgs =
                               case responsePayload of
                                 -- The lat should be equal to timestamp. This is because by this point in
                                 -- the trace messages, the write PaxosLogEntry should have been encoutered.
-                                -- TODO: it's possible that the `lat` was already here when the WriteRequest was received
-                                -- but that we're accidentally returning a `WriteResponse` instead of an error. We must
+                                -- TODO: it's possible that the `lat` was already here when the Write was received
+                                -- but that we're accidentally returning a `Write` instead of an error. We must
                                 -- figure out how to handle this issue.
-                                CRs.WriteResponse | lat == timestamp -> genericSuccess
+                                CRs.Write | lat == timestamp -> genericSuccess
                                 CRs.Error msg | msg == TIH.pastWriteAttempt -> genericSuccess
                                 -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
                                 CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess

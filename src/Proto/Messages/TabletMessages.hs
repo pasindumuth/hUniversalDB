@@ -12,26 +12,26 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages.PaxosMessages as PM
 import Infra.Lens
 
-data RequestMeta = RequestMeta {
+data Meta = Meta {
   _requestId :: Co.RequestId
 } deriving (Gn.Generic, Bn.Binary, Show)
 
-data RequestPayload =
-  ReadRequest {
+data Payload =
+  Read {
     key :: String,
     timestamp :: Int } |
-  WriteRequest {
+  Write {
     key :: String,
     value :: String,
     timestamp :: Int }
   deriving (Gn.Generic, Bn.Binary, Show)
 
 data ClientRequest = ClientRequest {
-  _meta :: RequestMeta,
-  _payload :: RequestPayload
+  _meta :: Meta,
+  _payload :: Payload
 } deriving (Gn.Generic, Bn.Binary, Show)
 
-makeLenses ''RequestMeta
+makeLenses ''Meta
 makeLenses ''ClientRequest
 
 data TabletMessage =

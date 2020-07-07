@@ -55,17 +55,17 @@ handleInputAction iAction =
               let description = show (eId, request)
                   task = createCreateDBTask eId requestId (databaseId, tableId) description
               handlingState .^ (PTM.handleTask task)
-            CRq.ReadRequest databaseId tableId key timestamp -> do
+            CRq.Read databaseId tableId key timestamp -> do
               let forwardedRequest =
                     TM.ClientRequest
-                      (TM.RequestMeta requestId)
-                      (TM.ReadRequest key timestamp)
+                      (TM.Meta requestId)
+                      (TM.Read key timestamp)
               handleForwarding eId requestId (databaseId, tableId) forwardedRequest
-            CRq.WriteRequest databaseId tableId key value timestamp -> do
+            CRq.Write databaseId tableId key value timestamp -> do
               let forwardedRequest =
                     TM.ClientRequest
-                      (TM.RequestMeta requestId)
-                      (TM.WriteRequest key value timestamp)
+                      (TM.Meta requestId)
+                      (TM.Write key value timestamp)
               handleForwarding eId requestId (databaseId, tableId) forwardedRequest
         Ms.SlaveMessage slaveMsg ->
           case slaveMsg of
@@ -105,7 +105,7 @@ handleForwarding eId requestId (databaseId, tableId) request = do
     else do
       let response =
             (CRs.ClientResponse
-              (CRs.ResponseMeta requestId)
+              (CRs.Meta requestId)
               (CRs.Error dbTableDNE))
       trace $ TrM.ClientResponseSent response
       addA $ Ac.Send [eId] $ Ms.ClientResponse response
@@ -121,7 +121,7 @@ createCreateDBTask eId requestId (databaseId, tableId) description =
       done _ = do
         let response =
               CRs.ClientResponse
-                (CRs.ResponseMeta requestId)
+                (CRs.Meta requestId)
                 (CRs.Success)
         trace $ TrM.ClientResponseSent response
         addA $ Ac.Send [eId] $ Ms.ClientResponse response

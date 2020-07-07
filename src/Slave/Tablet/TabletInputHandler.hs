@@ -75,7 +75,7 @@ createClientTask keySpaceRange eId request =
   let description = show (eId, request)
       requestId = request ^. TM.meta.TM.requestId
   in case request ^. TM.payload of
-    TM.ReadRequest key timestamp ->
+    TM.Read key timestamp ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
@@ -83,8 +83,8 @@ createClientTask keySpaceRange eId request =
                 let value = MS.staticRead key timestamp (derivedState ^. DS.kvStore)
                     response =
                       (CRs.ClientResponse
-                        (CRs.ResponseMeta requestId)
-                        (CRs.ReadResponse value))
+                        (CRs.Meta requestId)
+                        (CRs.Read value))
                 trace $ TrM.ClientResponseSent response
                 addA $ Ac.Send [eId] $ Ms.ClientResponse response
                 return True
@@ -93,21 +93,21 @@ createClientTask keySpaceRange eId request =
             let value = derivedState ^. DS.kvStore & MS.staticRead key timestamp
                 response =
                   CRs.ClientResponse
-                    (CRs.ResponseMeta requestId)
-                    (CRs.ReadResponse value)
+                    (CRs.Meta requestId)
+                    (CRs.Read value)
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Read key timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper
-    TM.WriteRequest key value timestamp ->
+    TM.Write key value timestamp ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 let response =
                       (CRs.ClientResponse
-                        (CRs.ResponseMeta requestId)
+                        (CRs.Meta requestId)
                         (CRs.Error pastWriteAttempt))
                 trace $ TrM.ClientResponseSent response
                 addA $ Ac.Send [eId] $ Ms.ClientResponse response
@@ -116,8 +116,8 @@ createClientTask keySpaceRange eId request =
           done derivedState = do
             let response =
                   CRs.ClientResponse
-                    (CRs.ResponseMeta requestId)
-                    (CRs.WriteResponse)
+                    (CRs.Meta requestId)
+                    (CRs.Write)
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Write key value timestamp

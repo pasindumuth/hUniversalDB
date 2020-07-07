@@ -12,20 +12,21 @@ import qualified GHC.Generics as Gn
 import qualified Proto.Common as Co
 import Infra.Lens
 
-data RequestMeta = RequestMeta {
+data Meta = Meta {
   _requestId :: Co.RequestId
 } deriving (Gn.Generic, Bn.Binary, Show)
 
-data RequestPayload =
+data Payload =
   CreateDatabase {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId } |
-  ReadRequest {
+  -- rename these to just Read and Write; Request is superfluous.
+  Read {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId,
     key :: String,
     timestamp :: Int } |
-  WriteRequest {
+  Write {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId,
     key :: String,
@@ -34,9 +35,9 @@ data RequestPayload =
   deriving (Gn.Generic, Bn.Binary, Show)
 
 data ClientRequest = ClientRequest {
-  _meta :: RequestMeta,
-  _payload :: RequestPayload
+  _meta :: Meta,
+  _payload :: Payload
 } deriving (Gn.Generic, Bn.Binary, Show)
 
-makeLenses ''RequestMeta
+makeLenses ''Meta
 makeLenses '' ClientRequest

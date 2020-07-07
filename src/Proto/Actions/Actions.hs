@@ -26,6 +26,9 @@ data TabletInputAction =
 
 data OutputAction =
   Send { eIds :: [Co.EndpointId], msg :: Ms.Message} |
+  -- TODO: the common code should have control over how long it should wait
+  -- until the next repeat We can also generalize RetryOutput to contain
+  -- generic data, and RetryInput also contains generic data.
   RetryOutput { counterValue :: Int } |
   Print { message :: String } |
   Slave_CreateTablet { range :: Co.KeySpaceRange } |

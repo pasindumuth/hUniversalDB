@@ -12,21 +12,21 @@ import qualified GHC.Generics as Gn
 import qualified Proto.Common as Co
 import Infra.Lens
 
-data ResponseMeta = ResponseMeta {
+data Meta = Meta {
   _requestId :: Co.RequestId
 } deriving (Gn.Generic, Bn.Binary, Show)
 
-data ResponsePayload =
+data Payload =
   Error { message :: String } |
-  ReadResponse { value :: Maybe String } |
-  WriteResponse |
+  Read { value :: Maybe String } |
+  Write |
   Success
   deriving (Gn.Generic, Bn.Binary, Show)
 
 data ClientResponse = ClientResponse {
-  _responseMeta :: ResponseMeta,
-  _responsePayload :: ResponsePayload
+  _responseMeta :: Meta,
+  _responsePayload :: Payload
 } deriving (Gn.Generic, Bn.Binary, Show)
 
-makeLenses ''ResponseMeta
+makeLenses ''Meta
 makeLenses '' ClientResponse
