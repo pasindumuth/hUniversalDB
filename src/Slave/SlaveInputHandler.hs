@@ -128,6 +128,6 @@ createCreateDBTask eId requestId (databaseId, tableId) description =
       createPLEntry derivedState =
         let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
             generation = (derivedState ^. IDS.keySpaceManager.IKSM.generation) + 1
-        in PM.Slave $ PM.AddRange range generation
+        in PM.Slave $ PM.AddRange requestId range generation
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper

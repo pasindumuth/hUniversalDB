@@ -18,8 +18,8 @@ handleDerivedState paxosId pl pl' = do
   Mo.forM_ (PL.newlyAddedEntries pl pl') $ \(index, plEntry) -> do
     trace $ TrM.PaxosInsertion paxosId index plEntry
     case plEntry of
-      PM.Tablet (PM.Read key timestamp) -> do
+      PM.Tablet (PM.Read _ key timestamp) -> do
         DS.kvStore .^^ MS.read key timestamp
         return ()
-      PM.Tablet (PM.Write key value timestamp) -> do
+      PM.Tablet (PM.Write _ key value timestamp) -> do
         DS.kvStore .^^ MS.write key value timestamp

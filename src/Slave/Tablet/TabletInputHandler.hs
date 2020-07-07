@@ -99,7 +99,7 @@ createClientTask keySpaceRange eId request =
                       (CRs.ReadSuccess value))
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
-          createPLEntry _ = PM.Tablet $ PM.Read key timestamp
+          createPLEntry _ = PM.Tablet $ PM.Read requestId key timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper
     TM.Write key value timestamp ->
@@ -122,6 +122,6 @@ createClientTask keySpaceRange eId request =
                     (CRs.WriteResponse CRs.WriteSuccess)
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
-          createPLEntry _ = PM.Tablet $ PM.Write key value timestamp
+          createPLEntry _ = PM.Tablet $ PM.Write requestId key value timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper

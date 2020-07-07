@@ -57,7 +57,7 @@ generateRequest = do
     _ | requestType == 1 || requestType == 2 -> do
       newTableProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
       (tableIdx, keyIdx) <-
-        if newTableProb >= 75
+        if newTableProb >= 75 || numTables == 0
           then return (numTables, 0)
           else do
             tableIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numTables - 1)
@@ -212,6 +212,7 @@ type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
 checkResponses :: [TrM.TraceMessage] -> Either String ()
 checkResponses msgs =
   let genericError response payload = Left $ "Response " ++ show response ++ " is the wrong response to Request " ++ show payload
+      plEntryError entry = Left $ "Unwarranted PaxosLogEntry: " ++ show entry
       testRes = U.s31 Mo.foldM (Mp.empty, Mp.empty, Mp.empty) msgs $
         \(requestMap, rangeMap, tables) msg ->
           case msg of
@@ -220,18 +221,47 @@ checkResponses msgs =
                 PM.Tablet entry ->
                   let (databaseId, tableId) = rangeMap ^?! ix paxosId
                   in case entry of
-                    PM.Read key timestamp ->
-                      let (_, tables') = tables %^^* (ix (databaseId, tableId)) $ MS.read key timestamp
-                      in Right (requestMap, rangeMap, tables')
-                    PM.Write key value timestamp ->
-                      let (_, tables') = tables %^^* (ix (databaseId, tableId)) $ MS.write key value timestamp
-                      in Right (requestMap, rangeMap, tables')
+                    PM.Read requestId key timestamp ->
+                      case requestMap ^. at requestId of
+                        Nothing -> plEntryError entry
+                        Just payload ->
+                          case payload of
+                            CRq.Read databaseId' tableId' key' timestamp'
+                              | databaseId' == databaseId &&
+                                tableId' == tableId &&
+                                key' == key &&
+                                timestamp' == timestamp ->
+                              let (_, tables') = tables %^^* (ix (databaseId, tableId)) $ MS.read key timestamp
+                              in Right (requestMap, rangeMap, tables')
+                            _ -> plEntryError entry
+                    PM.Write requestId key value timestamp ->
+                      case requestMap ^. at requestId of
+                        Nothing -> plEntryError entry
+                        Just payload ->
+                          case payload of
+                            CRq.Write databaseId' tableId' key' value' timestamp'
+                              | databaseId' == databaseId &&
+                                tableId' == tableId &&
+                                key' == key &&
+                                value' == value &&
+                                timestamp' == timestamp ->
+                              let (_, tables') = tables %^^* (ix (databaseId, tableId)) $ MS.write key value timestamp
+                              in Right (requestMap, rangeMap, tables')
+                            _ -> plEntryError entry
                 PM.Slave entry ->
                   case entry of
-                    PM.AddRange range@(Co.KeySpaceRange databaseId tableId _ _) generation ->
-                      let rangeMap' = rangeMap & at (show range) ?~ (databaseId, tableId)
-                          tables' = tables & at (databaseId, tableId) ?~ Mp.empty
-                      in Right (requestMap, rangeMap', tables')
+                    PM.AddRange requestId range@(Co.KeySpaceRange databaseId tableId _ _) generation ->
+                      case requestMap ^. at requestId of
+                        Nothing -> plEntryError entry
+                        Just payload ->
+                          case payload of
+                            CRq.CreateDatabase databaseId' tableId'
+                              | databaseId' == databaseId &&
+                                tableId' == tableId ->
+                              let rangeMap' = rangeMap & at (show range) ?~ (databaseId, tableId)
+                                  tables' = tables & at (databaseId, tableId) ?~ Mp.empty
+                              in Right (requestMap, rangeMap', tables')
+                            _ -> plEntryError entry
             TrM.ClientRequestReceived (CRq.ClientRequest (CRq.Meta requestId) payload) ->
               Right (requestMap & at requestId ?~ payload, rangeMap, tables)
             TrM.ClientResponseSent response@(CRs.ClientResponse (CRs.Meta requestId) responsePayload) ->
@@ -248,7 +278,8 @@ checkResponses msgs =
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case responsePayload of
-                            CRs.ReadResponse (CRs.ReadSuccess val) | val == (MS.staticRead key timestamp table) -> genericSuccess
+                            CRs.ReadResponse (CRs.ReadSuccess val)
+                              | val == (MS.staticRead key timestamp table) -> genericSuccess
                             -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
                             CRs.ReadResponse CRs.ReadUnknownDB -> genericSuccess
                             _ -> genericError response payload
@@ -267,7 +298,8 @@ checkResponses msgs =
                                 -- TODO: it's possible that the `lat` was already here when the Write was received
                                 -- but that we're accidentally returning a `Write` instead of an error. We must
                                 -- figure out how to handle this issue.
-                                CRs.WriteResponse CRs.WriteSuccess | lat == timestamp -> genericSuccess
+                                CRs.WriteResponse CRs.WriteSuccess 
+                                  | lat == timestamp -> genericSuccess
                                 CRs.WriteResponse CRs.BackwardsWrite -> genericSuccess
                                 -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
                                 CRs.WriteResponse CRs.WriteUnknownDB -> genericSuccess

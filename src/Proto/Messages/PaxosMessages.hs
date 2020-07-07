@@ -13,9 +13,11 @@ import qualified Proto.Common as Co
 
 data Tablet_Entry =
   Read {
+    requestId :: Co.RequestId,
     key :: String,
     timestamp :: Int } |
   Write {
+    requestId :: Co.RequestId,
     key :: String,
     value :: String,
     timestamp :: Int }
@@ -23,6 +25,7 @@ data Tablet_Entry =
 
 data Slave_Entry =
   AddRange {
+    requestId :: Co.RequestId,
     range :: Co.KeySpaceRange,
     generation :: Int }
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
