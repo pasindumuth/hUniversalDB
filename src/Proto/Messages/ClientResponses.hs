@@ -16,11 +16,25 @@ data Meta = Meta {
   _requestId :: Co.RequestId
 } deriving (Gn.Generic, Bn.Binary, Show)
 
+data ReadResponse =
+  ReadSuccess { value :: Maybe String } |
+  ReadUnknownDB
+  deriving (Gn.Generic, Bn.Binary, Show)
+
+data WriteResponse =
+  WriteSuccess |
+  WriteUnknownDB |
+  BackwardsWrite
+  deriving (Gn.Generic, Bn.Binary, Show)
+
+data CreateDBResponse =
+  CreateDBSuccess
+  deriving (Gn.Generic, Bn.Binary, Show)
+
 data Payload =
-  Error { message :: String } |
-  Read { value :: Maybe String } |
-  Write |
-  Success
+  ReadResponse ReadResponse |
+  WriteResponse WriteResponse |
+  CreateDBResponse CreateDBResponse
   deriving (Gn.Generic, Bn.Binary, Show)
 
 data ClientResponse = ClientResponse {

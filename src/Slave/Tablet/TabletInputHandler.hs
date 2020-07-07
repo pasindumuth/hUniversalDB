@@ -82,9 +82,10 @@ createClientTask keySpaceRange eId request =
               Just lat | timestamp <= lat -> do
                 let value = MS.staticRead key timestamp (derivedState ^. DS.kvStore)
                     response =
-                      (CRs.ClientResponse
+                      CRs.ClientResponse
                         (CRs.Meta requestId)
-                        (CRs.Read value))
+                        (CRs.ReadResponse
+                          (CRs.ReadSuccess value))
                 trace $ TrM.ClientResponseSent response
                 addA $ Ac.Send [eId] $ Ms.ClientResponse response
                 return True
@@ -94,7 +95,8 @@ createClientTask keySpaceRange eId request =
                 response =
                   CRs.ClientResponse
                     (CRs.Meta requestId)
-                    (CRs.Read value)
+                    (CRs.ReadResponse
+                      (CRs.ReadSuccess value))
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Read key timestamp
@@ -108,7 +110,7 @@ createClientTask keySpaceRange eId request =
                 let response =
                       (CRs.ClientResponse
                         (CRs.Meta requestId)
-                        (CRs.Error pastWriteAttempt))
+                        (CRs.WriteResponse CRs.BackwardsWrite))
                 trace $ TrM.ClientResponseSent response
                 addA $ Ac.Send [eId] $ Ms.ClientResponse response
                 return True
@@ -117,7 +119,7 @@ createClientTask keySpaceRange eId request =
             let response =
                   CRs.ClientResponse
                     (CRs.Meta requestId)
-                    (CRs.Write)
+                    (CRs.WriteResponse CRs.WriteSuccess)
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Write key value timestamp

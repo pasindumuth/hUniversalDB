@@ -98,10 +98,12 @@ analyzeResponses = do
   Mo.forM_ clientResponses $ \(_, responses) ->
     Mo.forM_ responses $ \(Ms.ClientResponse response) -> do
       case response ^. CRs.responsePayload of
-        CRs.Error _ -> Tt.requestStats.Tt.numErrRss .^^. (+1)
-        CRs.Read _ -> Tt.requestStats.Tt.numReadRss .^^. (+1)
-        CRs.Write -> Tt.requestStats.Tt.numWriteRss .^^. (+1)
-        CRs.Success -> Tt.requestStats.Tt.numSuccessRss .^^. (+1)
+        CRs.ReadResponse (CRs.ReadSuccess _) -> Tt.requestStats.Tt.numReadSuccessRss .^^. (+1)
+        CRs.ReadResponse CRs.ReadUnknownDB -> Tt.requestStats.Tt.numReadUnknownDBRss .^^. (+1)
+        CRs.WriteResponse CRs.WriteSuccess -> Tt.requestStats.Tt.numWriteSuccessRss .^^. (+1)
+        CRs.WriteResponse CRs.WriteUnknownDB -> Tt.requestStats.Tt.numWriteUnknownDBRss .^^. (+1)
+        CRs.WriteResponse CRs.BackwardsWrite -> Tt.requestStats.Tt.numBackwardsWriteRss .^^. (+1)
+        CRs.CreateDBResponse CRs.CreateDBSuccess -> Tt.requestStats.Tt.numCreateDBSuccessRss .^^. (+1)
 
 test1 :: ST Tt.TestState ()
 test1 = do
@@ -240,19 +242,19 @@ checkResponses msgs =
                   case payload of
                     CRq.CreateDatabase databaseId tableId ->
                       case responsePayload of
-                        CRs.Success -> genericSuccess
+                        CRs.CreateDBResponse CRs.CreateDBSuccess -> genericSuccess
                         _ -> genericError response payload
                     CRq.Read databaseId tableId key timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case responsePayload of
-                            CRs.Read val | val == (MS.staticRead key timestamp table) -> genericSuccess
+                            CRs.ReadResponse (CRs.ReadSuccess val) | val == (MS.staticRead key timestamp table) -> genericSuccess
                             -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
-                            CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
+                            CRs.ReadResponse CRs.ReadUnknownDB -> genericSuccess
                             _ -> genericError response payload
                         Nothing ->
                           case responsePayload of
-                            CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
+                            CRs.ReadResponse CRs.ReadUnknownDB -> genericSuccess
                             _ -> genericError response payload
                     CRq.Write databaseId tableId key value timestamp ->
                       case tables ^. at (databaseId, tableId) of
@@ -265,19 +267,19 @@ checkResponses msgs =
                                 -- TODO: it's possible that the `lat` was already here when the Write was received
                                 -- but that we're accidentally returning a `Write` instead of an error. We must
                                 -- figure out how to handle this issue.
-                                CRs.Write | lat == timestamp -> genericSuccess
-                                CRs.Error msg | msg == TIH.pastWriteAttempt -> genericSuccess
+                                CRs.WriteResponse CRs.WriteSuccess | lat == timestamp -> genericSuccess
+                                CRs.WriteResponse CRs.BackwardsWrite -> genericSuccess
                                 -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
-                                CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
+                                CRs.WriteResponse CRs.WriteUnknownDB -> genericSuccess
                                 _ -> genericError response payload
                             Nothing -> do
                               -- TODO: this case should result in a genericError when the datamasters are set up
                               case responsePayload of
-                                CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
+                                CRs.WriteResponse CRs.WriteUnknownDB -> genericSuccess
                                 _ -> genericError response payload
                         Nothing ->
                           case responsePayload of
-                            CRs.Error msg | msg == SIH.dbTableDNE -> genericSuccess
+                            CRs.WriteResponse CRs.WriteUnknownDB -> genericSuccess
                             _ -> genericError response payload
   in case testRes of
     Right (requestMap, _, _) ->

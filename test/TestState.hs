@@ -25,10 +25,12 @@ data RequestStats = RequestStats {
   _numCreateDBRqs :: Int,
   _numReadRqs :: Int,
   _numWriteRqs :: Int,
-  _numErrRss :: Int,
-  _numReadRss :: Int,
-  _numWriteRss :: Int,
-  _numSuccessRss :: Int
+  _numReadSuccessRss :: Int,
+  _numReadUnknownDBRss :: Int,
+  _numWriteSuccessRss :: Int,
+  _numWriteUnknownDBRss :: Int,
+  _numBackwardsWriteRss :: Int,
+  _numCreateDBSuccessRss :: Int
 } deriving (Show)
 
 makeLenses ''RequestStats

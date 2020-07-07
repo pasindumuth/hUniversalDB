@@ -56,17 +56,37 @@ handleInputAction iAction =
                   task = createCreateDBTask eId requestId (databaseId, tableId) description
               handlingState .^ (PTM.handleTask task)
             CRq.Read databaseId tableId key timestamp -> do
-              let forwardedRequest =
-                    TM.ClientRequest
-                      (TM.Meta requestId)
-                      (TM.Read key timestamp)
-              handleForwarding eId requestId (databaseId, tableId) forwardedRequest
+              let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
+              ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
+              if Li.elem range ranges
+                then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest $
+                       TM.ClientRequest
+                         (TM.Meta requestId)
+                         (TM.Read key timestamp)
+                else do
+                -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
+                  let response =
+                        (CRs.ClientResponse
+                          (CRs.Meta requestId)
+                          (CRs.ReadResponse CRs.ReadUnknownDB))
+                  trace $ TrM.ClientResponseSent response
+                  addA $ Ac.Send [eId] $ Ms.ClientResponse response
             CRq.Write databaseId tableId key value timestamp -> do
-              let forwardedRequest =
-                    TM.ClientRequest
-                      (TM.Meta requestId)
-                      (TM.Write key value timestamp)
-              handleForwarding eId requestId (databaseId, tableId) forwardedRequest
+              let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
+              ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
+              if Li.elem range ranges
+                then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest $
+                       TM.ClientRequest
+                         (TM.Meta requestId)
+                         (TM.Write key value timestamp)
+                else do
+                -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
+                  let response =
+                        (CRs.ClientResponse
+                          (CRs.Meta requestId)
+                          (CRs.WriteResponse CRs.WriteUnknownDB))
+                  trace $ TrM.ClientResponseSent response
+                  addA $ Ac.Send [eId] $ Ms.ClientResponse response
         Ms.SlaveMessage slaveMsg ->
           case slaveMsg of
             SM.MultiPaxosMessage multiPaxosMsg -> do
@@ -90,26 +110,6 @@ handleInputAction iAction =
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
-handleForwarding
-  :: Co.EndpointId
-  -> String
-  -> (String, String)
-  -> TM.ClientRequest
-  -> ST SS.SlaveState ()
-handleForwarding eId requestId (databaseId, tableId) request = do
-  let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
-  ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
-  if Li.elem range ranges
-    then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest request
-    -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
-    else do
-      let response =
-            (CRs.ClientResponse
-              (CRs.Meta requestId)
-              (CRs.Error dbTableDNE))
-      trace $ TrM.ClientResponseSent response
-      addA $ Ac.Send [eId] $ Ms.ClientResponse response
-
 createCreateDBTask
   :: Co.EndpointId
   -> String
@@ -122,7 +122,7 @@ createCreateDBTask eId requestId (databaseId, tableId) description =
         let response =
               CRs.ClientResponse
                 (CRs.Meta requestId)
-                (CRs.Success)
+                (CRs.CreateDBResponse CRs.CreateDBSuccess)
         trace $ TrM.ClientResponseSent response
         addA $ Ac.Send [eId] $ Ms.ClientResponse response
       createPLEntry derivedState =

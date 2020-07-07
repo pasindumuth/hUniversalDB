@@ -64,10 +64,12 @@ createTestState seed numSlaves numClients =
         Tt._numCreateDBRqs = 0,
         Tt._numReadRqs = 0,
         Tt._numWriteRqs = 0,
-        Tt._numErrRss = 0,
-        Tt._numReadRss = 0,
-        Tt._numWriteRss = 0,
-        Tt._numSuccessRss = 0
+        Tt._numReadSuccessRss = 0,
+        Tt._numReadUnknownDBRss = 0,
+        Tt._numWriteSuccessRss = 0,
+        Tt._numWriteUnknownDBRss = 0,
+        Tt._numBackwardsWriteRss = 0,
+        Tt._numCreateDBSuccessRss = 0
       },
       Tt._clientResponses = clientResponses
     }
