@@ -17,9 +17,10 @@ data Meta = Meta {
 } deriving (Gn.Generic, Bn.Binary, Show)
 
 data Payload =
-  CreateDatabase {
+  RangeWrite {
     databaseId :: Co.DatabaseId,
-    tableId :: Co.TableId } |
+    tableId :: Co.TableId,
+    timestamp :: Int } |
   SlaveRead {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId,

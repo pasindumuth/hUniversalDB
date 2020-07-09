@@ -12,6 +12,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
+import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
 import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
 import qualified Proto.Messages.ClientResponses.SlaveWrite as CRsSW
 import qualified Proto.Messages.PaxosMessages as PM
@@ -42,6 +43,13 @@ handlingState =
     SS.env.En.rand,
     SS.env.En.slaveEIds))
 
+getRanges :: ST SS.SlaveState [Co.KeySpaceRange]
+getRanges = do
+  versions <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.versions
+  case versions of
+    [] -> return []
+    (version:_) -> return $ version ^. _3
+
 handleInputAction
   :: Ac.InputAction
   -> ST SS.SlaveState ()
@@ -53,13 +61,14 @@ handleInputAction iAction =
           let requestId = (request ^. CRq.meta . CRq.requestId)
           trace $ TrM.ClientRequestReceived request
           case request ^. CRq.payload of
-            CRq.CreateDatabase databaseId tableId -> do
+            CRq.RangeWrite databaseId tableId timestamp -> do
+              ranges <- getRanges
               let description = show (eId, request)
-                  task = createCreateDBTask eId requestId (databaseId, tableId) description
+                  task = createCreateDBTask eId requestId (databaseId, tableId) timestamp ranges description
               handlingState .^ (PTM.handleTask task)
             CRq.SlaveRead databaseId tableId key timestamp -> do
               let range = Co.KeySpaceRange databaseId tableId
-              ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
+              ranges <- getRanges
               if Li.elem range ranges
                 then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest $
                        TM.ClientRequest
@@ -75,7 +84,7 @@ handleInputAction iAction =
                   addA $ Ac.Send [eId] $ Ms.ClientResponse response
             CRq.SlaveWrite databaseId tableId key value timestamp -> do
               let range = Co.KeySpaceRange databaseId tableId
-              ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
+              ranges <- getRanges
               if Li.elem range ranges
                 then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest $
                        TM.ClientRequest
@@ -105,31 +114,44 @@ handleInputAction iAction =
                   handlingState .^ PTM.handleInsert
                 else return ()
         Ms.TabletMessage keySpaceRange tabletMsg -> do
-          ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
+          ranges <- getRanges
           if Li.elem keySpaceRange ranges
             then addA $ Ac.TabletForward keySpaceRange eId tabletMsg
             else return ()
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
+-- TODO: this needs to be completely redone, but we need a proper RangeWrite Client Request.
 createCreateDBTask
   :: Co.EndpointId
   -> String
   -> (String, String)
+  -> Co.Timestamp
+  -> [Co.KeySpaceRange]
   -> String
   -> Ta.Task DS.DerivedState
-createCreateDBTask eId requestId (databaseId, tableId) description =
-  let tryHandling _ = do return False
+createCreateDBTask eId requestId (databaseId, tableId) timestamp ranges  description =
+  let tryHandling derivedState = do
+        let lat = derivedState ^. IDS.keySpaceManager.IKSM.lat
+        if lat < timestamp
+          then return False
+          else do
+            let response =
+                  (CRs.ClientResponse
+                    (CRs.Meta requestId)
+                    (CRs.RangeWrite CRsRW.BackwardsWrite))
+            trace $ TrM.ClientResponseSent response
+            addA $ Ac.Send [eId] $ Ms.ClientResponse response
+            return True
       done _ = do
         let response =
               CRs.ClientResponse
                 (CRs.Meta requestId)
-                (CRs.CreateDatabase CRs.CreateDBSuccess)
+                (CRs.RangeWrite CRsRW.Success)
         trace $ TrM.ClientResponseSent response
         addA $ Ac.Send [eId] $ Ms.ClientResponse response
       createPLEntry derivedState =
         let range = Co.KeySpaceRange databaseId tableId
-            generation = (derivedState ^. IDS.keySpaceManager.IKSM.generation) + 1
-        in PM.Slave $ PM.AddRange requestId range generation
+        in PM.Slave $ PM.RangeWrite requestId timestamp (range:ranges)
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper

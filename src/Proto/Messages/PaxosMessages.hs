@@ -24,13 +24,13 @@ data Tablet_Entry =
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
 data Slave_Entry =
-  AddRange {
+  RangeWrite {
     requestId :: Co.RequestId,
-    range :: Co.KeySpaceRange,
-    generation :: Int }
+    timestamp :: Int,
+    ranges :: [Co.KeySpaceRange] }
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
--- Todo: maybe it's better to namespace these PaxosLogEntries,
+-- TODO: maybe it's better to namespace these PaxosLogEntries,
 -- since we have Tablet and Slave in TraceMessages which are there
 -- precisely to differentiate between different paxos logs for when
 -- we reconstruct data from the trace messages for testing.

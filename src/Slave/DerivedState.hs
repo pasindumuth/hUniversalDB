@@ -19,7 +19,7 @@ handleDerivedState paxosId pl pl' = do
   Mo.forM_ (PL.newlyAddedEntries pl pl') $ \(index, plEntry) -> do
     trace $ TrM.PaxosInsertion paxosId index plEntry
     case plEntry of
-      PM.Slave (PM.AddRange _ newRange generation) -> do
-        IDS.keySpaceManager.IKSM.ranges .^^. (newRange:)
-        IDS.keySpaceManager.IKSM.generation .^^. \_ -> generation
-        addA $ Ac.Slave_CreateTablet newRange
+      PM.Slave (PM.RangeWrite requestId timestamp ranges) -> do
+        IDS.keySpaceManager.IKSM.lat .^^. \_ -> timestamp
+        IDS.keySpaceManager.IKSM.versions .^^. ((timestamp, requestId, ranges):)
+        addA $ Ac.Slave_CreateTablet ranges

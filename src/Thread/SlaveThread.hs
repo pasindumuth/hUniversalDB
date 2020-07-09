@@ -51,13 +51,17 @@ startSlaveThread rg iActionChan connM = do
           Ac.Print message -> do
             print message
             return (g', tabletMap)
-          Ac.Slave_CreateTablet range -> do
-            let (r, rg) = Rn.random $ g' ^. SS.env.En.rand
-                g'' = g' & SS.env.En.rand .~ rg
-                tabletRand = Rn.mkStdGen r
-            tabletIActionChan <- Ct.newChan
-            Ct.forkIO $ TT.startTabletThread tabletRand range tabletIActionChan connM
-            return (g'', tabletMap & Mp.insert range tabletIActionChan)
+          Ac.Slave_CreateTablet ranges ->
+            U.s31 Mo.foldM (g', tabletMap) ranges $ \(g', tabletMap) range ->
+              if tabletMap & Mp.member range
+                then return (g', tabletMap)
+                else do
+                  let (r, rg) = Rn.random $ g' ^. SS.env.En.rand
+                      g'' = g' & SS.env.En.rand .~ rg
+                      tabletRand = Rn.mkStdGen r
+                  tabletIActionChan <- Ct.newChan
+                  Ct.forkIO $ TT.startTabletThread tabletRand range tabletIActionChan connM
+                  return (g'', tabletMap & Mp.insert range tabletIActionChan)
           Ac.TabletForward range eId msg -> do
             let tabletIActionChan = tabletMap ^?! ix range
             Ct.writeChan tabletIActionChan $ Ac.TabletReceive eId msg

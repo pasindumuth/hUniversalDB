@@ -15,10 +15,13 @@ type PaxosId = String
 type RequestId = String
 type DatabaseId = String
 type TableId = String
+type Timestamp = Int
+type Key = String
+type Value = String
 
 type ErrorMsg = String
 
 data KeySpaceRange = KeySpaceRange {
-  databaseId :: String,
-  tableId :: String
+  databaseId :: DatabaseId,
+  tableId :: TableId
 } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)

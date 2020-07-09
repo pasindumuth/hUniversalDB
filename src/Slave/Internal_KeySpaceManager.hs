@@ -12,8 +12,8 @@ import qualified Proto.Common as Co
 import Infra.Lens
 
 data KeySpaceManager = KeySpaceManager {
-  _ranges :: [Co.KeySpaceRange],
-  _generation :: Int
+  _lat :: Int,
+  _versions :: [(Co.Timestamp, Co.RequestId, [Co.KeySpaceRange])]
 } deriving (Gn.Generic, Df.Default, Show)
 
 makeLenses ''KeySpaceManager

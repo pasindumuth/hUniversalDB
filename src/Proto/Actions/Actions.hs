@@ -31,6 +31,6 @@ data OutputAction =
   -- generic data, and RetryInput also contains generic data.
   RetryOutput { counterValue :: Int } |
   Print { message :: String } |
-  Slave_CreateTablet { range :: Co.KeySpaceRange } |
+  Slave_CreateTablet { ranges :: [Co.KeySpaceRange] } |
   TabletForward { range :: Co.KeySpaceRange, eId :: Co.EndpointId, tabletMsg :: TM.TabletMessage }
   deriving (Gn.Generic, Bn.Binary, Show)

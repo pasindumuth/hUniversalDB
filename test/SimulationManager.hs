@@ -61,7 +61,7 @@ createTestState seed numSlaves numClients =
       Tt._trueTimestamp = 0,
       Tt._numTableKeys = Mp.empty,
       Tt._requestStats = Tt.RequestStats {
-        Tt._numCreateDBRqs = 0,
+        Tt._numRangeWriteRqs = 0,
         Tt._numReadRqs = 0,
         Tt._numWriteRqs = 0,
         Tt._numReadSuccessRss = 0,
@@ -69,7 +69,8 @@ createTestState seed numSlaves numClients =
         Tt._numWriteSuccessRss = 0,
         Tt._numWriteUnknownDBRss = 0,
         Tt._numBackwardsWriteRss = 0,
-        Tt._numCreateDBSuccessRss = 0
+        Tt._numRangeWriteSuccessRss = 0,
+        Tt._numRangeWriteBackwardsWriteRss = 0
       },
       Tt._clientResponses = clientResponses
     }
@@ -117,12 +118,17 @@ runIAction eId iAction = do
         currentTime <- getT $ Tt.clocks . ix eId
         Tt.slaveAsyncQueues . ix eId .^^.* U.push (Ac.RetryInput counterValue, currentTime + 100)
         return ()
-      Ac.Slave_CreateTablet range -> do
-        r <- Tt.slaveState . ix eId . SS.env . En.rand .^^* Rn.random
-        slaveEIds <- getL $ Tt.slaveEIds
-        let tabletState = TS.constructor (show range) (Rn.mkStdGen r) slaveEIds range
-        Tt.tabletStates . ix eId .^^.* Mp.insert range tabletState
-        return ()
+      Ac.Slave_CreateTablet ranges' -> do
+        ranges <- getT $ Tt.tabletStates . ix eId
+        Mo.forM_ ranges' $ \range -> do
+          if Mp.member range ranges
+            then return ()
+            else do
+              r <- Tt.slaveState . ix eId . SS.env . En.rand .^^* Rn.random
+              slaveEIds <- getL $ Tt.slaveEIds
+              let tabletState = TS.constructor (show range) (Rn.mkStdGen r) slaveEIds range
+              Tt.tabletStates . ix eId .^^.* Mp.insert range tabletState
+              return ()
       Ac.TabletForward range clientEId tabletMsg -> do
         runTabletIAction eId range (Ac.TabletReceive clientEId tabletMsg)
       _ -> return ()
@@ -149,6 +155,8 @@ dropMessages numMessages = do
         pollMsg queueId
         return ()
 
+skewProb = 95
+
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
 -- `numMessages` number of messages.
@@ -156,9 +164,18 @@ simulateOnce :: Int -> ST Tt.TestState ()
 simulateOnce numMessages = do
   -- increment each slave's clocks and run async tasks that are now ready
   eIds <- getL Tt.slaveEIds
+  randPercent :: Int <- Tt.rand .^^ Rn.randomR (1, 100)
+  if randPercent <= skewProb
+    then do
+      -- We have to put this behind a randPercentage with the the same
+      -- probability of success as the Tt.clocks to prevent the trueTime from
+      -- pulling away.
+      Tt.trueTimestamp .^^. (+1)
+      return ()
+    else return ()
   Mo.forM_ eIds $ \eId -> do
     randPercent :: Int <- Tt.rand .^^ Rn.randomR (1, 100)
-    if randPercent <= 95
+    if randPercent <= skewProb
       then do
         -- Increment clock
         clockVal <- Tt.clocks . ix eId .^^.* (+1)

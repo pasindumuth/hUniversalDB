@@ -18,7 +18,7 @@ import qualified Proto.Messages.ClientRequests as CRq
 -- Example commands:
 -- r d t k 0
 -- w d t k v 0
--- c d t
+-- c 0 d t
 startClient :: [String] -> IO ()
 startClient (ip:message) = do
   Lg.infoM Lg.main "Starting client"
@@ -42,12 +42,12 @@ startClient (ip:message) = do
               (CRq.ClientRequest
                 (CRq.Meta "uid")
                 (CRq.SlaveWrite databaseId tableId key value (read timestamp)))
-        ["c", databaseId, tableId] -> do
+        ["c", databaseId, tableId, timestamp] -> do
           Cn.sendMessage socket $
             Ms.ClientRequest
               (CRq.ClientRequest
                 (CRq.Meta "uid")
-                (CRq.CreateDatabase databaseId tableId))
+                (CRq.RangeWrite databaseId tableId (read timestamp)))
         _ -> print "Unrecognized command or number of arguments"
 
 main :: IO ()
