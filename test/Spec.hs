@@ -377,7 +377,7 @@ testDriver = do
   driveTest 1 test1
   driveTest 2 test2
   driveTest 3 test3
-  driveTest 4 test4
+--  driveTest 4 test4
 
 main :: IO ()
 main = testDriver
