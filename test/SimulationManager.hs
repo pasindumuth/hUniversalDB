@@ -61,6 +61,7 @@ createTestState seed numSlaves numClients =
       Tt._trueTimestamp = 0,
       Tt._numTableKeys = Mp.empty,
       Tt._requestStats = Tt.RequestStats {
+        Tt._numRangeReadRqs = 0,
         Tt._numRangeWriteRqs = 0,
         Tt._numReadRqs = 0,
         Tt._numWriteRqs = 0,
@@ -69,6 +70,7 @@ createTestState seed numSlaves numClients =
         Tt._numWriteSuccessRss = 0,
         Tt._numWriteUnknownDBRss = 0,
         Tt._numBackwardsWriteRss = 0,
+        Tt._numRangeReadSuccessRss = 0,
         Tt._numRangeWriteSuccessRss = 0,
         Tt._numRangeWriteBackwardsWriteRss = 0
       },

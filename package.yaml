@@ -36,6 +36,8 @@ dependencies:
 
 library:
   source-dirs: src
+  ghc-options:
+    - -fwarn-incomplete-patterns
 
 executables:
   hUniversalDB-slave-exe:
@@ -45,6 +47,7 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
+      - -fwarn-incomplete-patterns
     dependencies:
       - hUniversalDB
 
@@ -55,6 +58,7 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
+      - -fwarn-incomplete-patterns
     dependencies:
       - hUniversalDB
 
@@ -66,5 +70,6 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -fwarn-incomplete-patterns
     dependencies:
     - hUniversalDB

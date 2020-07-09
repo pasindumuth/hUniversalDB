@@ -24,6 +24,9 @@ data Tablet_Entry =
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
 data Slave_Entry =
+  RangeRead {
+    requestId :: Co.RequestId,
+    timestamp :: Int } |
   RangeWrite {
     requestId :: Co.RequestId,
     timestamp :: Int,

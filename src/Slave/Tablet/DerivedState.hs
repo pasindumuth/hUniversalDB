@@ -5,6 +5,7 @@ module Slave.Tablet.DerivedState (
 
 import qualified Control.Monad as Mo
 
+import qualified Infra.Utils as U
 import qualified Paxos.PaxosLog as PL
 import qualified Proto.Common as Co
 import qualified Proto.Messages.PaxosMessages as PM
@@ -18,8 +19,11 @@ handleDerivedState paxosId pl pl' = do
   Mo.forM_ (PL.newlyAddedEntries pl pl') $ \(index, plEntry) -> do
     trace $ TrM.PaxosInsertion paxosId index plEntry
     case plEntry of
-      PM.Tablet (PM.Read _ key timestamp) -> do
-        DS.kvStore .^^ MS.read key timestamp
-        return ()
-      PM.Tablet (PM.Write _ key value timestamp) -> do
-        DS.kvStore .^^ MS.write key value timestamp
+      PM.Tablet tabletEntry ->
+        case tabletEntry of
+          PM.Read _ key timestamp -> do
+            DS.kvStore .^^ MS.read key timestamp
+            return ()
+          PM.Write _ key value timestamp -> do
+            DS.kvStore .^^ MS.write key value timestamp
+      _ -> U.caseError

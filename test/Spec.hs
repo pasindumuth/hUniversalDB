@@ -14,6 +14,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
+import qualified Proto.Messages.ClientResponses.RangeRead as CRsRR
 import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
 import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
 import qualified Proto.Messages.ClientResponses.SlaveWrite as CRsSW
@@ -91,7 +92,9 @@ generateRequest = do
         2 -> do
           SM.addClientMsg slaveId (CRq.SlaveRead "d" tableId key timestamp)
           Tt.requestStats.Tt.numReadRqs .^^. (+1)
+        _ -> U.caseError
       return ()
+    _ -> U.caseError
   where
     makeTimestamp = do
       noise <- Tt.rand .^^ Rn.randomR (-2, 2)
@@ -109,6 +112,7 @@ analyzeResponses = do
         CRs.SlaveWrite CRsSW.Success -> Tt.requestStats.Tt.numWriteSuccessRss .^^. (+1)
         CRs.SlaveWrite CRsSW.UnknownDB -> Tt.requestStats.Tt.numWriteUnknownDBRss .^^. (+1)
         CRs.SlaveWrite CRsSW.BackwardsWrite -> Tt.requestStats.Tt.numBackwardsWriteRss .^^. (+1)
+        CRs.RangeRead (CRsRR.Success _) -> Tt.requestStats.Tt.numRangeReadSuccessRss .^^. (+1)
         CRs.RangeWrite CRsRW.Success -> Tt.requestStats.Tt.numRangeWriteSuccessRss .^^. (+1)
         CRs.RangeWrite CRsRW.BackwardsWrite -> Tt.requestStats.Tt.numRangeWriteBackwardsWriteRss .^^. (+1)
 
@@ -260,6 +264,8 @@ checkResponses msgs =
                             _ -> plEntryError entry
                 PM.Slave entry ->
                   case entry of
+                    -- TODO: Do this properly
+                    PM.RangeRead _ _ -> Right (requestMap, rangeMap, tables)
                     PM.RangeWrite requestId timestamp (range@(Co.KeySpaceRange databaseId tableId):_) ->
                       case requestMap ^. at requestId of
                         Nothing -> plEntryError entry
@@ -272,6 +278,8 @@ checkResponses msgs =
                                   tables' = tables & at (databaseId, tableId) ?~ Mp.empty
                               in Right (requestMap, rangeMap', tables')
                             _ -> plEntryError entry
+                    -- TODO: get rid of this case by modifying the above
+                    _ ->  Right (requestMap, rangeMap, tables)
             TrM.ClientRequestReceived (CRq.ClientRequest (CRq.Meta requestId) payload) ->
               Right (requestMap & at requestId ?~ payload, rangeMap, tables)
             TrM.ClientResponseSent response@(CRs.ClientResponse (CRs.Meta requestId) responsePayload) ->
@@ -280,6 +288,8 @@ checkResponses msgs =
                 Just payload -> do
                   let genericSuccess = Right (requestMap & Mp.delete requestId, rangeMap, tables)
                   case payload of
+                    -- TODO: Do this properly
+                    CRq.RangeRead _ -> Right (requestMap, rangeMap, tables)
                     CRq.RangeWrite databaseId tableId _ ->
                       case responsePayload of
                         CRs.RangeWrite CRsRW.Success -> genericSuccess

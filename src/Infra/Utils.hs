@@ -28,3 +28,6 @@ prefix s (x:xs) =
   if s == x
     then []
     else x : prefix s xs
+
+caseError :: a
+caseError = error "Case Error: reached an unhandled case in the case statement."

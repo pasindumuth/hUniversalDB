@@ -22,6 +22,7 @@ type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
 type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)
 
 data RequestStats = RequestStats {
+  _numRangeReadRqs :: Int,
   _numRangeWriteRqs :: Int,
   _numReadRqs :: Int,
   _numWriteRqs :: Int,
@@ -30,6 +31,7 @@ data RequestStats = RequestStats {
   _numWriteSuccessRss :: Int,
   _numWriteUnknownDBRss :: Int,
   _numBackwardsWriteRss :: Int,
+  _numRangeReadSuccessRss :: Int,
   _numRangeWriteSuccessRss :: Int,
   _numRangeWriteBackwardsWriteRss :: Int
 } deriving (Show)

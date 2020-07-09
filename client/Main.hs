@@ -19,8 +19,8 @@ import qualified Proto.Messages.ClientRequests as CRq
 -- r d t k 0
 -- w d t k v 0
 -- c 0 d t
-startClient :: [String] -> IO ()
-startClient (ip:message) = do
+startClient :: String -> IO ()
+startClient ip = do
   Lg.infoM Lg.main "Starting client"
   TCP.connect ip "9000" $ \(socket, remoteAddr) -> do
     Lg.infoM Lg.main $ "Connection established to " ++ show remoteAddr
@@ -54,4 +54,5 @@ main :: IO ()
 main = do
   Lg.setupLogging
   args <- SE.getArgs
-  startClient args
+  let (ip:_) = args
+  startClient ip

@@ -17,6 +17,8 @@ data Meta = Meta {
 } deriving (Gn.Generic, Bn.Binary, Show)
 
 data Payload =
+  RangeRead {
+    timestamp :: Int } |
   RangeWrite {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId,

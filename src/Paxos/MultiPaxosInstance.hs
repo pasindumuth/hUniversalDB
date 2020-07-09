@@ -10,6 +10,7 @@ module Paxos.MultiPaxosInstance (
 import qualified Data.Default as Df
 import qualified System.Random as Rn
 
+import qualified Infra.Utils as U
 import qualified Paxos.Internal_MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Paxos.PaxosInstance as PI
@@ -47,6 +48,7 @@ insertMultiPaxos slaveEIds entry msgWrapper = do
   action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos $ PM.Propose nextRnd entry)
   case action of
     PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
+    _ -> U.caseError
 
 handleMultiPaxos
   :: Co.EndpointId

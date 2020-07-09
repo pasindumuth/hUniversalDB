@@ -3,6 +3,7 @@ module Slave.SlaveInputHandler where
 import qualified Data.List as Li
 import qualified System.Random as Rn
 
+import qualified Infra.Utils as U
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Paxos.Tasks.PaxosTaskManager as PTM
@@ -13,6 +14,7 @@ import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
+import qualified Proto.Messages.ClientResponses.RangeRead as CRsRR
 import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
 import qualified Proto.Messages.ClientResponses.SlaveWrite as CRsSW
 import qualified Proto.Messages.PaxosMessages as PM
@@ -24,6 +26,7 @@ import qualified Slave.Env as En
 import qualified Slave.SlaveState as SS
 import qualified Slave.Internal_DerivedState as IDS
 import qualified Slave.Internal_KeySpaceManager as IKSM
+import qualified Slave.KeySpaceManager as KSM
 import Infra.Lens
 import Infra.State
 
@@ -61,10 +64,14 @@ handleInputAction iAction =
           let requestId = (request ^. CRq.meta . CRq.requestId)
           trace $ TrM.ClientRequestReceived request
           case request ^. CRq.payload of
+            CRq.RangeRead timestamp -> do
+              let description = show (eId, request)
+                  task = createRangeReadTask eId requestId timestamp description
+              handlingState .^ (PTM.handleTask task)
             CRq.RangeWrite databaseId tableId timestamp -> do
               ranges <- getRanges
               let description = show (eId, request)
-                  task = createCreateDBTask eId requestId (databaseId, tableId) timestamp ranges description
+                  task = createRangeWriteTask eId requestId (databaseId, tableId) timestamp ranges description
               handlingState .^ (PTM.handleTask task)
             CRq.SlaveRead databaseId tableId key timestamp -> do
               let range = Co.KeySpaceRange databaseId tableId
@@ -118,11 +125,47 @@ handleInputAction iAction =
           if Li.elem keySpaceRange ranges
             then addA $ Ac.TabletForward keySpaceRange eId tabletMsg
             else return ()
+        Ms.ClientResponse _ -> U.caseError
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
+createRangeReadTask
+  :: Co.EndpointId
+  -> String
+  -> Co.Timestamp
+  -> String
+  -> Ta.Task DS.DerivedState
+createRangeReadTask eId requestId timestamp description =
+  let tryHandling derivedState = do
+        let lat = KSM.staticReadLat $ derivedState ^. IDS.keySpaceManager 
+        if lat < timestamp
+          then return False
+          else do
+            let ranges = KSM.staticRead timestamp $ derivedState ^. IDS.keySpaceManager
+                response =
+                  CRs.ClientResponse
+                    (CRs.Meta requestId)
+                    (CRs.RangeRead
+                      (CRsRR.Success ranges))
+            trace $ TrM.ClientResponseSent response
+            addA $ Ac.Send [eId] $ Ms.ClientResponse response
+            return True
+      done derivedState = do
+        let ranges = KSM.staticRead timestamp $ derivedState ^. IDS.keySpaceManager
+            response =
+              CRs.ClientResponse
+                (CRs.Meta requestId)
+                (CRs.RangeRead
+                  (CRsRR.Success ranges))
+        trace $ TrM.ClientResponseSent response
+        addA $ Ac.Send [eId] $ Ms.ClientResponse response
+      createPLEntry derivedState =
+        PM.Slave $ PM.RangeRead requestId timestamp
+      msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
+  in Ta.Task description tryHandling done createPLEntry msgWrapper
+
 -- TODO: this needs to be completely redone, but we need a proper RangeWrite Client Request.
-createCreateDBTask
+createRangeWriteTask
   :: Co.EndpointId
   -> String
   -> (String, String)
@@ -130,9 +173,9 @@ createCreateDBTask
   -> [Co.KeySpaceRange]
   -> String
   -> Ta.Task DS.DerivedState
-createCreateDBTask eId requestId (databaseId, tableId) timestamp ranges  description =
+createRangeWriteTask eId requestId (databaseId, tableId) timestamp ranges description =
   let tryHandling derivedState = do
-        let lat = derivedState ^. IDS.keySpaceManager.IKSM.lat
+        let lat = KSM.staticReadLat $ derivedState ^. IDS.keySpaceManager
         if lat < timestamp
           then return False
           else do

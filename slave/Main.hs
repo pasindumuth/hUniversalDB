@@ -85,8 +85,8 @@ handleReceive receiveChan iActionChan = do
     (eId, msg) <- Ct.readChan receiveChan
     Ct.writeChan iActionChan $ Ac.Receive eId msg
 
-startSlave :: [String] -> IO ()
-startSlave (seedStr:curIP:otherIPs) = do
+startSlave :: String -> String -> [String] -> IO ()
+startSlave seedStr curIP otherIPs = do
   Lg.infoM Lg.main "Start slave"
 
   -- Create PaxosChan
@@ -120,4 +120,5 @@ main :: IO ()
 main = do
   Lg.setupLogging
   args <- SE.getArgs
-  startSlave args
+  let (seedStr:curIP:otherIPs) = args
+  startSlave seedStr curIP otherIPs
