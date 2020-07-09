@@ -20,13 +20,12 @@ data Payload =
   CreateDatabase {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId } |
-  -- rename these to just Read and Write; Request is superfluous.
-  Read {
+  SlaveRead {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId,
     key :: String,
     timestamp :: Int } |
-  Write {
+  SlaveWrite {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId,
     key :: String,

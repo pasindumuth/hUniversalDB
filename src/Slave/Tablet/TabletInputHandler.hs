@@ -17,6 +17,8 @@ import qualified Paxos.Tasks.Task as Ta
 import qualified Proto.Common as Co
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
+import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
+import qualified Proto.Messages.ClientResponses.SlaveWrite as CRsSW
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TabletMessages as TM
 import qualified Proto.Messages.TraceMessages as TrM
@@ -75,7 +77,7 @@ createClientTask keySpaceRange eId request =
   let description = show (eId, request)
       requestId = request ^. TM.meta.TM.requestId
   in case request ^. TM.payload of
-    TM.Read key timestamp ->
+    TM.TabletRead key timestamp ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
@@ -84,8 +86,8 @@ createClientTask keySpaceRange eId request =
                     response =
                       CRs.ClientResponse
                         (CRs.Meta requestId)
-                        (CRs.ReadResponse
-                          (CRs.ReadSuccess value))
+                        (CRs.SlaveRead
+                          (CRsSR.Success value))
                 trace $ TrM.ClientResponseSent response
                 addA $ Ac.Send [eId] $ Ms.ClientResponse response
                 return True
@@ -95,14 +97,14 @@ createClientTask keySpaceRange eId request =
                 response =
                   CRs.ClientResponse
                     (CRs.Meta requestId)
-                    (CRs.ReadResponse
-                      (CRs.ReadSuccess value))
+                    (CRs.SlaveRead
+                      (CRsSR.Success value))
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Read requestId key timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper
-    TM.Write key value timestamp ->
+    TM.TabletWrite key value timestamp ->
       let description = description
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
@@ -110,7 +112,7 @@ createClientTask keySpaceRange eId request =
                 let response =
                       (CRs.ClientResponse
                         (CRs.Meta requestId)
-                        (CRs.WriteResponse CRs.BackwardsWrite))
+                        (CRs.SlaveWrite CRsSW.BackwardsWrite))
                 trace $ TrM.ClientResponseSent response
                 addA $ Ac.Send [eId] $ Ms.ClientResponse response
                 return True
@@ -119,7 +121,7 @@ createClientTask keySpaceRange eId request =
             let response =
                   CRs.ClientResponse
                     (CRs.Meta requestId)
-                    (CRs.WriteResponse CRs.WriteSuccess)
+                    (CRs.SlaveWrite CRsSW.Success)
             trace $ TrM.ClientResponseSent response
             addA $ Ac.Send [eId] $ Ms.ClientResponse response
           createPLEntry _ = PM.Tablet $ PM.Write requestId key value timestamp

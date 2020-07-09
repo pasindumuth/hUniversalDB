@@ -17,10 +17,10 @@ data Meta = Meta {
 } deriving (Gn.Generic, Bn.Binary, Show)
 
 data Payload =
-  Read {
+  TabletRead {
     key :: String,
     timestamp :: Int } |
-  Write {
+  TabletWrite {
     key :: String,
     value :: String,
     timestamp :: Int }

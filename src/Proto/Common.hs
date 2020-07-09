@@ -20,7 +20,5 @@ type ErrorMsg = String
 
 data KeySpaceRange = KeySpaceRange {
   databaseId :: String,
-  tableId :: String,
-  keyStart :: Maybe String,
-  keyEnd :: Maybe String
+  tableId :: String
 } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)

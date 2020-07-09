@@ -15,6 +15,8 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
+import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
+import qualified Proto.Messages.ClientResponses.SlaveWrite as CRsSW
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.SlaveInputHandler as SIH
@@ -85,10 +87,10 @@ generateRequest = do
       case requestType of
         1 -> do
           let value = "v" ++ show keyIdx
-          SM.addClientMsg slaveId (CRq.Write "d" tableId key value timestamp)
+          SM.addClientMsg slaveId (CRq.SlaveWrite "d" tableId key value timestamp)
           Tt.requestStats.Tt.numWriteRqs .^^. (+1)
         2 -> do
-          SM.addClientMsg slaveId (CRq.Read "d" tableId key timestamp)
+          SM.addClientMsg slaveId (CRq.SlaveRead "d" tableId key timestamp)
           Tt.requestStats.Tt.numReadRqs .^^. (+1)
       return ()
 
@@ -97,30 +99,30 @@ analyzeResponses = do
   clientResponses <- Tt.clientResponses .^^^ Mp.toList
   Mo.forM_ clientResponses $ \(_, responses) ->
     Mo.forM_ responses $ \(Ms.ClientResponse response) -> do
-      case response ^. CRs.responsePayload of
-        CRs.ReadResponse (CRs.ReadSuccess _) -> Tt.requestStats.Tt.numReadSuccessRss .^^. (+1)
-        CRs.ReadResponse CRs.ReadUnknownDB -> Tt.requestStats.Tt.numReadUnknownDBRss .^^. (+1)
-        CRs.WriteResponse CRs.WriteSuccess -> Tt.requestStats.Tt.numWriteSuccessRss .^^. (+1)
-        CRs.WriteResponse CRs.WriteUnknownDB -> Tt.requestStats.Tt.numWriteUnknownDBRss .^^. (+1)
-        CRs.WriteResponse CRs.BackwardsWrite -> Tt.requestStats.Tt.numBackwardsWriteRss .^^. (+1)
-        CRs.CreateDBResponse CRs.CreateDBSuccess -> Tt.requestStats.Tt.numCreateDBSuccessRss .^^. (+1)
+      case response ^. CRs.payload of
+        CRs.SlaveRead (CRsSR.Success _) -> Tt.requestStats.Tt.numReadSuccessRss .^^. (+1)
+        CRs.SlaveRead CRsSR.UnknownDB -> Tt.requestStats.Tt.numReadUnknownDBRss .^^. (+1)
+        CRs.SlaveWrite CRsSW.Success -> Tt.requestStats.Tt.numWriteSuccessRss .^^. (+1)
+        CRs.SlaveWrite CRsSW.UnknownDB -> Tt.requestStats.Tt.numWriteUnknownDBRss .^^. (+1)
+        CRs.SlaveWrite CRsSW.BackwardsWrite -> Tt.requestStats.Tt.numBackwardsWriteRss .^^. (+1)
+        CRs.CreateDatabase CRs.CreateDBSuccess -> Tt.requestStats.Tt.numCreateDBSuccessRss .^^. (+1)
 
 test1 :: ST Tt.TestState ()
 test1 = do
   SM.addClientMsg 0 (CRq.CreateDatabase "d" "t"); SM.simulateAll
-  SM.addClientMsg 1 (CRq.Write "d" "t" "key1" "value1" 1); SM.simulateAll
-  SM.addClientMsg 2 (CRq.Read "d" "t" "key1" 3); SM.simulateAll
-  SM.addClientMsg 3 (CRq.Write "d" "t" "key1" "value1" 2); SM.simulateAll
-  SM.addClientMsg 2 (CRq.Read "d" "t" "key2" 3); SM.simulateAll
+  SM.addClientMsg 1 (CRq.SlaveWrite "d" "t" "key1" "value1" 1); SM.simulateAll
+  SM.addClientMsg 2 (CRq.SlaveRead "d" "t" "key1" 3); SM.simulateAll
+  SM.addClientMsg 3 (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateAll
+  SM.addClientMsg 2 (CRq.SlaveRead "d" "t" "key2" 3); SM.simulateAll
 
 test2 :: ST Tt.TestState ()
 test2 = do
   SM.addClientMsg 0 (CRq.CreateDatabase "d" "t"); SM.simulateN 2
-  SM.addClientMsg 1 (CRq.Write "d" "t" "key1" "value1" 1); SM.simulateN 2
-  SM.addClientMsg 2 (CRq.Write "d" "t" "key2" "value2" 2); SM.simulateN 2
-  SM.addClientMsg 3 (CRq.Write "d" "t" "key3" "value3" 3); SM.simulateN 2
-  SM.addClientMsg 4 (CRq.Write "d" "t" "key4" "value4" 4); SM.simulateN 2
-  SM.addClientMsg 0 (CRq.Write "d" "t" "key5" "value5" 5); SM.simulateAll
+  SM.addClientMsg 1 (CRq.SlaveWrite "d" "t" "key1" "value1" 1); SM.simulateN 2
+  SM.addClientMsg 2 (CRq.SlaveWrite "d" "t" "key2" "value2" 2); SM.simulateN 2
+  SM.addClientMsg 3 (CRq.SlaveWrite "d" "t" "key3" "value3" 3); SM.simulateN 2
+  SM.addClientMsg 4 (CRq.SlaveWrite "d" "t" "key4" "value4" 4); SM.simulateN 2
+  SM.addClientMsg 0 (CRq.SlaveWrite "d" "t" "key5" "value5" 5); SM.simulateAll
 
 -- TODO: I want more monitoring of what happens during a test. Maybe
 -- I need message-drop stats.
@@ -226,7 +228,7 @@ checkResponses msgs =
                         Nothing -> plEntryError entry
                         Just payload ->
                           case payload of
-                            CRq.Read databaseId' tableId' key' timestamp'
+                            CRq.SlaveRead databaseId' tableId' key' timestamp'
                               | databaseId' == databaseId &&
                                 tableId' == tableId &&
                                 key' == key &&
@@ -239,7 +241,7 @@ checkResponses msgs =
                         Nothing -> plEntryError entry
                         Just payload ->
                           case payload of
-                            CRq.Write databaseId' tableId' key' value' timestamp'
+                            CRq.SlaveWrite databaseId' tableId' key' value' timestamp'
                               | databaseId' == databaseId &&
                                 tableId' == tableId &&
                                 key' == key &&
@@ -250,7 +252,7 @@ checkResponses msgs =
                             _ -> plEntryError entry
                 PM.Slave entry ->
                   case entry of
-                    PM.AddRange requestId range@(Co.KeySpaceRange databaseId tableId _ _) generation ->
+                    PM.AddRange requestId range@(Co.KeySpaceRange databaseId tableId) generation ->
                       case requestMap ^. at requestId of
                         Nothing -> plEntryError entry
                         Just payload ->
@@ -272,22 +274,22 @@ checkResponses msgs =
                   case payload of
                     CRq.CreateDatabase databaseId tableId ->
                       case responsePayload of
-                        CRs.CreateDBResponse CRs.CreateDBSuccess -> genericSuccess
+                        CRs.CreateDatabase CRs.CreateDBSuccess -> genericSuccess
                         _ -> genericError response payload
-                    CRq.Read databaseId tableId key timestamp ->
+                    CRq.SlaveRead databaseId tableId key timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case responsePayload of
-                            CRs.ReadResponse (CRs.ReadSuccess val)
+                            CRs.SlaveRead (CRsSR.Success val)
                               | val == (MS.staticRead key timestamp table) -> genericSuccess
                             -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
-                            CRs.ReadResponse CRs.ReadUnknownDB -> genericSuccess
+                            CRs.SlaveRead CRsSR.UnknownDB -> genericSuccess
                             _ -> genericError response payload
                         Nothing ->
                           case responsePayload of
-                            CRs.ReadResponse CRs.ReadUnknownDB -> genericSuccess
+                            CRs.SlaveRead CRsSR.UnknownDB -> genericSuccess
                             _ -> genericError response payload
-                    CRq.Write databaseId tableId key value timestamp ->
+                    CRq.SlaveWrite databaseId tableId key value timestamp ->
                       case tables ^. at (databaseId, tableId) of
                         Just table ->
                           case MS.staticReadLat key table of
@@ -298,20 +300,20 @@ checkResponses msgs =
                                 -- TODO: it's possible that the `lat` was already here when the Write was received
                                 -- but that we're accidentally returning a `Write` instead of an error. We must
                                 -- figure out how to handle this issue.
-                                CRs.WriteResponse CRs.WriteSuccess 
+                                CRs.SlaveWrite CRsSW.Success
                                   | lat == timestamp -> genericSuccess
-                                CRs.WriteResponse CRs.BackwardsWrite -> genericSuccess
+                                CRs.SlaveWrite CRsSW.BackwardsWrite -> genericSuccess
                                 -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
-                                CRs.WriteResponse CRs.WriteUnknownDB -> genericSuccess
+                                CRs.SlaveWrite CRsSW.UnknownDB -> genericSuccess
                                 _ -> genericError response payload
                             Nothing -> do
                               -- TODO: this case should result in a genericError when the datamasters are set up
                               case responsePayload of
-                                CRs.WriteResponse CRs.WriteUnknownDB -> genericSuccess
+                                CRs.SlaveWrite CRsSW.UnknownDB -> genericSuccess
                                 _ -> genericError response payload
                         Nothing ->
                           case responsePayload of
-                            CRs.WriteResponse CRs.WriteUnknownDB -> genericSuccess
+                            CRs.SlaveWrite CRsSW.UnknownDB -> genericSuccess
                             _ -> genericError response payload
   in case testRes of
     Right (requestMap, _, _) ->

@@ -35,13 +35,13 @@ startClient (ip:message) = do
             Ms.ClientRequest 
               (CRq.ClientRequest
                 (CRq.Meta "uid")
-                (CRq.Read databaseId tableId key (read timestamp)))
+                (CRq.SlaveRead databaseId tableId key (read timestamp)))
         ["w", databaseId, tableId, key, value, timestamp] -> do
           Cn.sendMessage socket $
             Ms.ClientRequest 
               (CRq.ClientRequest
                 (CRq.Meta "uid")
-                (CRq.Write databaseId tableId key value (read timestamp)))
+                (CRq.SlaveWrite databaseId tableId key value (read timestamp)))
         ["c", databaseId, tableId] -> do
           Cn.sendMessage socket $
             Ms.ClientRequest

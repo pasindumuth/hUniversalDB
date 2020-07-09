@@ -12,6 +12,8 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
+import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
+import qualified Proto.Messages.ClientResponses.SlaveWrite as CRsSW
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.SlaveMessages as SM
 import qualified Proto.Messages.TabletMessages as TM
@@ -55,36 +57,36 @@ handleInputAction iAction =
               let description = show (eId, request)
                   task = createCreateDBTask eId requestId (databaseId, tableId) description
               handlingState .^ (PTM.handleTask task)
-            CRq.Read databaseId tableId key timestamp -> do
-              let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
+            CRq.SlaveRead databaseId tableId key timestamp -> do
+              let range = Co.KeySpaceRange databaseId tableId
               ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
               if Li.elem range ranges
                 then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest $
                        TM.ClientRequest
                          (TM.Meta requestId)
-                         (TM.Read key timestamp)
+                         (TM.TabletRead key timestamp)
                 else do
                 -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
                   let response =
                         (CRs.ClientResponse
                           (CRs.Meta requestId)
-                          (CRs.ReadResponse CRs.ReadUnknownDB))
+                          (CRs.SlaveRead CRsSR.UnknownDB))
                   trace $ TrM.ClientResponseSent response
                   addA $ Ac.Send [eId] $ Ms.ClientResponse response
-            CRq.Write databaseId tableId key value timestamp -> do
-              let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
+            CRq.SlaveWrite databaseId tableId key value timestamp -> do
+              let range = Co.KeySpaceRange databaseId tableId
               ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.ranges
               if Li.elem range ranges
                 then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest $
                        TM.ClientRequest
                          (TM.Meta requestId)
-                         (TM.Write key value timestamp)
+                         (TM.TabletWrite key value timestamp)
                 else do
                 -- TODO we should be forwarding the request to the DM, since this Slave might just be behind.
                   let response =
                         (CRs.ClientResponse
                           (CRs.Meta requestId)
-                          (CRs.WriteResponse CRs.WriteUnknownDB))
+                          (CRs.SlaveWrite CRsSW.UnknownDB))
                   trace $ TrM.ClientResponseSent response
                   addA $ Ac.Send [eId] $ Ms.ClientResponse response
         Ms.SlaveMessage slaveMsg ->
@@ -122,11 +124,11 @@ createCreateDBTask eId requestId (databaseId, tableId) description =
         let response =
               CRs.ClientResponse
                 (CRs.Meta requestId)
-                (CRs.CreateDBResponse CRs.CreateDBSuccess)
+                (CRs.CreateDatabase CRs.CreateDBSuccess)
         trace $ TrM.ClientResponseSent response
         addA $ Ac.Send [eId] $ Ms.ClientResponse response
       createPLEntry derivedState =
-        let range = Co.KeySpaceRange databaseId tableId Nothing Nothing
+        let range = Co.KeySpaceRange databaseId tableId
             generation = (derivedState ^. IDS.keySpaceManager.IKSM.generation) + 1
         in PM.Slave $ PM.AddRange requestId range generation
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
