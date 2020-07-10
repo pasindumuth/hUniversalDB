@@ -8,30 +8,31 @@ module Slave.Tablet.MultiVersionKVStore (
 
 import qualified Control.Exception.Base as Ex
 
+import qualified Proto.Common as Co
 import qualified Slave.Tablet.Internal_MultiVersionKVStore as MS
 import Infra.Lens
 
 -- When a key is not present, that's not the fault of the caller. Subsequent reads
 -- at that timestamp will always return a Nothing. 
-read :: String -> Int -> MS.MultiVersionKVStore -> (Maybe String, MS.MultiVersionKVStore)
+read :: String -> Int -> MS.MultiVersionKVStore -> (Maybe (Co.Value, Co.RequestId), MS.MultiVersionKVStore)
 read key timestamp m =
   case m ^. at key of
     Just (versions, lat) ->
-      case dropWhile (\v -> (v ^. _2) > timestamp) versions of
-        ((value, _):_) -> (Just value, m & ix key . _2 %~ (max timestamp))
+      case dropWhile (\v -> (v ^. _3) > timestamp) versions of
+        ((value, requestId, _):_) -> (Just (value, requestId), m & ix key . _2 %~ (max timestamp))
         [] -> (Nothing, m & ix key . _2 %~ (max timestamp))
     Nothing -> (Nothing, m & at key ?~ ([], timestamp))
 
 -- This method is design to return the same thing every time for a 
 -- given key and timestamp (hence why we throw fatal errors if the
 -- key hasn't been seen or we are trying to read ahead of the `lat`).
-staticRead :: String -> Int -> MS.MultiVersionKVStore -> Maybe String
+staticRead :: String -> Int -> MS.MultiVersionKVStore -> Maybe (Co.Value, Co.RequestId)
 staticRead key timestamp m =
   case m ^. at key of
     Just (versions, lat) ->
       Ex.assert (timestamp <= lat) $
-      case dropWhile (\v -> (v ^. _2) > timestamp) versions of
-        ((value, _):_) -> Just value
+      case dropWhile (\v -> (v ^. _3) > timestamp) versions of
+        ((value, requestId, _):_) -> Just (value, requestId)
         _ -> Nothing
     _ -> Ex.assert False Nothing
 
@@ -43,10 +44,10 @@ staticReadLat key m =
     Just (_, lat) -> Just lat
     _ -> Nothing
 
-write :: String -> String -> Int -> MS.MultiVersionKVStore -> ((), MS.MultiVersionKVStore)
-write key value timestamp m =
+write :: Co.Key -> Co.Value -> Co.RequestId -> Co.Timestamp -> MS.MultiVersionKVStore -> ((), MS.MultiVersionKVStore)
+write key value requestId timestamp m =
   case m ^. at key of
-    Nothing -> ((), m & at key ?~ ([(value, timestamp)], timestamp))
+    Nothing -> ((), m & at key ?~ ([(value, requestId, timestamp)], timestamp))
     Just (versions, lat) ->
       Ex.assert (timestamp > lat) $
-      ((), m & ix key .~ ((value, timestamp):versions, timestamp))
+      ((), m & ix key .~ ((value, requestId, timestamp):versions, timestamp))

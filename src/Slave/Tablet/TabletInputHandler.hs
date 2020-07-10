@@ -68,7 +68,6 @@ handleInputAction iAction = do
     Ac.TabletRetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
--- TODO: must add requestId to MVKVS and then do idempotent writes.
 createClientTask
   :: Co.KeySpaceRange
   -> Co.EndpointId
@@ -83,18 +82,13 @@ createClientTask keySpaceRange eId request =
           tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
-                let value = MS.staticRead key timestamp (derivedState ^. DS.kvStore)
-                    response =
-                      CRs.ClientResponse
-                        (CRs.Meta requestId)
-                        (CRs.SlaveRead
-                          (CRsSR.Success value))
-                trace $ TrM.ClientResponseSent response
-                addA $ Ac.Send [eId] $ Ms.ClientResponse response
+                done derivedState
                 return True
               _ -> return False
           done derivedState = do
-            let value = derivedState ^. DS.kvStore & MS.staticRead key timestamp
+            let value = case (derivedState ^. DS.kvStore) &  MS.staticRead key timestamp of
+                          Just (value, _) -> Just value
+                          Nothing -> Nothing
                 response =
                   CRs.ClientResponse
                     (CRs.Meta requestId)
@@ -111,9 +105,15 @@ createClientTask keySpaceRange eId request =
             case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 let response =
-                      (CRs.ClientResponse
-                        (CRs.Meta requestId)
-                        (CRs.SlaveWrite CRsSW.BackwardsWrite))
+                      case (derivedState ^. DS.kvStore) & MS.staticRead key timestamp of
+                        Just (_, requestId') | requestId' == requestId ->
+                          CRs.ClientResponse
+                            (CRs.Meta requestId)
+                            (CRs.SlaveWrite CRsSW.Success)
+                        _ ->
+                          CRs.ClientResponse
+                            (CRs.Meta requestId)
+                            (CRs.SlaveWrite CRsSW.BackwardsWrite)
                 trace $ TrM.ClientResponseSent response
                 addA $ Ac.Send [eId] $ Ms.ClientResponse response
                 return True

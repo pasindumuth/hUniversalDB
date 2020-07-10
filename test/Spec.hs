@@ -261,7 +261,7 @@ checkResponses msgs =
                                 key' == key &&
                                 value' == value &&
                                 timestamp' == timestamp ->
-                              let (_, tables') = tables %^^* (ix (databaseId, tableId)) $ MS.write key value timestamp
+                              let (_, tables') = tables %^^* (ix (databaseId, tableId)) $ MS.write key value requestId timestamp
                               in Right (requestMap, rangeMap, tables')
                             _ -> plEntryError entry
                 PM.Slave entry ->
@@ -299,10 +299,12 @@ checkResponses msgs =
                         _ -> genericSuccess
                     CRq.SlaveRead databaseId tableId key timestamp ->
                       case tables ^. at (databaseId, tableId) of
-                        Just table ->
+                        Just table -> do
+                          let val' = case MS.staticRead key timestamp table of
+                                       Just (val', _) -> Just val'
+                                       Nothing -> Nothing
                           case responsePayload of
-                            CRs.SlaveRead (CRsSR.Success val)
-                              | val == (MS.staticRead key timestamp table) -> genericSuccess
+                            CRs.SlaveRead (CRsSR.Success val) | val == val' -> genericSuccess
                             -- TODO: An Error is possible until requests get routed to the DM if the slave is behind
                             CRs.SlaveRead CRsSR.UnknownDB -> genericSuccess
                             _ -> genericError response payload

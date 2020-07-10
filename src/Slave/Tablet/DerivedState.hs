@@ -24,6 +24,6 @@ handleDerivedState paxosId pl pl' = do
           PM.Read _ key timestamp -> do
             DS.kvStore .^^ MS.read key timestamp
             return ()
-          PM.Write _ key value timestamp -> do
-            DS.kvStore .^^ MS.write key value timestamp
+          PM.Write requestId key value timestamp -> do
+            DS.kvStore .^^ MS.write key requestId value timestamp
       _ -> U.caseError

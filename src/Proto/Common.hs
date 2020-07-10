@@ -16,6 +16,7 @@ type RequestId = String
 type DatabaseId = String
 type TableId = String
 type Timestamp = Int
+type Lat = Timestamp
 type Key = String
 type Value = String
 
