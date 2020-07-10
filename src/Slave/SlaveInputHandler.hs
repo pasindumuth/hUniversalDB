@@ -26,7 +26,6 @@ import qualified Slave.DerivedState as DS
 import qualified Slave.Env as En
 import qualified Slave.SlaveState as SS
 import qualified Slave.Internal_DerivedState as IDS
-import qualified Slave.Internal_KeySpaceManager as IKSM
 import qualified Slave.KeySpaceManager as KSM
 import Infra.Lens
 import Infra.State
@@ -96,7 +95,7 @@ handleInputAction iAction =
                   handlingState .^ PTM.handleInsert
                 else return ()
         Ms.TabletMessage keySpaceRange tabletMsg -> do
-          ranges <- getL $ SS.derivedState.IDS.keySpaceManager.IKSM.allRanges
+          ranges <- SS.derivedState.IDS.keySpaceManager .^^^ KSM.allRanges
           if St.member keySpaceRange ranges
             then addA $ Ac.TabletForward keySpaceRange eId tabletMsg
             else return ()

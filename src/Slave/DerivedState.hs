@@ -13,7 +13,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Internal_DerivedState as IDS
-import qualified Slave.Internal_KeySpaceManager as IKSM
+import qualified Slave.KeySpaceManager as KSM
 import Infra.State
 
 handleDerivedState :: Co.PaxosId -> PL.PaxosLog -> PL.PaxosLog -> ST IDS.DerivedState ()
@@ -24,12 +24,9 @@ handleDerivedState paxosId pl pl' = do
       PM.Slave slaveEntry ->
         case slaveEntry of
           PM.RangeRead _ timestamp -> do
-            IDS.keySpaceManager.IKSM.lat .^^. \_ -> timestamp
+            IDS.keySpaceManager .^^ KSM.read timestamp
             return ()
           PM.RangeWrite requestId timestamp ranges -> do
-            IDS.keySpaceManager.IKSM.lat .^^. \_ -> timestamp
-            IDS.keySpaceManager.IKSM.versions .^^. ((timestamp, requestId, ranges):)
-            Mo.forM_ ranges $ \range -> do
-              IDS.keySpaceManager.IKSM.allRanges .^^. St.insert range
+            IDS.keySpaceManager .^^ KSM.write timestamp requestId ranges
             addA $ Ac.Slave_CreateTablet ranges
       _ -> U.caseError

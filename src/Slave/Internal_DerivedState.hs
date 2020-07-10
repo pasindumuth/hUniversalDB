@@ -8,7 +8,7 @@ module Slave.Internal_DerivedState where
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
-import qualified Slave.Internal_KeySpaceManager as KSM
+import qualified Slave.KeySpaceManager as KSM
 import Infra.Lens
 
 data DerivedState = DerivedState {
