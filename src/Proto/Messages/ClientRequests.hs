@@ -20,8 +20,7 @@ data Payload =
   RangeRead {
     timestamp :: Int } |
   RangeWrite {
-    databaseId :: Co.DatabaseId,
-    tableId :: Co.TableId,
+    ranges :: [Co.KeySpaceRange],
     timestamp :: Int } |
   SlaveRead {
     databaseId :: Co.DatabaseId,

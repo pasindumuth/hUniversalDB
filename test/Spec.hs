@@ -52,9 +52,10 @@ generateRequest = do
   requestType :: Int <- Tt.rand .^^ Rn.randomR (0, 2)
   case requestType of
     0 -> do
-      let tableId = "t" ++ show numTables
+      -- TODO: this just simulates adding new KeySpaceRanges. Make it do more general things.
+      let ranges = [0..numTables] & map (\i -> Co.KeySpaceRange "d" ("t" ++ show i))
       timestamp <- makeTimestamp
-      SM.addClientMsg slaveId (CRq.RangeWrite "d" tableId timestamp)
+      SM.addClientMsg slaveId (CRq.RangeWrite ranges timestamp)
       Tt.requestStats.Tt.numRangeWriteRqs .^^. (+1)
       Tt.numTableKeys .^^. Mp.insert numTables 0
       return ()
@@ -118,7 +119,7 @@ analyzeResponses = do
 
 test1 :: ST Tt.TestState ()
 test1 = do
-  SM.addClientMsg 0 (CRq.RangeWrite "d" "t" 0); SM.simulateAll
+  SM.addClientMsg 0 (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 0); SM.simulateAll
   SM.addClientMsg 1 (CRq.SlaveWrite "d" "t" "key1" "value1" 1); SM.simulateAll
   SM.addClientMsg 2 (CRq.SlaveRead "d" "t" "key1" 3); SM.simulateAll
   SM.addClientMsg 3 (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateAll
@@ -126,7 +127,7 @@ test1 = do
 
 test2 :: ST Tt.TestState ()
 test2 = do
-  SM.addClientMsg 0 (CRq.RangeWrite "d" "t" 0); SM.simulateN 2
+  SM.addClientMsg 0 (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 0); SM.simulateN 2
   SM.addClientMsg 1 (CRq.SlaveWrite "d" "t" "key1" "value1" 1); SM.simulateN 2
   SM.addClientMsg 2 (CRq.SlaveWrite "d" "t" "key2" "value2" 2); SM.simulateN 2
   SM.addClientMsg 3 (CRq.SlaveWrite "d" "t" "key3" "value3" 3); SM.simulateN 2
@@ -223,10 +224,11 @@ type Tables = Mp.Map (Co.DatabaseId, Co.TableId) IMS.MultiVersionKVStore
 -- if the program is working right, then these operations shouldn't fail.
 -- Rather than checking whether the oepration would fail or not by using
 -- safe operations, it's more compact to just fail fatally.
+-- TODO: maybe change all of these to assertions
 checkResponses :: [TrM.TraceMessage] -> Either String ()
 checkResponses msgs =
-  let genericError response payload = Left $ "Response " ++ show response ++ " is the wrong response to Request " ++ show payload
-      plEntryError entry = Left $ "Unwarranted PaxosLogEntry: " ++ show entry
+  let genericError response payload = Left $ "Response " ++ ppShow response ++ " is the wrong response to Request " ++ ppShow payload
+      plEntryError entry = Left $ "Unwarranted PaxosLogEntry: " ++ ppShow entry
       testRes = U.s31 Mo.foldM (Mp.empty, Mp.empty, Mp.empty) msgs $
         \(requestMap, rangeMap, tables) msg ->
           case msg of
@@ -271,10 +273,10 @@ checkResponses msgs =
                         Nothing -> plEntryError entry
                         Just payload ->
                           case payload of
-                            CRq.RangeWrite databaseId' tableId' _
+                            CRq.RangeWrite (Co.KeySpaceRange databaseId' tableId':_) _
                               | databaseId' == databaseId &&
                                 tableId' == tableId ->
-                              let rangeMap' = rangeMap & at (show range) ?~ (databaseId, tableId)
+                              let rangeMap' = rangeMap & at (ppShow range) ?~ (databaseId, tableId)
                                   tables' = tables & at (databaseId, tableId) ?~ Mp.empty
                               in Right (requestMap, rangeMap', tables')
                             _ -> plEntryError entry
@@ -284,13 +286,13 @@ checkResponses msgs =
               Right (requestMap & at requestId ?~ payload, rangeMap, tables)
             TrM.ClientResponseSent response@(CRs.ClientResponse (CRs.Meta requestId) responsePayload) ->
               case requestMap ^. at requestId of
-                Nothing -> Left $ "Response " ++ show response ++ " has no corresponding request."
+                Nothing -> Left $ "Response " ++ ppShow response ++ " has no corresponding request."
                 Just payload -> do
                   let genericSuccess = Right (requestMap & Mp.delete requestId, rangeMap, tables)
                   case payload of
                     -- TODO: Do this properly
                     CRq.RangeRead _ -> Right (requestMap, rangeMap, tables)
-                    CRq.RangeWrite databaseId tableId _ ->
+                    CRq.RangeWrite (Co.KeySpaceRange databaseId' tableId':_) _ ->
                       case responsePayload of
                         CRs.RangeWrite CRsRW.Success -> genericSuccess
                         -- TODO: simulate everything and verify this properly
@@ -334,10 +336,11 @@ checkResponses msgs =
                           case responsePayload of
                             CRs.SlaveWrite CRsSW.UnknownDB -> genericSuccess
                             _ -> genericError response payload
+                    _ -> genericError response payload
   in case testRes of
     Right (requestMap, _, _) ->
       if Mp.size requestMap > 0
-        then Left $ "The following requests went unanswered: " ++ show requestMap
+        then Left $ "The following requests went unanswered: " ++ ppShow requestMap
         else Right ()
     Left errMsg -> Left errMsg
 
@@ -376,7 +379,7 @@ testDriver :: IO ()
 testDriver = do
   driveTest 1 test1
   driveTest 2 test2
-  driveTest 3 test3
+--  driveTest 3 test3
 --  driveTest 4 test4
 
 main :: IO ()

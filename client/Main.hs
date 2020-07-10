@@ -12,6 +12,7 @@ import qualified System.Environment as SE
 
 import qualified Infra.Logging as Lg
 import qualified Net.Connections as Cn
+import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 
@@ -27,28 +28,39 @@ startClient ip = do
     Ct.forkIO $ Mo.forever $ do
       msg <- Cn.receiveMessage socket
       print (msg :: Ms.Message)
-    Mo.forever $ do
+    loop socket []
+  where
+    loop :: TCP.Socket -> [Co.KeySpaceRange] -> IO ()
+    loop socket ranges = do
       line <- getLine
-      case words line of
-        ["r", databaseId, tableId, key, timestamp] -> do
-          Cn.sendMessage socket $
-            Ms.ClientRequest 
-              (CRq.ClientRequest
-                (CRq.Meta "uid")
-                (CRq.SlaveRead databaseId tableId key (read timestamp)))
-        ["w", databaseId, tableId, key, value, timestamp] -> do
-          Cn.sendMessage socket $
-            Ms.ClientRequest 
-              (CRq.ClientRequest
-                (CRq.Meta "uid")
-                (CRq.SlaveWrite databaseId tableId key value (read timestamp)))
-        ["c", databaseId, tableId, timestamp] -> do
-          Cn.sendMessage socket $
-            Ms.ClientRequest
-              (CRq.ClientRequest
-                (CRq.Meta "uid")
-                (CRq.RangeWrite databaseId tableId (read timestamp)))
-        _ -> print "Unrecognized command or number of arguments"
+      ranges' <-
+        case words line of
+          ["r", databaseId, tableId, key, timestamp] -> do
+            Cn.sendMessage socket $
+              Ms.ClientRequest
+                (CRq.ClientRequest
+                  (CRq.Meta "uid")
+                  (CRq.SlaveRead databaseId tableId key (read timestamp)))
+            return ranges
+          ["w", databaseId, tableId, key, value, timestamp] -> do
+            Cn.sendMessage socket $
+              Ms.ClientRequest
+                (CRq.ClientRequest
+                  (CRq.Meta "uid")
+                  (CRq.SlaveWrite databaseId tableId key value (read timestamp)))
+            return ranges
+          ["c", databaseId, tableId, timestamp] -> do
+            let ranges' = ((Co.KeySpaceRange databaseId tableId):ranges)
+            Cn.sendMessage socket $
+              Ms.ClientRequest
+                (CRq.ClientRequest
+                  (CRq.Meta "uid")
+                  (CRq.RangeWrite ranges' (read timestamp)))
+            return ranges'
+          _ -> do
+            print "Unrecognized command or number of arguments"
+            return ranges
+      loop socket ranges'
 
 main :: IO ()
 main = do
