@@ -5,7 +5,6 @@ import qualified Data.Default as Df
 import qualified Data.List as Li
 import qualified Data.Map as Mp
 import qualified Data.Set as St
-import Text.Show.Pretty (ppShow)
 
 import qualified Infra.Utils as U
 import qualified Proto.Messages.ClientRequests as CRq

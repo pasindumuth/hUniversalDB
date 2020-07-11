@@ -7,7 +7,6 @@ import qualified Control.Monad as Mo
 import qualified Data.Map as Mp
 import qualified Data.Set as St
 import qualified System.Random as Rn
-import Text.Show.Pretty (ppShow)
 
 import qualified Infra.Utils as U
 import qualified Proto.Common as Co
@@ -147,9 +146,7 @@ test4 = do
     \_ -> do
       Mo.forM_ [1..5] $
         \_ -> generateRequest
-      -- TODO: had to change this from SM.simulateN 2 because the
-      -- test was failing. Figure out why.
-      SM.simulateAll
+      SM.simulateN 2
       SM.dropMessages 2
   SM.simulateAll
   analyzeResponses
@@ -173,11 +170,11 @@ verifyTrace msgs =
 driveTest :: Int -> ST Tt.TestState () -> IO ()
 driveTest testNum test = do
   let g = SM.createTestState 0 5 1
-      (_, (oActions, traceMsgs, g')) = runST test g
+      (_, (_, traceMsgs, g')) = runST test g
       -- We must reverse traceMsgs since that's created in reverse order,
       -- with the most recent message first
       testMsg =
-        case verifyTrace $ reverse traceMsgs of
+        case verifyTrace $ traceMsgs of
           Left errMsg -> "Test " ++ (show testNum) ++ " Failed! Error: " ++ errMsg
           Right _ -> "Test " ++ (show testNum) ++ " Passed! " ++ (show $ length traceMsgs) ++ " trace messages."
   putStrLn $ ppShow $ g' ^. Tt.requestStats

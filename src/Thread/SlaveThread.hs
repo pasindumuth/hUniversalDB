@@ -38,7 +38,7 @@ startSlaveThread rg iActionChan connM = do
       iAction <- Ct.readChan iActionChan
       let (_, (oActions, _, g')) = runST (SIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
-      (g'', tabletMap') <- U.s31 Mo.foldM (g', tabletMap) (reverse oActions) $ \(g', tabletMap) action ->
+      (g'', tabletMap') <- U.s31 Mo.foldM (g', tabletMap) oActions $ \(g', tabletMap) action ->
         case action of
           Ac.Send eIds msg -> do
             Mo.forM_ eIds $ \eId -> Mp.lookup eId conn & Mb.fromJust $ msg

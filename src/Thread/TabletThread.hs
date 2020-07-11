@@ -35,7 +35,7 @@ startTabletThread rg keySpaceRange iActionChan connM = do
       iAction <- Ct.readChan iActionChan
       let (_, (oActions, _, g')) = runST (TIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
-      Mo.forM_ (reverse oActions) $ \action ->
+      Mo.forM_ oActions $ \action ->
         case action of
           Ac.Send eIds msg -> Mo.forM_ eIds $
             \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
