@@ -12,4 +12,4 @@ import qualified Proto.Common as Co
 
 data RangeRead =
   Success [Co.KeySpaceRange]
-  deriving (Gn.Generic, Bn.Binary, Show)
+  deriving (Gn.Generic, Bn.Binary, Show, Eq)

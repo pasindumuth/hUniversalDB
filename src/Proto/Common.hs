@@ -9,6 +9,8 @@ import qualified Data.Binary as Bn
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
+import Infra.Lens
+
 type EndpointId = String
 type PaxosId = String
 
@@ -26,3 +28,5 @@ data KeySpaceRange = KeySpaceRange {
   databaseId :: DatabaseId,
   tableId :: TableId
 } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
+
+makeLenses ''KeySpaceRange

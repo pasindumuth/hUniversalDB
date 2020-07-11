@@ -87,7 +87,7 @@ createClientTask keySpaceRange eId request =
               _ -> return False
           done derivedState = do
             let value = case (derivedState ^. DS.kvStore) &  MS.staticRead key timestamp of
-                          Just (value, _) -> Just value
+                          Just (value, _, _) -> Just value
                           Nothing -> Nothing
                 response =
                   CRs.ClientResponse
@@ -106,7 +106,7 @@ createClientTask keySpaceRange eId request =
               Just lat | timestamp <= lat -> do
                 let response =
                       case (derivedState ^. DS.kvStore) & MS.staticRead key timestamp of
-                        Just (_, requestId') | requestId' == requestId ->
+                        Just (_, requestId', _) | requestId' == requestId ->
                           CRs.ClientResponse
                             (CRs.Meta requestId)
                             (CRs.SlaveWrite CRsSW.Success)

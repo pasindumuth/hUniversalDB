@@ -26,13 +26,13 @@ read key timestamp m =
 -- This method is design to return the same thing every time for a 
 -- given key and timestamp (hence why we throw fatal errors if the
 -- key hasn't been seen or we are trying to read ahead of the `lat`).
-staticRead :: String -> Int -> MS.MultiVersionKVStore -> Maybe (Co.Value, Co.RequestId)
+staticRead :: String -> Int -> MS.MultiVersionKVStore -> Maybe (Co.Value, Co.RequestId, Co.Timestamp)
 staticRead key timestamp m =
   case m ^. at key of
     Just (versions, lat) ->
       Ex.assert (timestamp <= lat) $
       case dropWhile (\v -> (v ^. _3) > timestamp) versions of
-        ((value, requestId, _):_) -> Just (value, requestId)
+        ((value, requestId, timestamp'):_) -> Just (value, requestId, timestamp')
         _ -> Nothing
     _ -> Ex.assert False Nothing
 

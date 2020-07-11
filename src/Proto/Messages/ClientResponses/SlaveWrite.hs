@@ -12,4 +12,4 @@ data SlaveWrite =
   UnknownDB |
   BackwardsWrite |
   Success
-  deriving (Gn.Generic, Bn.Binary, Show)
+  deriving (Gn.Generic, Bn.Binary, Show, Eq)

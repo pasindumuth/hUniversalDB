@@ -11,4 +11,4 @@ import qualified GHC.Generics as Gn
 data SlaveRead =
   UnknownDB |
   Success { value :: Maybe String }
-  deriving (Gn.Generic, Bn.Binary, Show)
+  deriving (Gn.Generic, Bn.Binary, Show, Eq)
