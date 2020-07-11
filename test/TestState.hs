@@ -38,6 +38,20 @@ data RequestStats = RequestStats {
 
 makeLenses ''RequestStats
 
+data ClientState = ClientState {
+  _clientRand :: Rn.StdGen,
+  _nextUid :: Int,
+  _trueTimestamp :: Int,
+  -- contains the current set of ranges
+  _curRanges :: St.Set Co.KeySpaceRange,
+  -- contains all ranges and the maximum key that was inserted
+  _numTabletKeys :: Mp.Map Co.KeySpaceRange Int,
+  _requestStats :: RequestStats,
+  _clientResponses :: Mp.Map Co.EndpointId [Ms.Message]
+} deriving (Show)
+
+makeLenses ''ClientState
+
 data TestState = TestState {
   -- General
   _rand :: Rn.StdGen,
@@ -56,12 +70,8 @@ data TestState = TestState {
   _slaveAsyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (Ac.InputAction, Int)),
   _tabletAsyncQueues :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange (Sq.Seq (Ac.TabletInputAction, Int))),
   _clocks :: Mp.Map Co.EndpointId Int,
-  -- Fields for usage by the client
-  _nextUid :: Int,
-  _trueTimestamp :: Int,
-  _numTableKeys :: Mp.Map Int Int,
-  _requestStats :: RequestStats,
-  _clientResponses :: Mp.Map Co.EndpointId [Ms.Message]
+  -- Client field
+  _clientState :: ClientState
 } deriving (Show)
 
 makeLenses ''TestState

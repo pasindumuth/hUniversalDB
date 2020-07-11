@@ -45,5 +45,5 @@ startTabletThread rg keySpaceRange iActionChan connM = do
               Ct.writeChan iActionChan $ Ac.TabletRetryInput counterValue
             return ()
           Ac.Print message -> do
-            print message
+            putStrLn message
       handlePaxosMessage g'

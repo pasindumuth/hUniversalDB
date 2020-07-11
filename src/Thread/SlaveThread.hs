@@ -49,7 +49,7 @@ startSlaveThread rg iActionChan connM = do
               Ct.writeChan iActionChan $ Ac.RetryInput counterValue
             return (g', tabletMap)
           Ac.Print message -> do
-            print message
+            putStrLn message
             return (g', tabletMap)
           Ac.Slave_CreateTablet ranges ->
             U.s31 Mo.foldM (g', tabletMap) ranges $ \(g', tabletMap) range ->

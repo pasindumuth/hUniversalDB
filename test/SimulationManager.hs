@@ -46,6 +46,9 @@ createTestState seed numSlaves numClients =
       tabletAsyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
       clocks = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, 0)
       clientResponses = Mp.fromList $ U.for clientEIds $ \eId -> (eId, [])
+      (clientRand, rand'') = rand' & \rand' ->
+        let (r, rand'') = Rn.random rand'
+        in (Rn.mkStdGen r, rand'')
   in Tt.TestState {
       Tt._rand = rand',
       Tt._slaveEIds = slaveEIds,
@@ -57,24 +60,28 @@ createTestState seed numSlaves numClients =
       Tt._slaveAsyncQueues = asyncQueues,
       Tt._tabletAsyncQueues = tabletAsyncQueues,
       Tt._clocks = clocks,
-      Tt._nextUid = 0,
-      Tt._trueTimestamp = 0,
-      Tt._numTableKeys = Mp.empty,
-      Tt._requestStats = Tt.RequestStats {
-        Tt._numRangeReadRqs = 0,
-        Tt._numRangeWriteRqs = 0,
-        Tt._numReadRqs = 0,
-        Tt._numWriteRqs = 0,
-        Tt._numReadSuccessRss = 0,
-        Tt._numReadUnknownDBRss = 0,
-        Tt._numWriteSuccessRss = 0,
-        Tt._numWriteUnknownDBRss = 0,
-        Tt._numBackwardsWriteRss = 0,
-        Tt._numRangeReadSuccessRss = 0,
-        Tt._numRangeWriteSuccessRss = 0,
-        Tt._numRangeWriteBackwardsWriteRss = 0
-      },
-      Tt._clientResponses = clientResponses
+      Tt._clientState = Tt.ClientState {
+        Tt._clientRand = clientRand,
+        Tt._nextUid = 0,
+        Tt._trueTimestamp = 0,
+        Tt._curRanges = St.empty,
+        Tt._numTabletKeys = Mp.empty,
+        Tt._requestStats = Tt.RequestStats {
+          Tt._numRangeReadRqs = 0,
+          Tt._numRangeWriteRqs = 0,
+          Tt._numReadRqs = 0,
+          Tt._numWriteRqs = 0,
+          Tt._numReadSuccessRss = 0,
+          Tt._numReadUnknownDBRss = 0,
+          Tt._numWriteSuccessRss = 0,
+          Tt._numWriteUnknownDBRss = 0,
+          Tt._numBackwardsWriteRss = 0,
+          Tt._numRangeReadSuccessRss = 0,
+          Tt._numRangeWriteSuccessRss = 0,
+          Tt._numRangeWriteBackwardsWriteRss = 0
+        },
+        Tt._clientResponses = clientResponses
+      }
     }
 
 addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST Tt.TestState ()
@@ -142,7 +149,7 @@ deliverMessage (fromEId, toEId) = do
   if Li.elem toEId slaveEIds'
     then runIAction toEId $ Ac.Receive fromEId msg
     else do
-      Tt.clientResponses . ix toEId .^^.* (msg:)
+      Tt.clientState . Tt.clientResponses . ix toEId .^^.* (msg:)
       return ()
 
 dropMessages :: Int -> ST Tt.TestState ()
@@ -172,7 +179,7 @@ simulateOnce numMessages = do
       -- We have to put this behind a randPercentage with the the same
       -- probability of success as the Tt.clocks to prevent the trueTime from
       -- pulling away.
-      Tt.trueTimestamp .^^. (+1)
+      Tt.clientState . Tt.trueTimestamp .^^. (+1)
       return ()
     else return ()
   Mo.forM_ eIds $ \eId -> do
@@ -231,7 +238,7 @@ addClientMsg
   -> CRq.Payload
   -> ST Tt.TestState ()
 addClientMsg slaveId payload = do
-  uid <- Tt.nextUid .^^. (+1)
+  uid <- Tt.clientState . Tt.nextUid .^^. (+1)
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
       msg = Ms.ClientRequest
               (CRq.ClientRequest

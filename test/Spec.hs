@@ -39,64 +39,78 @@ import Infra.State
 --    of requests that were already sent. However, we add a slight bit of noise to this
 --    to simulate sending requests to the past (which sometimes we expect the system
 --    to reply with an error).
-generateRequest :: ST Tt.TestState ()
+generateRequest :: ST Tt.ClientState (Int, CRq.Payload)
 generateRequest = do
-  numTables <- Tt.numTableKeys .^^^ Mp.size
-  slaveId :: Int <- Tt.rand .^^ Rn.randomR (0, 4)
-  requestType :: Int <- Tt.rand .^^ Rn.randomR (0, 2)
+  numTablets <- Tt.numTabletKeys .^^^ Mp.size
+  slaveId :: Int <- Tt.clientRand .^^ Rn.randomR (0, 4)
+  requestType :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
   case requestType of
-    0 -> do
-      -- TODO: this just simulates adding new KeySpaceRanges. Make it do more general things.
-      let ranges = [0..numTables] & map (\i -> Co.KeySpaceRange "d" ("t" ++ show i))
+    _ | requestType < 15 -> do
       timestamp <- makeTimestamp
-      SM.addClientMsg slaveId (CRq.RangeWrite ranges timestamp)
+      Tt.requestStats.Tt.numRangeReadRqs .^^. (+1)
+      return (slaveId, CRq.RangeRead timestamp)
+    _ | requestType < 30 -> do
+      allRanges <- Tt.numTabletKeys .^^^ Mp.keys
+      curRanges <- U.s31 Mo.foldM St.empty allRanges $ \curRanges range -> do
+        addRange <- Tt.clientRand .^^ Rn.random
+        if addRange
+          then return $ curRanges & St.insert range
+          else return $ curRanges
+      addNewRange <-  Tt.clientRand .^^ Rn.random
+      curRanges <- if addNewRange
+                      then do
+                        let range = makeRange numTablets
+                        Tt.numTabletKeys .^^. Mp.insert range 0
+                        return $ curRanges & St.insert range
+                      else return $ curRanges
+      Tt.curRanges .^^. \_ -> curRanges
+      timestamp <- makeTimestamp
       Tt.requestStats.Tt.numRangeWriteRqs .^^. (+1)
-      Tt.numTableKeys .^^. Mp.insert numTables 0
-      return ()
-    _ | requestType == 1 || requestType == 2 -> do
-      newTableProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
-      (tableIdx, keyIdx) <-
-        if newTableProb >= 75 || numTables == 0
-          then return (numTables, 0)
+      return (slaveId, CRq.RangeWrite (St.toList curRanges) timestamp)
+    _ -> do
+      newTableProb :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
+      curRanges <- getL $ Tt.curRanges
+      (range, keyIdx) <-
+        if newTableProb >= 75 || (St.size curRanges) == 0
+          then return (makeRange numTablets, 0)
           else do
-            tableIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numTables - 1)
+            tabletIdx :: Int <- Tt.clientRand .^^ Rn.randomR (0, (St.size curRanges) - 1)
+            let range = St.elemAt tabletIdx curRanges
             keyIdx <- do
-              res <- Tt.numTableKeys .^^^ Mp.lookup tableIdx
+              res <- Tt.numTabletKeys .^^^ Mp.lookup range
               case res of
                 Just numKeys | numKeys > 0 -> do
-                  newKeyProb :: Int <- Tt.rand .^^ Rn.randomR (0, 99)
+                  newKeyProb :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
                   if newKeyProb >= 75
                     then do
-                      Tt.numTableKeys .^^. Mp.insert tableIdx (numKeys + 1)
+                      Tt.numTabletKeys .^^. Mp.insert range (numKeys + 1)
                       return numKeys
                     else do
-                      keyIdx :: Int <- Tt.rand .^^ Rn.randomR (0, numKeys - 1)
+                      keyIdx :: Int <- Tt.clientRand .^^ Rn.randomR (0, numKeys - 1)
                       return keyIdx
                 _ -> do
-                  Tt.numTableKeys .^^. Mp.insert tableIdx 1
+                  Tt.numTabletKeys .^^. Mp.insert range 1
                   return 0
-            return (tableIdx, keyIdx)
-      let tableId = "t" ++ show tableIdx
+            return (range, keyIdx)
+      let (Co.KeySpaceRange databaseId tableId) = range
           key = "k" ++ show keyIdx
       timestamp <- makeTimestamp
       case requestType of
-        1 -> do
+        _ | requestType < 65 -> do
           let value = "v" ++ show keyIdx
-          SM.addClientMsg slaveId (CRq.SlaveWrite "d" tableId key value timestamp)
           Tt.requestStats.Tt.numWriteRqs .^^. (+1)
-        2 -> do
-          SM.addClientMsg slaveId (CRq.SlaveRead "d" tableId key timestamp)
+          return (slaveId, CRq.SlaveWrite databaseId tableId key value timestamp)
+        _ -> do
           Tt.requestStats.Tt.numReadRqs .^^. (+1)
-        _ -> U.caseError
-      return ()
-    _ -> U.caseError
+          return (slaveId, CRq.SlaveRead databaseId tableId key timestamp)
   where
     makeTimestamp = do
-      noise <- Tt.rand .^^ Rn.randomR (-2, 2)
+      noise <- Tt.clientRand .^^ Rn.randomR (-2, 2)
       trueTimestamp <- getL $ Tt.trueTimestamp
       return $ trueTimestamp + noise
+    makeRange i = Co.KeySpaceRange "d" ("t" ++ show i)
 
-analyzeResponses :: ST Tt.TestState ()
+analyzeResponses :: ST Tt.ClientState ()
 analyzeResponses = do
   clientResponses <- Tt.clientResponses .^^^ Mp.toList
   Mo.forM_ clientResponses $ \(_, responses) ->
@@ -128,28 +142,29 @@ test2 = do
   SM.addClientMsg 4 (CRq.SlaveWrite "d" "t" "key4" "value4" 4); SM.simulateN 2
   SM.addClientMsg 0 (CRq.SlaveWrite "d" "t" "key5" "value5" 5); SM.simulateAll
 
--- TODO: I want more monitoring of what happens during a test. Maybe
--- I need message-drop stats.
 test3 :: ST Tt.TestState ()
 test3 = do
-  Mo.forM_ [1..50] $
+  Mo.forM_ [1..100] $
     \_ -> do
-      generateRequest
+      (slaveId, payload) <- Tt.clientState .^ generateRequest
+      SM.addClientMsg slaveId payload
       SM.simulateN 2
       SM.dropMessages 1
   SM.simulateAll
-  analyzeResponses
+  Tt.clientState .^ analyzeResponses
 
 test4 :: ST Tt.TestState ()
 test4 = do
-  Mo.forM_ [1..20] $
+  Mo.forM_ [1..50] $
     \_ -> do
       Mo.forM_ [1..5] $
-        \_ -> generateRequest
+        \_ -> do
+          (slaveId, payload) <- Tt.clientState .^ generateRequest
+          SM.addClientMsg slaveId payload
       SM.simulateN 2
       SM.dropMessages 2
   SM.simulateAll
-  analyzeResponses
+  Tt.clientState .^ analyzeResponses
 
 -- This list of trace messages includes all events across all slaves.
 verifyTrace :: [TrM.TraceMessage] -> Either String ()
@@ -177,7 +192,7 @@ driveTest testNum test = do
         case verifyTrace $ traceMsgs of
           Left errMsg -> "Test " ++ (show testNum) ++ " Failed! Error: " ++ errMsg
           Right _ -> "Test " ++ (show testNum) ++ " Passed! " ++ (show $ length traceMsgs) ++ " trace messages."
-  putStrLn $ ppShow $ g' ^. Tt.requestStats
+  putStrLn $ ppShow $ g' ^. Tt.clientState . Tt.requestStats
   putStrLn testMsg
   putStrLn ""
   return ()
