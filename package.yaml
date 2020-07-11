@@ -28,6 +28,7 @@ dependencies:
 - data-default
 - hslogger
 - lens
+- MissingH
 - mtl
 - network-simple
 - pretty-show

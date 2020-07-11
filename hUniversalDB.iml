@@ -76,5 +76,13 @@
     <orderEntry type="library" name="void-0.7.3" level="project" />
     <orderEntry type="library" name="pretty-show-1.10" level="project" />
     <orderEntry type="library" name="haskell-lexer-1.1" level="project" />
+    <orderEntry type="library" name="MissingH-1.4.3.0" level="project" />
+    <orderEntry type="library" name="directory-1.3.6.0" level="project" />
+    <orderEntry type="library" name="old-time-1.1.0.3" level="project" />
+    <orderEntry type="library" name="parsec-3.1.14.0" level="project" />
+    <orderEntry type="library" name="process-1.6.8.0" level="project" />
+    <orderEntry type="library" name="regex-compat-0.95.2.0" level="project" />
+    <orderEntry type="library" name="regex-base-0.94.0.0" level="project" />
+    <orderEntry type="library" name="regex-posix-0.96.0.0" level="project" />
   </component>
 </module>

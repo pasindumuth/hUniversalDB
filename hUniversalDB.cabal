@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fd7df2eda7b2f881bf22a3a7d4df139d968d3914752b8eef9f5234d47ed5d181
+-- hash: 141ff4d52aa456b700da700ab42c7ec20ec63ddf6f76705bbd30db2b4e92a3b7
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -77,7 +77,8 @@ library
       src
   ghc-options: -fwarn-incomplete-patterns
   build-depends:
-      async
+      MissingH
+    , async
     , base >=4.7 && <5
     , binary
     , bytestring
@@ -100,7 +101,8 @@ executable hUniversalDB-client-exe
       client
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -fwarn-incomplete-patterns
   build-depends:
-      async
+      MissingH
+    , async
     , base >=4.7 && <5
     , binary
     , bytestring
@@ -124,7 +126,8 @@ executable hUniversalDB-slave-exe
       slave
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -fwarn-incomplete-patterns
   build-depends:
-      async
+      MissingH
+    , async
     , base >=4.7 && <5
     , binary
     , bytestring
@@ -153,7 +156,8 @@ test-suite hUniversalDB-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -fwarn-incomplete-patterns
   build-depends:
-      async
+      MissingH
+    , async
     , base >=4.7 && <5
     , binary
     , bytestring
