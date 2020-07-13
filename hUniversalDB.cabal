@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4203b54165d2f78e11bbd3b16727394b35515c7c2049f5ca754abc60c1d0ecfc
+-- hash: 0a7e851b9f25daf5511b807ba6d21417ec712b2aa8c5a713d2fa2f4d66b0e630
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -34,21 +34,14 @@ library
       Infra.Utils
       Master.DerivedState
       Master.Env
-      Master.Internal_DerivedState
-      Master.Internal_NetworkTask
-      Master.Internal_SlaveGroupRanges
       Master.MasterInputHandler
       Master.MasterState
       Master.NetworkTask
       Master.SlaveGroupRanges
       Net.Connections
-      Paxos.Internal_MultiPaxosInstance
-      Paxos.Internal_PaxosInstance
-      Paxos.Internal_PaxosLog
       Paxos.MultiPaxosInstance
       Paxos.PaxosInstance
       Paxos.PaxosLog
-      Paxos.Tasks.Internal_PaxosTaskManager
       Paxos.Tasks.PaxosTaskManager
       Paxos.Tasks.Task
       Proto.Actions.Actions
@@ -66,15 +59,11 @@ library
       Proto.Messages.TraceMessages
       Slave.DerivedState
       Slave.Env
-      Slave.Internal_DerivedState
-      Slave.Internal_KeySpaceManager
       Slave.KeySpaceManager
       Slave.SlaveInputHandler
       Slave.SlaveState
       Slave.Tablet.DerivedState
       Slave.Tablet.Env
-      Slave.Tablet.Internal_DerivedState
-      Slave.Tablet.Internal_MultiVersionKVStore
       Slave.Tablet.MultiVersionKVStore
       Slave.Tablet.TabletInputHandler
       Slave.Tablet.TabletState
@@ -156,7 +145,6 @@ test-suite hUniversalDB-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      Internal_TraceChecker
       SimulationManager
       TestState
       TraceChecker

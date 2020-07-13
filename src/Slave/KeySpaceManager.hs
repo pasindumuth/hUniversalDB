@@ -1,5 +1,10 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module Slave.KeySpaceManager (
-  IKSM.KeySpaceManager,
+  KeySpaceManager,
   Slave.KeySpaceManager.read,
   write,
   staticReadLat,
@@ -8,39 +13,48 @@ module Slave.KeySpaceManager (
 ) where
 
 import qualified Control.Exception.Base as Ex
+import qualified Data.Default as Df
 import qualified Data.Set as St
+import qualified GHC.Generics as Gn
 
 import qualified Infra.Utils as U
 import qualified Proto.Common as Co
-import qualified Slave.Internal_KeySpaceManager as IKSM
 import Infra.Lens
+
+data KeySpaceManager = KeySpaceManager {
+  _i'lat :: Int,
+  _i'versions :: [(Co.Timestamp, Co.RequestId, [Co.KeySpaceRange])],
+  _i'allRanges :: St.Set Co.KeySpaceRange
+} deriving (Gn.Generic, Df.Default, Show)
+
+makeLenses ''KeySpaceManager
 
 -- Add a read and write operation here, and use asserts. Make it safe.
 -- Then, use this during testing. We don't need to test this itself, I guess.
-read :: Int -> IKSM.KeySpaceManager -> (Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange]), IKSM.KeySpaceManager)
+read :: Int -> KeySpaceManager -> (Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange]), KeySpaceManager)
 read timestamp keySpaceManager =
-  let version = case dropWhile (\v -> (v ^. _1) > timestamp) (keySpaceManager ^. IKSM.versions) of
+  let version = case dropWhile (\v -> (v ^. _1) > timestamp) (keySpaceManager ^. i'versions) of
                   [] -> Nothing
                   (version:_) -> Just version
-  in (version, keySpaceManager & IKSM.lat %~ (max timestamp))
+  in (version, keySpaceManager & i'lat %~ (max timestamp))
 
-staticReadLat :: IKSM.KeySpaceManager -> Int
-staticReadLat keySpaceManager = keySpaceManager ^. IKSM.lat
+staticReadLat :: KeySpaceManager -> Int
+staticReadLat keySpaceManager = keySpaceManager ^. i'lat
 
-staticRead :: Int -> IKSM.KeySpaceManager -> Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange])
+staticRead :: Int -> KeySpaceManager -> Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange])
 staticRead timestamp keySpaceManager =
-  Ex.assert (timestamp <= (keySpaceManager ^. IKSM.lat)) $
-  case dropWhile (\v -> (v ^. _1) > timestamp) (keySpaceManager ^. IKSM.versions) of
+  Ex.assert (timestamp <= (keySpaceManager ^. i'lat)) $
+  case dropWhile (\v -> (v ^. _1) > timestamp) (keySpaceManager ^. i'versions) of
     [] -> Nothing
     (version:_) -> Just version
 
-write :: Co.Timestamp -> Co.RequestId -> [Co.KeySpaceRange] -> IKSM.KeySpaceManager -> ((), IKSM.KeySpaceManager)
+write :: Co.Timestamp -> Co.RequestId -> [Co.KeySpaceRange] -> KeySpaceManager -> ((), KeySpaceManager)
 write timestamp requestId ranges keySpaceManager =
-  Ex.assert (timestamp > (keySpaceManager ^. IKSM.lat)) $
-  ((), keySpaceManager & IKSM.lat .~ timestamp
-                       & IKSM.versions %~ ((timestamp, requestId, ranges):)
+  Ex.assert (timestamp > (keySpaceManager ^. i'lat)) $
+  ((), keySpaceManager & i'lat .~ timestamp
+                       & i'versions %~ ((timestamp, requestId, ranges):)
                        & (U.s13 foldl ranges $ \keySpaceManager range ->
-                           keySpaceManager & IKSM.allRanges %~ (St.insert range)))
+                           keySpaceManager & i'allRanges %~ (St.insert range)))
 
-allRanges :: IKSM.KeySpaceManager -> St.Set Co.KeySpaceRange
-allRanges = (^. IKSM.allRanges)
+allRanges :: KeySpaceManager -> St.Set Co.KeySpaceRange
+allRanges = (^. i'allRanges)

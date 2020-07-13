@@ -1,10 +1,19 @@
-module TraceChecker where
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+module TraceChecker (
+  refineTrace,
+  checkMsgs
+) where
 
 import qualified Control.Monad as Mo
 import qualified Data.Default as Df
 import qualified Data.List as Li
 import qualified Data.Map as Mp
 import qualified Data.Set as St
+import qualified GHC.Generics as Gn
 
 import qualified Infra.Utils as U
 import qualified Proto.Messages.ClientRequests as CRq
@@ -18,9 +27,23 @@ import qualified Proto.Messages.TraceMessages as TrM
 import qualified Proto.Common as Co
 import qualified Slave.KeySpaceManager as KSM
 import qualified Slave.Tablet.MultiVersionKVStore as MVS
-import qualified Internal_TraceChecker as ITC
 import Infra.Lens
 import Infra.State
+
+data CheckState = CheckState {
+  _i'requestMap :: Mp.Map Co.RequestId CRq.Payload,
+  _i'rangeMap :: Mp.Map Co.PaxosId Co.KeySpaceRange,
+  _i'tables :: Mp.Map Co.KeySpaceRange MVS.MultiVersionKVStore,
+  _i'keySpaceManager :: KSM.KeySpaceManager
+} deriving (Gn.Generic, Df.Default)
+
+data TestPaxosLog = TestPaxosLog {
+  _i'plog :: Mp.Map PM.IndexT PM.PaxosLogEntry,
+  _i'nextIdx :: PM.IndexT
+}
+
+makeLenses ''CheckState
+makeLenses ''TestPaxosLog
 
 addMsgs
  :: Co.PaxosId
@@ -45,7 +68,7 @@ refineTrace msgs =
             TrM.PaxosInsertion paxosId index entry ->
               case paxosLogs ^. at paxosId of
                 Just paxosLog ->
-                  case paxosLog ^. ITC.plog . at index of
+                  case paxosLog ^. i'plog . at index of
                     Just entry' ->
                       if entry' == entry
                         then Right (paxosLogs, modMsgs)
@@ -53,15 +76,15 @@ refineTrace msgs =
                                     "PaxosId = " ++ show paxosId ++
                                     ", Entry: (" ++ show entry ++ ") vs. (" ++ show entry' ++ ")"
                     _ ->
-                      let plog' = paxosLog ^. ITC.plog & at index ?~ entry
-                          (nextIdx', modMsgs') = addMsgs paxosId (paxosLog ^. ITC.nextIdx) plog' modMsgs
-                          paxosLog' = ITC.TestPaxosLog plog' nextIdx'
+                      let plog' = paxosLog ^. i'plog & at index ?~ entry
+                          (nextIdx', modMsgs') = addMsgs paxosId (paxosLog ^. i'nextIdx) plog' modMsgs
+                          paxosLog' = TestPaxosLog plog' nextIdx'
                           paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
                       in Right (paxosLogs', modMsgs')
                 Nothing ->
                   let plog' = Mp.empty & at index ?~ entry
                       (nextIdx', modMsgs') = addMsgs paxosId 0 plog' modMsgs
-                      paxosLog' = ITC.TestPaxosLog plog' nextIdx'
+                      paxosLog' = TestPaxosLog plog' nextIdx'
                       paxosLogs' = paxosLogs & at paxosId ?~ paxosLog'
                   in Right (paxosLogs', modMsgs')
             _ -> Right (paxosLogs, (msg:modMsgs))
@@ -71,7 +94,7 @@ refineTrace msgs =
 
 checkMsgs :: [TrM.TraceMessage] -> Either Co.ErrorMsg ()
 checkMsgs msgs =
-  let ret = U.s31 Mo.foldM (Df.def :: ITC.CheckState) msgs $ \state msg ->
+  let ret = U.s31 Mo.foldM (Df.def :: CheckState) msgs $ \state msg ->
               let (ret, (_, _, state')) = runST (checkMsg msg) state
               in case ret of
                 Left message -> Left message
@@ -79,8 +102,8 @@ checkMsgs msgs =
   in case ret of
     Left message -> Left message
     Right state ->
-      if (state ^. ITC.requestMap & Mp.size) > 0
-        then Left $ "The following requests went unanswered: " ++ ppShow (state ^. ITC.requestMap)
+      if (state ^. i'requestMap & Mp.size) > 0
+        then Left $ "The following requests went unanswered: " ++ ppShow (state ^. i'requestMap)
         else Right ()
 
 entryUnfamiliarE :: PM.PaxosLogEntry -> Either Co.ErrorMsg a
@@ -118,16 +141,16 @@ derivedStateIncorrectlyWrittenE requestPayload response =
 -- Rather than checking whether the oepration would fail or not by using
 -- safe operations, it's more compact to just fail fatally.
 -- TODO: maybe change all of these to assertions
-checkMsg :: TrM.TraceMessage -> ST ITC.CheckState (Either Co.ErrorMsg ())
+checkMsg :: TrM.TraceMessage -> ST CheckState (Either Co.ErrorMsg ())
 checkMsg msg = do
   case msg of
     TrM.PaxosInsertion paxosId _ paxosLogEntry ->
       case paxosLogEntry of
         PM.Tablet entry -> do
-          range <- getT $ ITC.rangeMap . ix paxosId
+          range <- getT $ i'rangeMap . ix paxosId
           case entry of
             PM.Read requestId key timestamp -> do
-              payloadM <- getL $ ITC.requestMap . at requestId
+              payloadM <- getL $ i'requestMap . at requestId
               case payloadM of
                 Nothing -> return $ entryUnfamiliarE paxosLogEntry
                 Just payload ->
@@ -136,11 +159,11 @@ checkMsg msg = do
                       | (Co.KeySpaceRange databaseId' tableId') == range &&
                         key' == key &&
                         timestamp' == timestamp -> do
-                      ITC.tables . ix range .^^* MVS.read key timestamp
+                      i'tables . ix range .^^* MVS.read key timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
             PM.Write requestId key value timestamp -> do
-              payloadM <- getL $ ITC.requestMap . at requestId
+              payloadM <- getL $ i'requestMap . at requestId
               case payloadM of
                 Nothing -> return $ entryUnfamiliarE paxosLogEntry
                 Just payload ->
@@ -150,13 +173,13 @@ checkMsg msg = do
                         key' == key &&
                         value' == value &&
                         timestamp' == timestamp -> do
-                      ITC.tables . ix range .^^* MVS.write key value requestId timestamp
+                      i'tables . ix range .^^* MVS.write key value requestId timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
         PM.Slave entry ->
           case entry of
             PM.RangeRead requestId timestamp -> do
-              payloadM <- getL $ ITC.requestMap . at requestId
+              payloadM <- getL $ i'requestMap . at requestId
               case payloadM of
                 Nothing -> return $ entryUnfamiliarE paxosLogEntry
                 Just payload -> do
@@ -171,11 +194,11 @@ checkMsg msg = do
                         _ -> False
                   if entryCorrect
                     then do
-                      ITC.keySpaceManager .^^ KSM.read timestamp
+                      i'keySpaceManager .^^ KSM.read timestamp
                       return $ Right ()
                     else return $ entryIncorrectE paxosLogEntry payload
             PM.RangeWrite requestId timestamp ranges -> do
-              payloadM <- getL $ ITC.requestMap . at requestId
+              payloadM <- getL $ i'requestMap . at requestId
               case payloadM of
                 Nothing -> return $ entryUnfamiliarE paxosLogEntry
                 Just payload -> do
@@ -183,35 +206,35 @@ checkMsg msg = do
                     CRq.RangeWrite ranges' timestamp'
                       | ranges' == ranges &&
                         timestamp' == timestamp -> do
-                      ITC.keySpaceManager .^^ KSM.write timestamp requestId ranges
+                      i'keySpaceManager .^^ KSM.write timestamp requestId ranges
                       -- Update the Checkstate with the new ranges
                       Mo.forM ranges $ \range -> do
                         let paxosId = show range
-                        hasRange <- ITC.rangeMap .^^^ Mp.member paxosId
+                        hasRange <- i'rangeMap .^^^ Mp.member paxosId
                         if hasRange
                           then return ()
                           else do
-                            ITC.rangeMap .^^. Mp.insert paxosId range
-                            ITC.tables .^^. Mp.insert range Df.def
+                            i'rangeMap .^^. Mp.insert paxosId range
+                            i'tables .^^. Mp.insert range Df.def
                             return ()
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
     TrM.ClientRequestReceived request -> do
-      ITC.requestMap .^^. at (request ^. CRq.meta . CRq.requestId) ?~ (request ^. CRq.payload)
+      i'requestMap .^^. at (request ^. CRq.meta . CRq.requestId) ?~ (request ^. CRq.payload)
       return $ Right ()
     TrM.ClientResponseSent response -> do
       let requestId = response ^. CRs.meta . CRs.requestId
-      requestPayloadM <- getL $ ITC.requestMap . at requestId
+      requestPayloadM <- getL $ i'requestMap . at requestId
       case requestPayloadM of
         Nothing -> return $ responseNoRequestE response
         Just requestPayload -> do
-          ITC.requestMap .^^. Mp.delete requestId
+          i'requestMap .^^. Mp.delete requestId
           case response ^. CRs.payload of
             CRs.RangeRead responsePayload -> do
               case requestPayload of
                 CRq.RangeRead timestamp -> do
                   -- staticRead ensure the `lat` is beyond `timestamp`
-                  res <- ITC.keySpaceManager .^^^ KSM.staticRead timestamp
+                  res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
                   let ranges = case res of
                                  Nothing -> []
                                  Just (_, _, ranges) -> ranges
@@ -223,7 +246,7 @@ checkMsg msg = do
               case requestPayload of
                 CRq.RangeWrite ranges timestamp -> do
                   -- staticRead ensure the `lat` is beyond `timestamp`
-                  res <- ITC.keySpaceManager .^^^ KSM.staticRead timestamp
+                  res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
                   case res of
                     Just (timestamp', requestId', ranges')
                       | requestId' == requestId -> do
@@ -240,12 +263,12 @@ checkMsg msg = do
             CRs.SlaveRead responsePayload -> do
               case requestPayload of
                 CRq.SlaveRead databaseId tableId key timestamp -> do
-                  res <- ITC.keySpaceManager .^^^ KSM.staticRead timestamp
+                  res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
                   case res of
                     Just (_, _, ranges')
                       | elem (Co.KeySpaceRange databaseId tableId) ranges' -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
-                      res <- ITC.tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MVS.staticRead key timestamp
+                      res <- i'tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MVS.staticRead key timestamp
                       let value = case res of
                                     Nothing -> Nothing
                                     Just (value', _, _) -> Just value'
@@ -258,12 +281,12 @@ checkMsg msg = do
             CRs.SlaveWrite responsePayload -> do
               case requestPayload of
                 CRq.SlaveWrite databaseId tableId key value timestamp -> do
-                  res <- ITC.keySpaceManager .^^^ KSM.staticRead timestamp
+                  res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
                   case res of
                     Just (_, _, ranges')
                       | elem (Co.KeySpaceRange databaseId tableId) ranges' -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
-                      res <- ITC.tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MVS.staticRead key timestamp
+                      res <- i'tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MVS.staticRead key timestamp
                       case res of
                         Just (value', requestId', timestamp')
                           | requestId' == requestId -> do

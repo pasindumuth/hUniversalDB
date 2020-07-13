@@ -1,17 +1,23 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 module Paxos.MultiPaxosInstance (
-  MP.MultiPaxosInstance,
-  MP.constructor,
-  MP.paxosLog,
-  MP.paxosId,
+  MultiPaxosInstance,
+  constructor,
+  paxosLog,
+  paxosId,
   insertMultiPaxos,
   handleMultiPaxos,
 ) where
 
 import qualified Data.Default as Df
+import qualified Data.Map as Mp
+import qualified GHC.Generics as Gn
 import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
-import qualified Paxos.Internal_MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Paxos.PaxosInstance as PI
 import qualified Proto.Actions.Actions as Ac
@@ -23,29 +29,50 @@ import Infra.State
 
 maxRndIncrease = 1000
 
-getPaxosInstance :: PM.IndexT -> ST MP.MultiPaxosInstance PI.PaxosInstance
+data MultiPaxosInstance = MultiPaxosInstance {
+  _i'paxosId :: Co.PaxosId,
+  _i'paxosInstances :: Mp.Map PM.IndexT PI.PaxosInstance,
+  _i'paxosLog :: PL.PaxosLog
+} deriving (Gn.Generic, Show)
+
+makeLenses ''MultiPaxosInstance
+
+constructor :: Co.PaxosId -> MultiPaxosInstance
+constructor paxosId = MultiPaxosInstance {
+  _i'paxosId = paxosId,
+  _i'paxosInstances = Df.def,
+  _i'paxosLog = Df.def
+}
+
+paxosId :: Lens' MultiPaxosInstance Co.PaxosId
+paxosId = i'paxosId
+
+paxosLog :: Lens' MultiPaxosInstance PL.PaxosLog
+paxosLog = i'paxosLog
+
+getPaxosInstance :: PM.IndexT -> ST MultiPaxosInstance PI.PaxosInstance
 getPaxosInstance index = do
-  pIM <- getL $ MP.paxosInstances . at index
+  pIM <- getL $ i'paxosInstances . at index
   case pIM of
     Just paxosInstance -> return paxosInstance
     Nothing -> do
       let paxosInstance = Df.def :: PI.PaxosInstance
-      id .^^. MP.paxosInstances . at index ?~ paxosInstance
+      id .^^. i'paxosInstances . at index ?~ paxosInstance
       return paxosInstance
 
 insertMultiPaxos
   :: [Co.EndpointId]
   -> PM.PaxosLogEntry
   -> (PM.MultiPaxosMessage -> Ms.Message)
-  -> ST (MP.MultiPaxosInstance, Rn.StdGen) ()
+  -> ST (MultiPaxosInstance, Rn.StdGen) ()
 insertMultiPaxos slaveEIds entry msgWrapper = do
   r <- _2 .^^ Rn.randomR (1, maxRndIncrease)
-  index <- _1.MP.paxosLog .^^^ PL.nextAvailableIndex
+  index <- _1.i'paxosLog .^^^ PL.nextAvailableIndex
   paxosInstance <- _1 .^ getPaxosInstance index
   let nextRnd = case PI.maxProposalM paxosInstance of
                  Just (rnd, _) -> rnd + r
                  Nothing -> r
-  action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos $ PM.Propose nextRnd entry)
+  action <- _1 . i'paxosInstances . ix index .^* (PI.handlePaxos $ PM.Propose nextRnd entry)
   case action of
     PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
     _ -> U.caseError
@@ -55,14 +82,14 @@ handleMultiPaxos
   -> [Co.EndpointId]
   -> PM.MultiPaxosMessage
   -> (PM.MultiPaxosMessage -> Ms.Message)
-  -> ST (MP.MultiPaxosInstance, Rn.StdGen) ()
+  -> ST (MultiPaxosInstance, Rn.StdGen) ()
 handleMultiPaxos fromEId slaveEIds (PM.PaxosMessage index pMsg) msgWrapper = do
   _1 .^ getPaxosInstance index
-  action <- _1 . MP.paxosInstances . ix index .^* (PI.handlePaxos pMsg)
+  action <- _1 . i'paxosInstances . ix index .^* (PI.handlePaxos pMsg)
   case action of
     PI.Reply paxosMessage -> addA $ Ac.Send [fromEId] $ msgWrapper $ PM.PaxosMessage index paxosMessage
     PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
     PI.Choose chosenValue -> do
-      _1.MP.paxosLog .^^. (PL.insert index chosenValue)
+      _1.i'paxosLog .^^. (PL.insert index chosenValue)
       return ()
     _ -> return ()
