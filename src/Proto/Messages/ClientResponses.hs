@@ -9,6 +9,7 @@ import qualified Data.Binary as Bn
 import qualified GHC.Generics as Gn
 
 import qualified Proto.Common as Co
+import qualified Proto.Messages.ClientResponses.CreateDatabase as CRsCD
 import qualified Proto.Messages.ClientResponses.RangeRead as CRsRR
 import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
 import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
@@ -20,6 +21,7 @@ data Meta = Meta {
 } deriving (Gn.Generic, Bn.Binary, Show)
 
 data Payload =
+  CreateDatabase CRsCD.CreateDatabase |
   RangeRead CRsRR.RangeRead |
   RangeWrite CRsRW.RangeWrite |
   SlaveRead CRsSR.SlaveRead |

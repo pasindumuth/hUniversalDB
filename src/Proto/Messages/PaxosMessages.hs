@@ -33,13 +33,22 @@ data Slave_Entry =
     ranges :: [Co.KeySpaceRange] }
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
+data Master_Entry =
+  CreateDatabase {
+    requestId :: Co.RequestId,
+    databaseId :: Co.DatabaseId,
+    tableId :: Co.TableId,
+    timestamp :: Co.Timestamp }
+  deriving (Gn.Generic, Bn.Binary, Show, Eq)
+
 -- TODO: maybe it's better to namespace these PaxosLogEntries,
 -- since we have Tablet and Slave in TraceMessages which are there
 -- precisely to differentiate between different paxos logs for when
 -- we reconstruct data from the trace messages for testing.
 data PaxosLogEntry =
   Tablet Tablet_Entry |
-  Slave Slave_Entry
+  Slave Slave_Entry |
+  Master Master_Entry
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
 type IndexT = Int

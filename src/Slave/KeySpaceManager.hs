@@ -31,7 +31,10 @@ makeLenses ''KeySpaceManager
 
 -- Add a read and write operation here, and use asserts. Make it safe.
 -- Then, use this during testing. We don't need to test this itself, I guess.
-read :: Int -> KeySpaceManager -> (Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange]), KeySpaceManager)
+read
+  :: Int
+  -> KeySpaceManager
+  -> (Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange]), KeySpaceManager)
 read timestamp keySpaceManager =
   let version = case dropWhile (\v -> (v ^. _1) > timestamp) (keySpaceManager ^. i'versions) of
                   [] -> Nothing
@@ -41,14 +44,22 @@ read timestamp keySpaceManager =
 staticReadLat :: KeySpaceManager -> Int
 staticReadLat keySpaceManager = keySpaceManager ^. i'lat
 
-staticRead :: Int -> KeySpaceManager -> Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange])
+staticRead
+  :: Int
+  -> KeySpaceManager
+  -> Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange])
 staticRead timestamp keySpaceManager =
   Ex.assert (timestamp <= (keySpaceManager ^. i'lat)) $
   case dropWhile (\v -> (v ^. _1) > timestamp) (keySpaceManager ^. i'versions) of
     [] -> Nothing
     (version:_) -> Just version
 
-write :: Co.Timestamp -> Co.RequestId -> [Co.KeySpaceRange] -> KeySpaceManager -> ((), KeySpaceManager)
+write
+  :: Co.Timestamp
+  -> Co.RequestId
+  -> [Co.KeySpaceRange]
+  -> KeySpaceManager
+  -> ((), KeySpaceManager)
 write timestamp requestId ranges keySpaceManager =
   Ex.assert (timestamp > (keySpaceManager ^. i'lat)) $
   ((), keySpaceManager & i'lat .~ timestamp

@@ -40,8 +40,6 @@ handlingState =
     TS.env.En.rand,
     TS.env.En.slaveEIds))
 
-pastWriteAttempt = "Attempting to write into the past."
-
 handleInputAction
   :: Ac.TabletInputAction
   -> ST TS.TabletState ()
@@ -51,7 +49,7 @@ handleInputAction iAction = do
     Ac.TabletReceive eId tabletMsg ->
       case tabletMsg of
         TM.ForwardedClientRequest request -> do
-          handlingState .^ (PTM.handleTask $ createClientTask keySpaceRange eId request)
+          handlingState .^ (PTM.handleTask $ clientTask keySpaceRange eId request)
         TM.MultiPaxosMessage multiPaxosMsg -> do
           pl <- getL $ TS.multiPaxosInstance.MP.paxosLog
           slaveEIds <- getL $ TS.env.En.slaveEIds
@@ -68,12 +66,12 @@ handleInputAction iAction = do
     Ac.TabletRetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
-createClientTask
+clientTask
   :: Co.KeySpaceRange
   -> Co.EndpointId
   -> TM.ClientRequest
   -> Ta.Task DS.DerivedState
-createClientTask keySpaceRange eId request =
+clientTask keySpaceRange eId request =
   let description = show (eId, request)
       requestId = request ^. TM.meta.TM.requestId
   in case request ^. TM.payload of

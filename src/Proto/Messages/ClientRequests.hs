@@ -32,7 +32,11 @@ data Payload =
     tableId :: Co.TableId,
     key :: String,
     value :: String,
-    timestamp :: Int }
+    timestamp :: Int } |
+  CreateDatabase {
+    databaseId :: Co.DatabaseId,
+    tableId :: Co.TableId,
+    timestamp :: Co.Timestamp }
   deriving (Gn.Generic, Bn.Binary, Show)
 
 data ClientRequest = ClientRequest {

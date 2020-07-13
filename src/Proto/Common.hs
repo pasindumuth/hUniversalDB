@@ -27,8 +27,8 @@ type ErrorMsg = String
 type UID = String
 
 data KeySpaceRange = KeySpaceRange {
-  databaseId :: DatabaseId,
-  tableId :: TableId
+  _databaseId :: DatabaseId,
+  _tableId :: TableId
 } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
 
 makeLenses ''KeySpaceRange
@@ -36,8 +36,8 @@ makeLenses ''KeySpaceRange
 type KeySpace = [KeySpaceRange]
 
 data NewKeySpace = NewKeySpace {
-  oldKeySpace :: KeySpace,
-  newKeySpace :: KeySpace
+  _oldKeySpace :: KeySpace,
+  _newKeySpace :: KeySpace
 } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
 
 makeLenses ''NewKeySpace

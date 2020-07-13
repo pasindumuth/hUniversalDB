@@ -64,20 +64,21 @@ handleInputAction iAction =
           case request ^. CRq.payload of
             CRq.RangeRead timestamp -> do
               let description = show (eId, request)
-                  task = createRangeReadTask eId requestId timestamp description
+                  task = rangeReadTask eId requestId timestamp description
               handlingState .^ (PTM.handleTask task)
             CRq.RangeWrite ranges timestamp -> do
               let description = show (eId, request)
-                  task = createRangeWriteTask eId requestId ranges timestamp description
+                  task = rangeWriteTask eId requestId ranges timestamp description
               handlingState .^ (PTM.handleTask task)
             CRq.SlaveRead databaseId tableId key timestamp -> do
               let description = show (eId, request)
-                  task = createSlaveReadTask eId requestId (databaseId, tableId) key timestamp description
+                  task = slaveReadTask eId requestId (databaseId, tableId) key timestamp description
               handlingState .^ (PTM.handleTask task)
             CRq.SlaveWrite databaseId tableId key value timestamp -> do
               let description = show (eId, request)
-                  task = createSlaveWriteTask eId requestId (databaseId, tableId) key value timestamp description
+                  task = slaveWriteTask eId requestId (databaseId, tableId) key value timestamp description
               handlingState .^ (PTM.handleTask task)
+            _ -> U.caseError
         Ms.SlaveMessage slaveMsg ->
           case slaveMsg of
             SM.MultiPaxosMessage multiPaxosMsg -> do
@@ -102,13 +103,13 @@ handleInputAction iAction =
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
-createRangeReadTask
+rangeReadTask
   :: Co.EndpointId
   -> Co.RequestId
   -> Co.Timestamp
   -> String
   -> Ta.Task DS.DerivedState
-createRangeReadTask eId requestId timestamp description =
+rangeReadTask eId requestId timestamp description =
   let tryHandling derivedState = do
         let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
@@ -130,14 +131,14 @@ createRangeReadTask eId requestId timestamp description =
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper
 
-createRangeWriteTask
+rangeWriteTask
   :: Co.EndpointId
   -> Co.RequestId
   -> [Co.KeySpaceRange]
   -> Co.Timestamp
   -> String
   -> Ta.Task DS.DerivedState
-createRangeWriteTask eId requestId ranges timestamp description =
+rangeWriteTask eId requestId ranges timestamp description =
   let tryHandling derivedState = do
         let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
@@ -167,7 +168,7 @@ createRangeWriteTask eId requestId ranges timestamp description =
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper
 
-createSlaveReadTask
+slaveReadTask
   :: Co.EndpointId
   -> Co.RequestId
   -> (Co.DatabaseId, Co.TableId)
@@ -175,7 +176,7 @@ createSlaveReadTask
   -> Co.Timestamp
   -> String
   -> Ta.Task DS.DerivedState
-createSlaveReadTask eId requestId (databaseId, tableId) key timestamp description =
+slaveReadTask eId requestId (databaseId, tableId) key timestamp description =
   let tryHandling derivedState = do
         let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
@@ -203,7 +204,7 @@ createSlaveReadTask eId requestId (databaseId, tableId) key timestamp descriptio
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper
 
-createSlaveWriteTask
+slaveWriteTask
   :: Co.EndpointId
   -> Co.RequestId
   -> (Co.DatabaseId, Co.TableId)
@@ -212,7 +213,7 @@ createSlaveWriteTask
   -> Co.Timestamp
   -> String
   -> Ta.Task DS.DerivedState
-createSlaveWriteTask eId requestId (databaseId, tableId) key value timestamp description =
+slaveWriteTask eId requestId (databaseId, tableId) key value timestamp description =
   let tryHandling derivedState = do
         let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp

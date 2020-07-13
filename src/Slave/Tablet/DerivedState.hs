@@ -31,7 +31,11 @@ makeLenses ''DerivedState
 kvStore :: Lens' DerivedState MVS.MultiVersionKVStore
 kvStore = i'kvStore
 
-handleDerivedState :: Co.PaxosId -> PL.PaxosLog -> PL.PaxosLog -> ST DerivedState ()
+handleDerivedState
+  :: Co.PaxosId
+  -> PL.PaxosLog
+  -> PL.PaxosLog
+  -> ST DerivedState ()
 handleDerivedState paxosId pl pl' = do
   Mo.forM_ (PL.newlyAddedEntries pl pl') $ \(index, plEntry) -> do
     trace $ TrM.PaxosInsertion paxosId index plEntry
