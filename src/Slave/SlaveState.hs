@@ -13,7 +13,7 @@ import qualified System.Random as Rn
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.Tasks.PaxosTaskManager as PTM
 import qualified Proto.Common as Co
-import qualified Slave.Internal_DerivedState as DS
+import qualified Slave.DerivedState as DS
 import qualified Slave.Env as En
 import Infra.Lens
 

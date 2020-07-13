@@ -14,7 +14,7 @@ import qualified Proto.Common as Co
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.Tasks.PaxosTaskManager as PTM
 import qualified Proto.Common as Co
-import qualified Slave.Tablet.Internal_DerivedState as DS
+import qualified Slave.Tablet.DerivedState as DS
 import qualified Slave.Tablet.Env as En
 import Infra.Lens
 

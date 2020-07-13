@@ -1,6 +1,5 @@
 module Slave.SlaveInputHandler where
 
-import qualified Data.Hash.MD5 as MD5
 import qualified Data.List as Li
 import qualified Data.Set as St
 import qualified System.Random as Rn
@@ -26,7 +25,7 @@ import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.DerivedState as DS
 import qualified Slave.Env as En
 import qualified Slave.SlaveState as SS
-import qualified Slave.Internal_DerivedState as IDS
+import qualified Slave.DerivedState as DS
 import qualified Slave.KeySpaceManager as KSM
 import Infra.Lens
 import Infra.State
@@ -95,7 +94,7 @@ handleInputAction iAction =
                   handlingState .^ PTM.handleInsert
                 else return ()
         Ms.TabletMessage keySpaceRange tabletMsg -> do
-          ranges <- SS.derivedState.IDS.keySpaceManager .^^^ KSM.allRanges
+          ranges <- SS.derivedState.DS.keySpaceManager .^^^ KSM.allRanges
           if St.member keySpaceRange ranges
             then addA $ Ac.TabletForward keySpaceRange eId tabletMsg
             else return ()
@@ -111,14 +110,14 @@ createRangeReadTask
   -> Ta.Task DS.DerivedState
 createRangeReadTask eId requestId timestamp description =
   let tryHandling derivedState = do
-        let lat = KSM.staticReadLat $ derivedState ^. IDS.keySpaceManager
+        let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
           then return False
           else do
             done derivedState
             return True
       done derivedState = do
-        let ranges = getRanges timestamp $ derivedState ^. IDS.keySpaceManager
+        let ranges = getRanges timestamp $ derivedState ^. DS.keySpaceManager
             response =
               CRs.ClientResponse
                 (CRs.Meta requestId)
@@ -140,12 +139,12 @@ createRangeWriteTask
   -> Ta.Task DS.DerivedState
 createRangeWriteTask eId requestId ranges timestamp description =
   let tryHandling derivedState = do
-        let lat = KSM.staticReadLat $ derivedState ^. IDS.keySpaceManager
+        let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
           then return False
           else do
             let response =
-                  case (KSM.staticRead timestamp $ derivedState ^. IDS.keySpaceManager) of
+                  case (KSM.staticRead timestamp $ derivedState ^. DS.keySpaceManager) of
                     Just (_, requestId', _) | requestId' == requestId ->
                       CRs.ClientResponse
                         (CRs.Meta requestId)
@@ -178,14 +177,14 @@ createSlaveReadTask
   -> Ta.Task DS.DerivedState
 createSlaveReadTask eId requestId (databaseId, tableId) key timestamp description =
   let tryHandling derivedState = do
-        let lat = KSM.staticReadLat $ derivedState ^. IDS.keySpaceManager
+        let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
           then return False
           else do
             done derivedState
             return True
       done derivedState = do
-        let ranges = getRanges timestamp $ derivedState ^. IDS.keySpaceManager
+        let ranges = getRanges timestamp $ derivedState ^. DS.keySpaceManager
             range = Co.KeySpaceRange databaseId tableId
         if elem range ranges
           then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest $
@@ -215,14 +214,14 @@ createSlaveWriteTask
   -> Ta.Task DS.DerivedState
 createSlaveWriteTask eId requestId (databaseId, tableId) key value timestamp description =
   let tryHandling derivedState = do
-        let lat = KSM.staticReadLat $ derivedState ^. IDS.keySpaceManager
+        let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
           then return False
           else do
             done derivedState
             return True
       done derivedState = do
-        let ranges = getRanges timestamp $ derivedState ^. IDS.keySpaceManager
+        let ranges = getRanges timestamp $ derivedState ^. DS.keySpaceManager
             range = Co.KeySpaceRange databaseId tableId
         if elem range ranges
           then addA $ Ac.TabletForward range eId $ TM.ForwardedClientRequest $

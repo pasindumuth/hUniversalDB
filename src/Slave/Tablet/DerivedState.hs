@@ -1,5 +1,6 @@
 module Slave.Tablet.DerivedState (
   DS.DerivedState,
+  DS.kvStore,
   handleDerivedState
 ) where
 
@@ -11,7 +12,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.Internal_DerivedState as DS
-import qualified Slave.Tablet.MultiVersionKVStore as MS
+import qualified Slave.Tablet.MultiVersionKVStore as MVS
 import Infra.State
 
 handleDerivedState :: Co.PaxosId -> PL.PaxosLog -> PL.PaxosLog -> ST DS.DerivedState ()
@@ -22,8 +23,8 @@ handleDerivedState paxosId pl pl' = do
       PM.Tablet tabletEntry ->
         case tabletEntry of
           PM.Read _ key timestamp -> do
-            DS.kvStore .^^ MS.read key timestamp
+            DS.kvStore .^^ MVS.read key timestamp
             return ()
           PM.Write requestId key value timestamp -> do
-            DS.kvStore .^^ MS.write key requestId value timestamp
+            DS.kvStore .^^ MVS.write key requestId value timestamp
       _ -> U.caseError

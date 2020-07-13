@@ -22,8 +22,8 @@ import qualified Proto.Messages.ClientResponses.SlaveWrite as CRsSW
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TabletMessages as TM
 import qualified Proto.Messages.TraceMessages as TrM
-import qualified Slave.Tablet.MultiVersionKVStore as MS
-import qualified Slave.Tablet.Internal_DerivedState as DS
+import qualified Slave.Tablet.MultiVersionKVStore as MVS
+import qualified Slave.Tablet.DerivedState as DS
 import qualified Slave.Tablet.TabletState as TS
 
 handlingState :: Lens' TS.TabletState (
@@ -80,13 +80,13 @@ createClientTask keySpaceRange eId request =
     TM.TabletRead key timestamp ->
       let description = description
           tryHandling derivedState = do
-            case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
+            case (derivedState ^. DS.kvStore) & MVS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 done derivedState
                 return True
               _ -> return False
           done derivedState = do
-            let value = case (derivedState ^. DS.kvStore) &  MS.staticRead key timestamp of
+            let value = case (derivedState ^. DS.kvStore) &  MVS.staticRead key timestamp of
                           Just (value, _, _) -> Just value
                           Nothing -> Nothing
                 response =
@@ -102,10 +102,10 @@ createClientTask keySpaceRange eId request =
     TM.TabletWrite key value timestamp ->
       let description = description
           tryHandling derivedState = do
-            case (derivedState ^. DS.kvStore) & MS.staticReadLat key of
+            case (derivedState ^. DS.kvStore) & MVS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 let response =
-                      case (derivedState ^. DS.kvStore) & MS.staticRead key timestamp of
+                      case (derivedState ^. DS.kvStore) & MVS.staticRead key timestamp of
                         Just (_, requestId', _) | requestId' == requestId ->
                           CRs.ClientResponse
                             (CRs.Meta requestId)

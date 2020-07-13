@@ -8,11 +8,11 @@ module Slave.Tablet.Internal_DerivedState where
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
-import qualified Slave.Tablet.Internal_MultiVersionKVStore as MS
+import qualified Slave.Tablet.MultiVersionKVStore as MVS
 import Infra.Lens
 
 data DerivedState = DerivedState {
-  _kvStore :: MS.MultiVersionKVStore
+  _kvStore :: MVS.MultiVersionKVStore
 } deriving (Gn.Generic, Df.Default, Show)
 
 makeLenses ''DerivedState

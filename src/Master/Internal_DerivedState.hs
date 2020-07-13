@@ -10,8 +10,8 @@ import qualified Data.Map as Mp
 import qualified GHC.Generics as Gn
 
 import qualified Proto.Common as Co
-import qualified Master.Internal_SlaveGroupRanges as SGR
-import qualified Master.Internal_NetworkTask as NT
+import qualified Master.SlaveGroupRanges as SGR
+import qualified Master.NetworkTask as NT
 import Infra.Lens
 
 data DerivedState = DerivedState {

@@ -1,5 +1,6 @@
 module Slave.DerivedState (
   IDS.DerivedState,
+  IDS.keySpaceManager,
   handleDerivedState
 ) where
 

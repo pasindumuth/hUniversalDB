@@ -17,7 +17,7 @@ import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.TraceMessages as TrM
 import qualified Proto.Common as Co
 import qualified Slave.KeySpaceManager as KSM
-import qualified Slave.Tablet.MultiVersionKVStore as MS
+import qualified Slave.Tablet.MultiVersionKVStore as MVS
 import qualified Internal_TraceChecker as ITC
 import Infra.Lens
 import Infra.State
@@ -136,7 +136,7 @@ checkMsg msg = do
                       | (Co.KeySpaceRange databaseId' tableId') == range &&
                         key' == key &&
                         timestamp' == timestamp -> do
-                      ITC.tables . ix range .^^* MS.read key timestamp
+                      ITC.tables . ix range .^^* MVS.read key timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
             PM.Write requestId key value timestamp -> do
@@ -150,7 +150,7 @@ checkMsg msg = do
                         key' == key &&
                         value' == value &&
                         timestamp' == timestamp -> do
-                      ITC.tables . ix range .^^* MS.write key value requestId timestamp
+                      ITC.tables . ix range .^^* MVS.write key value requestId timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
         PM.Slave entry ->
@@ -245,7 +245,7 @@ checkMsg msg = do
                     Just (_, _, ranges')
                       | elem (Co.KeySpaceRange databaseId tableId) ranges' -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
-                      res <- ITC.tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MS.staticRead key timestamp
+                      res <- ITC.tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MVS.staticRead key timestamp
                       let value = case res of
                                     Nothing -> Nothing
                                     Just (value', _, _) -> Just value'
@@ -263,7 +263,7 @@ checkMsg msg = do
                     Just (_, _, ranges')
                       | elem (Co.KeySpaceRange databaseId tableId) ranges' -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
-                      res <- ITC.tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MS.staticRead key timestamp
+                      res <- ITC.tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MVS.staticRead key timestamp
                       case res of
                         Just (value', requestId', timestamp')
                           | requestId' == requestId -> do
