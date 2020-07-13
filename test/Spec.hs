@@ -153,6 +153,8 @@ test3 = do
   SM.simulateAll
   Tt.clientState .^ analyzeResponses
 
+-- TODO: maybe we should take statistics on insertion retries. This will help
+-- verify PaxosTaskManager and it will help us understand wasted cycles.
 test4 :: ST Tt.TestState ()
 test4 = do
   Mo.forM_ [1..50] $

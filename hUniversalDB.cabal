@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 141ff4d52aa456b700da700ab42c7ec20ec63ddf6f76705bbd30db2b4e92a3b7
+-- hash: 9856b5dfbf69634beb4fcaa905502f9081029244f72fae59680b5ab0ac9914bc
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -32,6 +32,14 @@ library
       Infra.Logging
       Infra.State
       Infra.Utils
+      Master.DerivedState
+      Master.Env
+      Master.Internal_DerivedState
+      Master.Internal_NetworkTask
+      Master.Internal_SlaveGroupRanges
+      Master.MasterInputHandler
+      Master.MasterState
+      Master.NetworkTask
       Net.Connections
       Paxos.Internal_MultiPaxosInstance
       Paxos.Internal_PaxosInstance

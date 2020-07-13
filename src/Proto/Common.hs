@@ -11,6 +11,7 @@ import qualified GHC.Generics as Gn
 
 import Infra.Lens
 
+type SlaveGroupId = String
 type EndpointId = String
 type PaxosId = String
 
@@ -23,6 +24,7 @@ type Key = String
 type Value = String
 
 type ErrorMsg = String
+type UID = String
 
 data KeySpaceRange = KeySpaceRange {
   databaseId :: DatabaseId,
@@ -30,3 +32,12 @@ data KeySpaceRange = KeySpaceRange {
 } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
 
 makeLenses ''KeySpaceRange
+
+type KeySpace = [KeySpaceRange]
+
+data NewKeySpace = NewKeySpace {
+  oldKeySpace :: KeySpace,
+  newKeySpace :: KeySpace
+} deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
+
+makeLenses ''NewKeySpace

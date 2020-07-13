@@ -59,12 +59,8 @@ handleInputAction iAction =
   case iAction of
     Ac.Receive eId msg ->
       case msg of
-        Ms.ClientRequest rawRequest -> do
-          -- We consider the hash of the whole request (including the requestId) to be the *real*
-          -- requestId of the request. This ensures that if the requestId of two requests are the
-          -- same, their payloads are for-sure the same as well.
-          let requestId = MD5.md5s $ MD5.Str (show rawRequest)
-          let request = rawRequest & CRq.meta . CRq.requestId .~ requestId
+        Ms.ClientRequest request -> do
+          let requestId = request ^. CRq.meta .CRq.requestId
           trace $ TrM.ClientRequestReceived request
           case request ^. CRq.payload of
             CRq.RangeRead timestamp -> do
