@@ -1,6 +1,7 @@
 module Master.MasterInputHandler where
 
 import qualified Data.Map as Mp
+import qualified Data.Maybe as Mb
 import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
@@ -83,28 +84,23 @@ createDatabaseTask
   -> Ta.Task DS.DerivedState
 createDatabaseTask eId requestId databaseId tableId timestamp description =
   let keySpaceRange = Co.KeySpaceRange databaseId tableId
+      sendResponse responseValue = do
+        let response =
+              CRs.ClientResponse
+                (CRs.Meta requestId)
+                (CRs.CreateDatabase responseValue)
+        trace $ TrM.ClientResponseSent response
+        addA $ Ac.Send [eId] $ Ms.ClientResponse response
       tryHandling derivedState = do
         let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
         if timestamp <= lat
           then do
-            let response =
-                  CRs.ClientResponse
-                    (CRs.Meta requestId)
-                    (CRs.CreateDatabase CRsCD.BackwardsWrite)
-            trace $ TrM.ClientResponseSent response
-            addA $ Ac.Send [eId] $ Ms.ClientResponse response
+            sendResponse CRsCD.BackwardsWrite
             return True
           else do
             let latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
-                exists =
-                  U.s31 Mp.foldl False latestValues $ \exists value ->
-                    if exists
-                      then exists
-                      else
-                        case value of
-                          Just (_, SGR.Old keySpace) -> elem keySpaceRange keySpace
-                          _ -> False
-            if exists
+                exists = DS.rangeExists keySpaceRange latestValues
+            if Mb.isJust exists
               -- We return False so that the entry the PL entry can be inserted, which
               -- will then update the lat before sending back AlreadyExists.
               then return False
@@ -119,55 +115,21 @@ createDatabaseTask eId requestId databaseId tableId timestamp description =
                                 elem keySpaceRange (newKeySpace ^. Co.oldKeySpace) ||
                                 elem keySpaceRange (newKeySpace ^. Co.newKeySpace)
                               _ -> False
-                    existsFreeGroup =
-                      U.s31 Mp.foldl False latestValues $ \existsFreeGroup value ->
-                        if existsFreeGroup
-                          then existsFreeGroup
-                          else
-                            case value of
-                              Just (_, SGR.Old _) -> True
-                              Nothing -> True
-                              _ -> False
-                if maybeExists || not existsFreeGroup
+                    freeGroupM = DS.findFreeGroupM latestValues
+                if maybeExists || Mb.isNothing freeGroupM
                   then do
-                    let response =
-                          CRs.ClientResponse
-                            (CRs.Meta requestId)
-                            (CRs.CreateDatabase CRsCD.NothingChanged)
-                    trace $ TrM.ClientResponseSent response
-                    addA $ Ac.Send [eId] $ Ms.ClientResponse response
+                    sendResponse CRsCD.NothingChanged
                     return True
                   else return False
       done derivedState = do
         let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
             latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
-            exists =
-              U.s31 Mp.foldl False latestValues $ \exists value ->
-                if exists
-                  then exists
-                  else
-                    case value of
-                      Just (_, SGR.Old keySpace) -> elem keySpaceRange keySpace
-                      _ -> False
-        if exists
-          then do
-            let response =
-                  CRs.ClientResponse
-                    (CRs.Meta requestId)
-                    (CRs.CreateDatabase CRsCD.AlreadyExists)
-            trace $ TrM.ClientResponseSent response
-            addA $ Ac.Send [eId] $ Ms.ClientResponse response
+            exists = DS.rangeExists keySpaceRange latestValues
+        if Mb.isJust exists
+          then sendResponse CRsCD.AlreadyExists
           else do
             -- The only reason we can be here is if we can go ahead and finish the creation
-            let freeGroupM =
-                  U.s31 Mp.foldlWithKey Nothing latestValues $ \freeGroupM slaveGroupId value ->
-                    case freeGroupM of
-                      Just freeGroup -> Just freeGroup
-                      Nothing ->
-                        case value of
-                          Just (_, SGR.Old _) -> Just slaveGroupId
-                          Nothing -> Just slaveGroupId
-                          _ -> Nothing
+            let freeGroupM = DS.findFreeGroupM latestValues
             case freeGroupM of
               Just slaveGroupId -> do
                 -- TODO: do this

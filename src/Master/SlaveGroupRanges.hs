@@ -84,15 +84,17 @@ write
   -> ((), SlaveGroupRanges)
 write timestamp newKeySpaces s =
   Ex.assert (timestamp > s ^. i'lat) $
-  let s' = U.s31 Mp.foldlWithKey s newKeySpaces $ \s slaveGroupId keySpace ->
-             case Mp.lookup slaveGroupId (s ^. i'ranges) of
-               Just versions ->
-                 let newKeySpace = case versions of
-                                     ((timestamp', New _):_) -> Ex.assert False (Co.NewKeySpace [] [])
-                                     ((timestamp', Old oldKeySpace):_) -> Co.NewKeySpace oldKeySpace keySpace
-                                     [] -> Co.NewKeySpace [] keySpace
-                 in s & i'ranges . at slaveGroupId ?~ (timestamp, New newKeySpace):versions
-               Nothing -> Ex.assert False s
+  let s' =
+        U.s31 Mp.foldlWithKey s newKeySpaces $ \s slaveGroupId keySpace ->
+          case Mp.lookup slaveGroupId (s ^. i'ranges) of
+            Just versions ->
+              let newKeySpace =
+                    case versions of
+                      ((timestamp', New _):_) -> Ex.assert False (Co.NewKeySpace [] [])
+                      ((timestamp', Old oldKeySpace):_) -> Co.NewKeySpace oldKeySpace keySpace
+                      [] -> Co.NewKeySpace [] keySpace
+              in s & i'ranges . at slaveGroupId ?~ (timestamp, New newKeySpace):versions
+            Nothing -> Ex.assert False s
   in ((), s' & i'lat .~ timestamp)
 
 pick
@@ -103,9 +105,10 @@ pick
 pick slaveGroupId choice s =
   case Mp.lookup slaveGroupId (s ^. i'ranges) of
     Just ((timestamp', New (Co.NewKeySpace newKeySpace oldKeySpace)):rest) ->
-      let keySpace = case choice of
-                       NewChoice -> newKeySpace
-                       OldChoice -> oldKeySpace
+      let keySpace =
+            case choice of
+              NewChoice -> newKeySpace
+              OldChoice -> oldKeySpace
           s' = s & i'ranges . at slaveGroupId ?~ (timestamp', Old keySpace):rest
       in ((), s')
     _ -> Ex.assert False ((), s)
