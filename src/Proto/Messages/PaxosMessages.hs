@@ -38,7 +38,13 @@ data Master_Entry =
     requestId :: Co.RequestId,
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId,
-    timestamp :: Co.Timestamp }
+    timestamp :: Co.Timestamp,
+    eId :: Co.EndpointId,
+    uid :: Co.UID } |
+  PickKeySpace {
+    slaveGroupId :: Co.SlaveGroupId,
+    choice :: Co.Choice,
+    uid :: Co.UID }
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
 -- TODO: maybe it's better to namespace these PaxosLogEntries,

@@ -5,6 +5,11 @@ import qualified Data.Maybe as Mb
 import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
+import qualified Master.DerivedState as DS
+import qualified Master.Env as En
+import qualified Master.MasterState as MS
+import qualified Master.SlaveGroupRanges as SGR
+import qualified Master.NetworkTaskManager as NTM
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Paxos.Tasks.PaxosTaskManager as PTM
@@ -18,10 +23,6 @@ import qualified Proto.Messages.ClientResponses.CreateDatabase as CRsCD
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.SlaveMessages as SM
 import qualified Proto.Messages.TraceMessages as TrM
-import qualified Master.DerivedState as DS
-import qualified Master.Env as En
-import qualified Master.MasterState as MS
-import qualified Master.SlaveGroupRanges as SGR
 import Infra.Lens
 import Infra.State
 
@@ -40,19 +41,20 @@ handlingState =
     MS.env.En.slaveEIds))
 
 handleInputAction
-  :: Ac.InputAction
+  :: Ac.MasterInputAction
   -> ST MS.MasterState ()
 handleInputAction iAction =
   case iAction of
-    Ac.Receive eId msg ->
+    Ac.MasterReceive eId msg ->
       case msg of
         Ms.ClientRequest request -> do
           let requestId = request ^. CRq.meta .CRq.requestId
           trace $ TrM.ClientRequestReceived request
           case request ^. CRq.payload of
             CRq.CreateDatabase databaseId tableId timestamp -> do
+              uid <- MS.env . En.rand .^^ U.mkUID
               let description = show (eId, request)
-                  task = createDatabaseTask eId requestId databaseId tableId timestamp description
+                  task = createDatabaseTask eId requestId databaseId tableId timestamp description uid
               handlingState .^ (PTM.handleTask task)
             _ -> U.caseError
         Ms.SlaveMessage slaveMsg ->
@@ -71,8 +73,14 @@ handleInputAction iAction =
                   handlingState .^ PTM.handleInsert
                 else return ()
         _ -> U.caseError
-    Ac.RetryInput counterValue ->
+    Ac.MasterRetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
+    Ac.PerformInput uid -> do
+      taskManager <- getL $ MS.derivedState . DS.networkTaskManager
+      slaveGroupRanges <- getL $ MS.derivedState . DS.slaveGroupRanges
+      lp0 .^ NTM.performTask uid taskManager slaveGroupRanges
+      return ()
+
 
 createDatabaseTask
   :: Co.EndpointId
@@ -81,8 +89,9 @@ createDatabaseTask
   -> Co.TableId
   -> Co.Timestamp
   -> String
+  -> Co.UID
   -> Ta.Task DS.DerivedState
-createDatabaseTask eId requestId databaseId tableId timestamp description =
+createDatabaseTask eId requestId databaseId tableId timestamp description uid =
   let keySpaceRange = Co.KeySpaceRange databaseId tableId
       sendResponse responseValue = do
         let response =
@@ -111,9 +120,9 @@ createDatabaseTask eId requestId databaseId tableId timestamp description =
                           then maybeExists
                           else
                             case value of
-                              Just (_, SGR.New newKeySpace) ->
-                                elem keySpaceRange (newKeySpace ^. Co.oldKeySpace) ||
-                                elem keySpaceRange (newKeySpace ^. Co.newKeySpace)
+                              Just (_, SGR.Changing changingKeySpace) ->
+                                elem keySpaceRange (changingKeySpace ^. Co.oldKeySpace) ||
+                                elem keySpaceRange (changingKeySpace ^. Co.newKeySpace)
                               _ -> False
                     freeGroupM = DS.findFreeGroupM latestValues
                 if maybeExists || Mb.isNothing freeGroupM
@@ -132,10 +141,10 @@ createDatabaseTask eId requestId databaseId tableId timestamp description =
             let freeGroupM = DS.findFreeGroupM latestValues
             case freeGroupM of
               Just slaveGroupId -> do
-                -- TODO: do this
+                NTM.performTask uid (derivedState ^. DS.networkTaskManager) (derivedState ^. DS.slaveGroupRanges)
                 return ()
               Nothing -> U.caseError
       createPLEntry derivedState =
-        PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp
+        PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp eId uid
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper

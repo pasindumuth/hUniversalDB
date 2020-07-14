@@ -8,6 +8,7 @@ module Master.SlaveGroupRanges (
   Value(..),
   Master.SlaveGroupRanges.read,
   staticReadLat,
+  staticRead,
   staticReadAll,
   write,
   pick
@@ -22,19 +23,26 @@ import qualified Infra.Utils as U
 import qualified Proto.Common as Co
 import Infra.Lens
 
-data Choice = NewChoice | OldChoice
-
 data Value =
-  New Co.NewKeySpace |
+  Changing Co.ChangingKeySpace |
   Old Co.KeySpace
   deriving (Show)
 
 data SlaveGroupRanges = SlaveGroupRanges {
   _i'lat :: Co.Lat,
   _i'ranges :: Mp.Map Co.SlaveGroupId [(Co.Timestamp, Value)]
-} deriving (Gn.Generic, Df.Default, Show)
+} deriving (Gn.Generic, Show)
 
 makeLenses ''SlaveGroupRanges
+
+-- TODO: eventually, this manual default definition should be made obselete
+-- by an admin client API that allows for reconfiguration.
+instance Df.Default SlaveGroupRanges where
+  def =
+    SlaveGroupRanges {
+      _i'lat = Df.def,
+      _i'ranges = Mp.fromList [("slaveGroup1", [])]
+    }
 
 read
   :: Co.SlaveGroupId
@@ -88,27 +96,27 @@ write timestamp newKeySpaces s =
         U.s31 Mp.foldlWithKey s newKeySpaces $ \s slaveGroupId keySpace ->
           case Mp.lookup slaveGroupId (s ^. i'ranges) of
             Just versions ->
-              let newKeySpace =
+              let changingKeySpace =
                     case versions of
-                      ((timestamp', New _):_) -> Ex.assert False (Co.NewKeySpace [] [])
-                      ((timestamp', Old oldKeySpace):_) -> Co.NewKeySpace oldKeySpace keySpace
-                      [] -> Co.NewKeySpace [] keySpace
-              in s & i'ranges . at slaveGroupId ?~ (timestamp, New newKeySpace):versions
+                      ((timestamp', Changing _):_) -> Ex.assert False (Co.ChangingKeySpace [] [])
+                      ((timestamp', Old oldKeySpace):_) -> Co.ChangingKeySpace oldKeySpace keySpace
+                      [] -> Co.ChangingKeySpace [] keySpace
+              in s & i'ranges . at slaveGroupId ?~ (timestamp, Changing changingKeySpace):versions
             Nothing -> Ex.assert False s
   in ((), s' & i'lat .~ timestamp)
 
 pick
   :: Co.SlaveGroupId
-  -> Choice
+  -> Co.Choice
   -> SlaveGroupRanges
   -> ((), SlaveGroupRanges)
 pick slaveGroupId choice s =
   case Mp.lookup slaveGroupId (s ^. i'ranges) of
-    Just ((timestamp', New (Co.NewKeySpace newKeySpace oldKeySpace)):rest) ->
+    Just ((timestamp', Changing (Co.ChangingKeySpace newKeySpace oldKeySpace)):rest) ->
       let keySpace =
             case choice of
-              NewChoice -> newKeySpace
-              OldChoice -> oldKeySpace
+              Co.NewChoice -> newKeySpace
+              Co.OldChoice -> oldKeySpace
           s' = s & i'ranges . at slaveGroupId ?~ (timestamp', Old keySpace):rest
       in ((), s')
     _ -> Ex.assert False ((), s)

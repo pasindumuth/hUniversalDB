@@ -35,9 +35,14 @@ makeLenses ''KeySpaceRange
 
 type KeySpace = [KeySpaceRange]
 
-data NewKeySpace = NewKeySpace {
+data ChangingKeySpace = ChangingKeySpace {
   _oldKeySpace :: KeySpace,
   _newKeySpace :: KeySpace
 } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
 
-makeLenses ''NewKeySpace
+makeLenses ''ChangingKeySpace
+
+data Choice =
+  NewChoice |
+  OldChoice
+  deriving (Gn.Generic, Bn.Binary, Show, Eq)

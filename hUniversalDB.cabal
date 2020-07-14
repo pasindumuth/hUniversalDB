@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6c515c70284b1eb7ee420afa5aeaa78be181dc5e8feed5fa8ad3ba9c453a5026
+-- hash: 697858ced81ef8078194965b2b37eee3dfa28fa1bb0b98bed396696801ed26fd
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -36,7 +36,7 @@ library
       Master.Env
       Master.MasterInputHandler
       Master.MasterState
-      Master.NetworkTask
+      Master.NetworkTaskManager
       Master.SlaveGroupRanges
       Net.Connections
       Paxos.MultiPaxosInstance

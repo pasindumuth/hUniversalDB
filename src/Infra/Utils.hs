@@ -1,6 +1,9 @@
 module Infra.Utils where
 
 import qualified Data.Sequence as Sq
+import qualified System.Random as Rn
+
+import qualified Proto.Common as Co
 
 for = flip map
 s12 f a b = f b a
@@ -31,3 +34,9 @@ prefix s (x:xs) =
 
 caseError :: a
 caseError = error "Case Error: reached an unhandled case in the case statement."
+
+mkUID :: Rn.StdGen -> (Co.UID, Rn.StdGen)
+mkUID rg =
+  s31 foldl ([], rg) [1..16] $ \(uid, rg) _ ->
+    let (r, rg') = Rn.random rg
+    in (r:uid, rg')

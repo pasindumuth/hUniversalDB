@@ -13,6 +13,13 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.TabletMessages as TM
 
+-- TODO: should we create MasterActions.hs? If so, do we also make MasterOutputAction?
+data MasterInputAction =
+  MasterReceive { eId :: Co.EndpointId, msg :: Ms.Message } |
+  MasterRetryInput { counterValue :: Int } |
+  PerformInput { uid :: Co.UID }
+  deriving (Gn.Generic, Bn.Binary, Show)
+
 data InputAction =
   Receive { eId :: Co.EndpointId, msg :: Ms.Message } |
   RetryInput { counterValue :: Int }
@@ -32,5 +39,6 @@ data OutputAction =
   RetryOutput { counterValue :: Int } |
   Print { message :: String } |
   Slave_CreateTablet { ranges :: [Co.KeySpaceRange] } |
-  TabletForward { range :: Co.KeySpaceRange, eId :: Co.EndpointId, tabletMsg :: TM.TabletMessage }
+  TabletForward { range :: Co.KeySpaceRange, eId :: Co.EndpointId, tabletMsg :: TM.TabletMessage } |
+  PerformOutput { uid :: Co.UID, delay :: Int }
   deriving (Gn.Generic, Bn.Binary, Show)
