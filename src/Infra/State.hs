@@ -33,9 +33,9 @@ runST st s =
   let (ret, ((actions, _, traceMsgs), state')) = St.runState st (([], 0, []), s)
   in (ret, (reverse actions, reverse traceMsgs, state'))
 
-debugP :: String -> ST o s ()
-debugP message =  St.state $ \((as, cnt, trace), s) ->
-  Tr.trace ("Trace L" ++ show cnt ++ ": " ++ message) ((), ((as, (cnt + 1), trace), s))
+debugP :: String -> a -> ST o s a
+debugP message output =  St.state $ \((as, cnt, trace), s) ->
+  (Tr.trace ("Trace L" ++ show cnt ++ ": " ++ message) output, ((as, (cnt + 1), trace), s))
 
 -- Adds actions. Importantly, this adds actions in reverse.
 addA :: o -> ST o s ()

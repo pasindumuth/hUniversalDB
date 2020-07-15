@@ -48,7 +48,7 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
-      - -O0
+      - -O2
       - -fwarn-incomplete-patterns
     dependencies:
       - hUniversalDB
@@ -60,7 +60,7 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
-      - -O0
+      - -O2
       - -fwarn-incomplete-patterns
     dependencies:
       - hUniversalDB
@@ -72,7 +72,7 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
-      - -O0
+      - -O2
       - -fwarn-incomplete-patterns
     dependencies:
       - hUniversalDB
@@ -85,7 +85,7 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -O0
+    - -O2
     - -fwarn-incomplete-patterns
     dependencies:
     - hUniversalDB

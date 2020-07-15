@@ -32,8 +32,11 @@ prefix s (x:xs) =
     then []
     else x : prefix s xs
 
+-- To see the location of the case error, build the program using the
+-- --profile flag. The INLINE pragma helps improve the callstack.
 caseError :: a
 caseError = error "Case Error: reached an unhandled case in the case statement."
+{-# INLINE caseError #-}
 
 mkUID :: Rn.StdGen -> (Co.UID, Rn.StdGen)
 mkUID rg =

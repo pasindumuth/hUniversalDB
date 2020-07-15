@@ -88,6 +88,7 @@ handleInputAction iAction =
                               CRsRW.Success -> Co.NewChoice
                               _ -> Co.OldChoice
                           task = createPickKeySpace requestId eId slaveGroupId timestamp choice uid description
+                      handlingState .^ (PTM.handleTask task)
                       return ()
                 _ -> return ()
             _ -> U.caseError
@@ -157,17 +158,12 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
             exists = DS.rangeExists keySpaceRange latestValues
         if Mb.isJust exists
           then sendResponse CRsCD.AlreadyExists
-          else do
+          else
             -- The only reason we can be here is if we can go ahead and finish the creation
-            let freeGroupM = DS.findFreeGroupM latestValues
-            case freeGroupM of
-              Just slaveGroupId -> do
-                NTM.performTask uid
-                  (derivedState ^. DS.networkTaskManager)
-                  (derivedState ^. DS.slaveGroupRanges)
-                  (derivedState ^. DS.slaveEIds)
-                return ()
-              Nothing -> U.caseError
+            NTM.performTask uid
+              (derivedState ^. DS.networkTaskManager)
+              (derivedState ^. DS.slaveGroupRanges)
+              (derivedState ^. DS.slaveEIds)
       createPLEntry derivedState =
         PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp eId uid
       msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage

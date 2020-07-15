@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4eb41db840f210e05166eb9b0809b0a3c91c35039724b3c7be44f4fcfe545c92
+-- hash: b591a13d1b89cb8b1ac086591171ae1075c8b35b08f412b20363d7f8712c06d3
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -103,7 +103,7 @@ executable hUniversalDB-client-exe
       Paths_hUniversalDB
   hs-source-dirs:
       client
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -fwarn-incomplete-patterns
   build-depends:
       MissingH
     , async
@@ -128,7 +128,7 @@ executable hUniversalDB-master-exe
       Paths_hUniversalDB
   hs-source-dirs:
       master
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -fwarn-incomplete-patterns
   build-depends:
       MissingH
     , async
@@ -153,7 +153,7 @@ executable hUniversalDB-slave-exe
       Paths_hUniversalDB
   hs-source-dirs:
       slave
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -fwarn-incomplete-patterns
   build-depends:
       MissingH
     , async
@@ -182,7 +182,7 @@ test-suite hUniversalDB-test
       Paths_hUniversalDB
   hs-source-dirs:
       test
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2 -fwarn-incomplete-patterns
   build-depends:
       MissingH
     , async
