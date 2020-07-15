@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c78f204d75cae4efb78c58197120b1e91b1e9dca55f97501615da4dd4941297a
+-- hash: 4eb41db840f210e05166eb9b0809b0a3c91c35039724b3c7be44f4fcfe545c92
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -103,7 +103,32 @@ executable hUniversalDB-client-exe
       Paths_hUniversalDB
   hs-source-dirs:
       client
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -fwarn-incomplete-patterns
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
+  build-depends:
+      MissingH
+    , async
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , containers
+    , data-default
+    , hUniversalDB
+    , hslogger
+    , lens
+    , mtl
+    , network-simple
+    , pretty-show
+    , random
+    , stm
+  default-language: Haskell2010
+
+executable hUniversalDB-master-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_hUniversalDB
+  hs-source-dirs:
+      master
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
     , async
@@ -128,7 +153,7 @@ executable hUniversalDB-slave-exe
       Paths_hUniversalDB
   hs-source-dirs:
       slave
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -fwarn-incomplete-patterns
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
     , async
@@ -157,7 +182,7 @@ test-suite hUniversalDB-test
       Paths_hUniversalDB
   hs-source-dirs:
       test
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N -fwarn-incomplete-patterns
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
     , async

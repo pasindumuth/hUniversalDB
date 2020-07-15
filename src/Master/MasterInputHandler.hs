@@ -39,7 +39,7 @@ handlingState =
     MS.derivedState,
     MS.paxosTaskManager,
     MS.env.En.rand,
-    MS.env.En.slaveEIds))
+    MS.env.En.masterEIds))
 
 handleInputAction
   :: MAc.InputAction
@@ -62,9 +62,9 @@ handleInputAction iAction =
           case masterMsg of
             MM.MultiPaxosMessage multiPaxosMsg -> do
               pl <- getL $ MS.multiPaxosInstance.MP.paxosLog
-              slaveEIds <- getL $ MS.env.En.slaveEIds
+              masterEIds <- getL $ MS.env.En.masterEIds
               lp2 (MS.multiPaxosInstance, MS.env.En.rand)
-                .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.MasterMessage . MM.MultiPaxosMessage)
+                .^ MP.handleMultiPaxos eId masterEIds multiPaxosMsg (Ms.MasterMessage . MM.MultiPaxosMessage)
               pl' <- getL $ MS.multiPaxosInstance.MP.paxosLog
               if (pl /= pl')
                 then do
@@ -85,8 +85,8 @@ handleInputAction iAction =
                       let description = show (eId, response)
                           choice =
                             case rangeWrite of
-                               CRsRW.Success -> Co.NewChoice
-                               _ -> Co.OldChoice
+                              CRsRW.Success -> Co.NewChoice
+                              _ -> Co.OldChoice
                           task = createPickKeySpace requestId eId slaveGroupId timestamp choice uid description
                       return ()
                 _ -> return ()

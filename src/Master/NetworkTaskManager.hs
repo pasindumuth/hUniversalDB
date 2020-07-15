@@ -54,7 +54,7 @@ performTask uid taskManager slaveGroupRanges = do
                   -- TODO: This is so wrong in so many ways. We should be accessing a table indexed by SlaveGroupId,
                   -- and then picking a slave that's not dead. Also, we need to know if this master should even
                   -- be doing this (since this might be a backup master).
-                  slaveEId = "universal0"
+                  slaveEId = "172.18.0.3"
               addA $ MAc.Send [slaveEId] request
               addA $ MAc.PerformOutput uid 100
             _ -> return ()

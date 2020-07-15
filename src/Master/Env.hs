@@ -14,7 +14,7 @@ import Infra.Lens
 
 data Env = Env {
   _rand :: Rn.StdGen,
-  _slaveEIds :: [Co.EndpointId]
+  _masterEIds :: [Co.EndpointId]
 } deriving (Gn.Generic, Show)
 
 instance Df.Default Env where

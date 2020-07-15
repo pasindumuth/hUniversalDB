@@ -18,12 +18,14 @@ import qualified System.Random as Rn
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
-import qualified Proto.Actions.SlaveActions as SAc
+import qualified Proto.Actions.MasterActions as SAc
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
-import qualified Thread.SlaveThread as ST
+import qualified Thread.MasterThread as ST
 import Infra.Lens
 import Infra.State
+
+slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
 
 handleSelfConn
   :: MV.MVar Cn.Connections
@@ -73,24 +75,27 @@ handleReceive receiveChan iActionChan = do
     (eId, msg) <- Ct.readChan receiveChan
     Ct.writeChan iActionChan $ SAc.Receive eId msg
 
-startSlave :: String -> String -> [String] -> IO ()
-startSlave seedStr curIP otherIPs = do
-  Lg.infoM Lg.main "Start slave"
+startMaster :: String -> String -> [String] -> IO ()
+startMaster seedStr curIP otherIPs = do
+  Lg.infoM Lg.main "Start master"
 
   -- Create PaxosChan
   receiveChan <- Ct.newChan
 
-  -- Create the Slave Connections
+  -- Create the Master Connections
   connM <- MV.newMVar Mp.empty
 
   -- Create a single thread to handle the self connection
   Ct.forkIO $ handleSelfConn connM curIP receiveChan
 
-  -- Start accepting slave connections
+  -- Start accepting master connections
   Ct.forkIO $ accept connM receiveChan
 
-  -- Initiate connections with other slaves
+  -- Initiate connections with other masters
   Mo.forM_ otherIPs $ \ip -> Ct.forkIO $ connect ip connM receiveChan
+
+  -- Initiate connections with all of the slaves
+  Mo.forM_ slaveEIds $ \ip -> Ct.forkIO $ connect ip connM receiveChan
 
   -- Setup message routing thread
   iActionChan <- Ct.newChan
@@ -99,11 +104,11 @@ startSlave seedStr curIP otherIPs = do
   -- Start Paxos handling thread
   let seed = read seedStr :: Int
       rg = Rn.mkStdGen seed
-  ST.startSlaveThread rg iActionChan connM
+  ST.startMasterThread rg iActionChan connM
 
 main :: IO ()
 main = do
   Lg.setupLogging
   args <- SE.getArgs
   let (seedStr:curIP:otherIPs) = args
-  startSlave seedStr curIP otherIPs
+  startMaster seedStr curIP otherIPs

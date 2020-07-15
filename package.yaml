@@ -41,6 +41,18 @@ library:
     - -fwarn-incomplete-patterns
 
 executables:
+  hUniversalDB-master-exe:
+    main:                Main.hs
+    source-dirs:         master
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -O0
+      - -fwarn-incomplete-patterns
+    dependencies:
+      - hUniversalDB
+
   hUniversalDB-slave-exe:
     main:                Main.hs
     source-dirs:         slave
@@ -48,6 +60,7 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
+      - -O0
       - -fwarn-incomplete-patterns
     dependencies:
       - hUniversalDB
@@ -59,6 +72,7 @@ executables:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
+      - -O0
       - -fwarn-incomplete-patterns
     dependencies:
       - hUniversalDB
@@ -71,6 +85,7 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -O0
     - -fwarn-incomplete-patterns
     dependencies:
     - hUniversalDB
