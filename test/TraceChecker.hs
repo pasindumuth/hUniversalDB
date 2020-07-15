@@ -141,6 +141,7 @@ derivedStateIncorrectlyWrittenE requestPayload response =
 -- Rather than checking whether the oepration would fail or not by using
 -- safe operations, it's more compact to just fail fatally.
 -- TODO: maybe change all of these to assertions
+-- TODO: We must revamp this so that it works with Master
 checkMsg :: TrM.TraceMessage -> STS CheckState (Either Co.ErrorMsg ())
 checkMsg msg = do
   case msg of
@@ -219,6 +220,8 @@ checkMsg msg = do
                             return ()
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
+        -- TODO: Don't do this
+        _ -> return $ Right()
     TrM.ClientRequestReceived request -> do
       i'requestMap .^^. at (request ^. CRq.meta . CRq.requestId) ?~ (request ^. CRq.payload)
       return $ Right ()
@@ -302,4 +305,6 @@ checkMsg msg = do
                     _ | responsePayload == CRsSW.UnknownDB -> return $ Right ()
                     _ -> return $ responseValueIncorrectE response requestPayload
                 _ -> return $ responseTypeIncorrectE response requestPayload
+            -- TODO: Don't do this
+            _ -> return $ Right()
       return $ Right ()

@@ -13,6 +13,7 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
+import qualified Proto.Messages.ClientResponses.CreateDatabase as CRsCD
 import qualified Proto.Messages.ClientResponses.RangeRead as CRsRR
 import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
 import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
@@ -47,7 +48,6 @@ generateRequest = do
   case requestType of
     _ | requestType < 15 -> do
       timestamp <- makeTimestamp
-      Tt.requestStats.Tt.numRangeReadRqs .^^. (+1)
       return (slaveId, CRq.RangeRead timestamp)
     _ | requestType < 30 -> do
       allRanges <- Tt.numTabletKeys .^^^ Mp.keys
@@ -65,7 +65,6 @@ generateRequest = do
                       else return $ curRanges
       Tt.curRanges .^^. \_ -> curRanges
       timestamp <- makeTimestamp
-      Tt.requestStats.Tt.numRangeWriteRqs .^^. (+1)
       return (slaveId, CRq.RangeWrite (St.toList curRanges) timestamp)
     _ -> do
       newTableProb :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
@@ -98,10 +97,8 @@ generateRequest = do
       case requestType of
         _ | requestType < 65 -> do
           let value = "v" ++ show keyIdx
-          Tt.requestStats.Tt.numWriteRqs .^^. (+1)
           return (slaveId, CRq.SlaveWrite databaseId tableId key value timestamp)
         _ -> do
-          Tt.requestStats.Tt.numReadRqs .^^. (+1)
           return (slaveId, CRq.SlaveRead databaseId tableId key timestamp)
   where
     makeTimestamp = do
@@ -124,30 +121,36 @@ analyzeResponses = do
         CRs.RangeRead (CRsRR.Success _) -> Tt.requestStats.Tt.numRangeReadSuccessRss .^^. (+1)
         CRs.RangeWrite CRsRW.Success -> Tt.requestStats.Tt.numRangeWriteSuccessRss .^^. (+1)
         CRs.RangeWrite CRsRW.BackwardsWrite -> Tt.requestStats.Tt.numRangeWriteBackwardsWriteRss .^^. (+1)
+        CRs.CreateDatabase CRsCD.BackwardsWrite -> Tt.requestStats.Tt.numCreateDatabaseBackwardsWriteRss .^^. (+1)
+        CRs.CreateDatabase CRsCD.AlreadyExists -> Tt.requestStats.Tt.numCreateDatabaseAlreadyExistsRss .^^. (+1)
+        CRs.CreateDatabase CRsCD.NothingChanged -> Tt.requestStats.Tt.numCreateDatabaseNothingChangedRss .^^. (+1)
+        CRs.CreateDatabase CRsCD.Success -> Tt.requestStats.Tt.numCreateDatabaseSuccessRss .^^. (+1)
 
 test1 :: STS Tt.TestState ()
 test1 = do
-  SM.addClientMsg 0 (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 0); SM.simulateAll
-  SM.addClientMsg 1 (CRq.SlaveWrite "d" "t" "key1" "value1" 1); SM.simulateAll
-  SM.addClientMsg 2 (CRq.SlaveRead "d" "t" "key1" 3); SM.simulateAll
-  SM.addClientMsg 3 (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateAll
-  SM.addClientMsg 2 (CRq.SlaveRead "d" "t" "key2" 3); SM.simulateAll
+  SM.addClientMsg (SM.Slave 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateAll
+  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateAll
+  SM.addClientMsg (SM.Slave 2) (CRq.SlaveRead "d" "t" "key1" 4); SM.simulateAll
+  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateAll
+  SM.addClientMsg (SM.Slave 2) (CRq.SlaveRead "d" "t" "key2" 4); SM.simulateAll
+  Tt.clientState .^ analyzeResponses
 
 test2 :: STS Tt.TestState ()
 test2 = do
-  SM.addClientMsg 0 (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 0); SM.simulateN 2
-  SM.addClientMsg 1 (CRq.SlaveWrite "d" "t" "key1" "value1" 1); SM.simulateN 2
-  SM.addClientMsg 2 (CRq.SlaveWrite "d" "t" "key2" "value2" 2); SM.simulateN 2
-  SM.addClientMsg 3 (CRq.SlaveWrite "d" "t" "key3" "value3" 3); SM.simulateN 2
-  SM.addClientMsg 4 (CRq.SlaveWrite "d" "t" "key4" "value4" 4); SM.simulateN 2
-  SM.addClientMsg 0 (CRq.SlaveWrite "d" "t" "key5" "value5" 5); SM.simulateAll
+  SM.addClientMsg (SM.Slave 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
+  Tt.clientState .^ analyzeResponses
 
 test3 :: STS Tt.TestState ()
 test3 = do
   Mo.forM_ [1..100] $
     \_ -> do
       (slaveId, payload) <- Tt.clientState .^ generateRequest
-      SM.addClientMsg slaveId payload
+      SM.addClientMsg (SM.Slave slaveId) payload
       SM.simulateN 2
       SM.dropMessages 1
   SM.simulateAll
@@ -162,10 +165,20 @@ test4 = do
       Mo.forM_ [1..5] $
         \_ -> do
           (slaveId, payload) <- Tt.clientState .^ generateRequest
-          SM.addClientMsg slaveId payload
+          SM.addClientMsg (SM.Slave slaveId) payload
       SM.simulateN 2
       SM.dropMessages 2
   SM.simulateAll
+  Tt.clientState .^ analyzeResponses
+
+test5 :: STS Tt.TestState ()
+test5 = do
+  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
   Tt.clientState .^ analyzeResponses
 
 -- This list of trace messages includes all events across all slaves.
@@ -205,6 +218,7 @@ testDriver = do
   driveTest 2 test2
   driveTest 3 test3
   driveTest 4 test4
+  driveTest 5 test5
 
 main :: IO ()
 main = testDriver

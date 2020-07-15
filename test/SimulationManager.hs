@@ -5,7 +5,8 @@ module SimulationManager (
   dropMessages,
   simulateN,
   simulateAll,
-  addClientMsg
+  addClientMsg,
+  Endpoint(..),
 ) where
 
 import qualified Control.Monad as Mo
@@ -94,6 +95,7 @@ createTestState seed numMasters numSlaves numClients =
           Tt._numRangeWriteRqs = 0,
           Tt._numReadRqs = 0,
           Tt._numWriteRqs = 0,
+          Tt._numCreateDatabaseRqs = 0,
           Tt._numReadSuccessRss = 0,
           Tt._numReadUnknownDBRss = 0,
           Tt._numWriteSuccessRss = 0,
@@ -101,7 +103,11 @@ createTestState seed numMasters numSlaves numClients =
           Tt._numBackwardsWriteRss = 0,
           Tt._numRangeReadSuccessRss = 0,
           Tt._numRangeWriteSuccessRss = 0,
-          Tt._numRangeWriteBackwardsWriteRss = 0
+          Tt._numRangeWriteBackwardsWriteRss = 0,
+          Tt._numCreateDatabaseBackwardsWriteRss = 0,
+          Tt._numCreateDatabaseAlreadyExistsRss = 0,
+          Tt._numCreateDatabaseNothingChangedRss = 0,
+          Tt._numCreateDatabaseSuccessRss = 0
         },
         Tt._clientResponses = clientResponses
       }
@@ -291,16 +297,31 @@ simulateAll = do
             else return ()
   simulate
 
+data Endpoint =
+  Master Int |
+  Slave Int
+  deriving (Show)
+
 addClientMsg
-  :: Int
+  :: Endpoint
   -> CRq.Payload
   -> STS Tt.TestState ()
-addClientMsg slaveId payload = do
+addClientMsg toEndpoint payload = do
   uid <- Tt.clientState . Tt.nextUid .^^. (+1)
-  let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)
+  let toEId =
+        case toEndpoint of
+          Master endpoint -> mkMasterEId endpoint
+          Slave endpoint -> mkSlaveEId endpoint
+      (clientEId, slaveEId) = (mkClientEId 0, toEId)
       msg = Ms.ClientRequest
               (CRq.ClientRequest
                 (CRq.Meta (show uid))
                 payload)
   addMsg msg (clientEId, slaveEId)
+  case payload of
+    CRq.RangeRead _ -> Tt.clientState.Tt.requestStats.Tt.numRangeReadRqs .^^. (+1)
+    CRq.RangeWrite _ _ -> Tt.clientState.Tt.requestStats.Tt.numRangeWriteRqs .^^. (+1)
+    CRq.SlaveRead _ _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numReadRqs .^^. (+1)
+    CRq.SlaveWrite _ _ _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numWriteRqs .^^. (+1)
+    CRq.CreateDatabase _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numCreateDatabaseRqs .^^. (+1)
   return ()
