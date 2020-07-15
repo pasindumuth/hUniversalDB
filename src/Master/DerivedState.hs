@@ -4,16 +4,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Master.DerivedState (
-  DerivedState,
+  DerivedState(..),
   handleDerivedState,
   slaveGroupRanges,
+  slaveEIds,
   networkTaskManager,
   findFreeGroupM,
   rangeExists
 ) where
 
 import qualified Control.Monad as Mo
-import qualified Data.Default as Df
 import qualified Data.Map as Mp
 import qualified GHC.Generics as Gn
 
@@ -29,8 +29,9 @@ import Infra.State
 
 data DerivedState = DerivedState {
   _i'slaveGroupRanges :: SGR.SlaveGroupRanges,
-  _i'networkTaskManager :: NTM.NetworkTaskManager
-} deriving (Gn.Generic, Df.Default, Show)
+  _i'networkTaskManager :: NTM.NetworkTaskManager,
+  _i'slaveEIds :: [Co.EndpointId]
+} deriving (Gn.Generic, Show)
 
 makeLenses ''DerivedState
 
@@ -39,6 +40,9 @@ slaveGroupRanges = i'slaveGroupRanges
 
 networkTaskManager :: Lens' DerivedState NTM.NetworkTaskManager
 networkTaskManager = i'networkTaskManager
+
+slaveEIds :: Lens' DerivedState [Co.EndpointId]
+slaveEIds = i'slaveEIds
 
 findFreeGroupM
   :: Mp.Map Co.SlaveGroupId (Maybe (Co.Timestamp, SGR.Value))

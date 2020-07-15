@@ -19,6 +19,7 @@ import Infra.Lens
 import Infra.State
 
 masterEIds = ["172.18.1.3", "172.18.1.4", "172.18.1.5", "172.18.1.6", "172.18.1.7"]
+slaveEIds  = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
 
 startMasterThread
   :: Rn.StdGen
@@ -26,7 +27,7 @@ startMasterThread
   -> MV.MVar Cn.Connections
   -> IO ()
 startMasterThread rg iActionChan connM = do
-  let g = MS.constructor "master" rg masterEIds
+  let g = MS.constructor "master" rg masterEIds slaveEIds
   handlePaxosMessage g
   where
     handlePaxosMessage :: MS.MasterState -> IO ()

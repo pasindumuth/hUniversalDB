@@ -95,9 +95,12 @@ handleInputAction iAction =
     MAc.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
     MAc.PerformInput uid -> do
-      taskManager <- getL $ MS.derivedState . DS.networkTaskManager
-      slaveGroupRanges <- getL $ MS.derivedState . DS.slaveGroupRanges
-      lp0 .^ NTM.performTask uid taskManager slaveGroupRanges
+      (taskManager, slaveGroupRanges, slaveEIds) <- getL $
+        MS.derivedState . (lp3 (
+          DS.networkTaskManager,
+          DS.slaveGroupRanges,
+          DS.slaveEIds))
+      lp0 .^ NTM.performTask uid taskManager slaveGroupRanges slaveEIds
       return ()
 
 createDatabaseTask
@@ -159,7 +162,10 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
             let freeGroupM = DS.findFreeGroupM latestValues
             case freeGroupM of
               Just slaveGroupId -> do
-                NTM.performTask uid (derivedState ^. DS.networkTaskManager) (derivedState ^. DS.slaveGroupRanges)
+                NTM.performTask uid
+                  (derivedState ^. DS.networkTaskManager)
+                  (derivedState ^. DS.slaveGroupRanges)
+                  (derivedState ^. DS.slaveEIds)
                 return ()
               Nothing -> U.caseError
       createPLEntry derivedState =

@@ -31,10 +31,11 @@ constructor
   :: Co.PaxosId
   -> Rn.StdGen
   -> [Co.EndpointId]
+  -> [Co.EndpointId]
   -> MasterState
-constructor paxosId rand masterEIds = MasterState {
+constructor paxosId rand masterEIds slaveEIds = MasterState {
   _multiPaxosInstance = MP.constructor paxosId,
-  _derivedState = Df.def,
+  _derivedState = DS.DerivedState Df.def Df.def slaveEIds,
   _paxosTaskManager = Df.def,
   _env = En.Env rand masterEIds
 }
