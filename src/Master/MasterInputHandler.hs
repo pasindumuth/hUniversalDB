@@ -22,7 +22,7 @@ import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.ClientResponses.CreateDatabase as CRsCD
 import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Proto.Messages.SlaveMessages as SM
+import qualified Proto.Messages.MasterMessages as MM
 import qualified Proto.Messages.TraceMessages as TrM
 import Infra.Lens
 import Infra.State
@@ -58,13 +58,13 @@ handleInputAction iAction =
                   task = createDatabaseTask eId requestId databaseId tableId timestamp description uid
               handlingState .^ (PTM.handleTask task)
             _ -> U.caseError
-        Ms.SlaveMessage slaveMsg ->
-          case slaveMsg of
-            SM.MultiPaxosMessage multiPaxosMsg -> do
+        Ms.MasterMessage masterMsg ->
+          case masterMsg of
+            MM.MultiPaxosMessage multiPaxosMsg -> do
               pl <- getL $ MS.multiPaxosInstance.MP.paxosLog
               slaveEIds <- getL $ MS.env.En.slaveEIds
               lp2 (MS.multiPaxosInstance, MS.env.En.rand)
-                .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.SlaveMessage . SM.MultiPaxosMessage)
+                .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.MasterMessage . MM.MultiPaxosMessage)
               pl' <- getL $ MS.multiPaxosInstance.MP.paxosLog
               if (pl /= pl')
                 then do
@@ -89,7 +89,6 @@ handleInputAction iAction =
                                _ -> Co.OldChoice
                           task = createPickKeySpace requestId eId slaveGroupId timestamp choice uid description
                       return ()
-                    _ -> return ()
                 _ -> return ()
             _ -> U.caseError
         _ -> U.caseError
@@ -165,8 +164,7 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
               Nothing -> U.caseError
       createPLEntry derivedState =
         PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp eId uid
-      -- TODO: maybe make a MasterMessage instead.
-      msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
+      msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper
 
 createPickKeySpace
@@ -197,5 +195,5 @@ createPickKeySpace requestId eId slaveGroupId timestamp choice uid description =
         return ()
       createPLEntry derivedState =
         PM.Master $ PM.PickKeySpace slaveGroupId choice uid
-      msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
+      msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper

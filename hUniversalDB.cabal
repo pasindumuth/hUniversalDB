@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 697858ced81ef8078194965b2b37eee3dfa28fa1bb0b98bed396696801ed26fd
+-- hash: a6cfd599ad888129fd7c89e421e909d59b63476ccd44d8beb084b6a2e575c717
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -54,6 +54,7 @@ library
       Proto.Messages.ClientResponses.RangeWrite
       Proto.Messages.ClientResponses.SlaveRead
       Proto.Messages.ClientResponses.SlaveWrite
+      Proto.Messages.MasterMessages
       Proto.Messages.PaxosMessages
       Proto.Messages.SlaveMessages
       Proto.Messages.TabletMessages

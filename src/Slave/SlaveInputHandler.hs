@@ -99,7 +99,7 @@ handleInputAction iAction =
           if St.member keySpaceRange ranges
             then addA $ Ac.TabletForward keySpaceRange eId tabletMsg
             else return ()
-        Ms.ClientResponse _ -> U.caseError
+        _ -> U.caseError
     Ac.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 
