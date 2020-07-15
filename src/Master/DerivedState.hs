@@ -103,7 +103,7 @@ handleDerivedState paxosId pl pl' = do
                       return ()
                     Nothing -> U.caseError
             PM.PickKeySpace slaveGroupId choice uid -> do
-              -- TODO: pick the shit properly.
               i'networkTaskManager . NTM.taskMap .^^. Mp.delete uid
+              i'slaveGroupRanges .^^ SGR.pick slaveGroupId choice
               return ()
         _ -> U.caseError

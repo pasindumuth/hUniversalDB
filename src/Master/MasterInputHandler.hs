@@ -20,6 +20,7 @@ import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.ClientResponses.CreateDatabase as CRsCD
+import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.SlaveMessages as SM
 import qualified Proto.Messages.TraceMessages as TrM
@@ -48,7 +49,7 @@ handleInputAction iAction =
     Ac.MasterReceive eId msg ->
       case msg of
         Ms.ClientRequest request -> do
-          let requestId = request ^. CRq.meta .CRq.requestId
+          let requestId = request ^. CRq.meta . CRq.requestId
           trace $ TrM.ClientRequestReceived request
           case request ^. CRq.payload of
             CRq.CreateDatabase databaseId tableId timestamp -> do
@@ -72,6 +73,25 @@ handleInputAction iAction =
                   MS.derivedState .^ DS.handleDerivedState paxosId pl pl'
                   handlingState .^ PTM.handleInsert
                 else return ()
+        Ms.ClientResponse response -> do
+          case response ^. CRs.payload of
+            CRs.RangeWrite rangeWrite -> do
+              let uid = response ^. CRs.meta . CRs.requestId
+              taskMap <- getL $ MS.derivedState . DS.networkTaskManager . NTM.taskMap
+              case Mp.lookup uid taskMap of
+                Just task ->
+                  case task of
+                    NTM.CreateDatabase eId requestId timestamp slaveGroupId -> do
+                      let description = show (eId, response)
+                          choice =
+                            case rangeWrite of
+                               CRsRW.Success -> Co.NewChoice
+                               _ -> Co.OldChoice
+                          task = createPickKeySpace requestId eId slaveGroupId timestamp choice uid description
+                      return ()
+                    _ -> return ()
+                _ -> return ()
+            _ -> U.caseError
         _ -> U.caseError
     Ac.MasterRetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
@@ -80,7 +100,6 @@ handleInputAction iAction =
       slaveGroupRanges <- getL $ MS.derivedState . DS.slaveGroupRanges
       lp0 .^ NTM.performTask uid taskManager slaveGroupRanges
       return ()
-
 
 createDatabaseTask
   :: Co.EndpointId
@@ -146,5 +165,37 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
               Nothing -> U.caseError
       createPLEntry derivedState =
         PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp eId uid
+      -- TODO: maybe make a MasterMessage instead.
+      msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
+  in Ta.Task description tryHandling done createPLEntry msgWrapper
+
+createPickKeySpace
+  :: Co.SlaveGroupId
+  -> Co.RequestId
+  -> Co.EndpointId
+  -> Co.Timestamp
+  -> Co.Choice
+  -> Co.UID
+  -> String
+  -> Ta.Task DS.DerivedState
+createPickKeySpace requestId eId slaveGroupId timestamp choice uid description =
+  let tryHandling derivedState = do
+        case derivedState ^. DS.slaveGroupRanges & SGR.staticRead slaveGroupId timestamp of
+          Just (_, SGR.Changing _) -> return False
+          _ -> return True
+      done derivedState = do
+        let responseValue =
+              case choice of
+                Co.NewChoice -> CRsCD.Success
+                Co.OldChoice -> CRsCD.BackwardsWrite
+            response =
+              CRs.ClientResponse
+                (CRs.Meta requestId)
+                (CRs.CreateDatabase responseValue)
+        trace $ TrM.ClientResponseSent response
+        addA $ Ac.Send [eId] $ Ms.ClientResponse response
+        return ()
+      createPLEntry derivedState =
+        PM.Master $ PM.PickKeySpace slaveGroupId choice uid
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper

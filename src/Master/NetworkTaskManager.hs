@@ -57,6 +57,5 @@ performTask uid taskManager slaveGroupRanges = do
                   slaveEId = "universal0"
               addA $ Ac.Send [slaveEId] request
               addA $ Ac.PerformOutput uid 100
-              -- TODO: we must add the Perform UID Delay Output Action (and Input Action, and handle that Input Action)
             _ -> return ()
     _ -> return ()
