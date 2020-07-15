@@ -5,6 +5,7 @@
 
 module Master.DerivedState where
 
+import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
 import qualified Master.SlaveGroupRanges as SGR
@@ -19,3 +20,12 @@ data DerivedState = DerivedState {
 } deriving (Gn.Generic, Show)
 
 makeLenses ''DerivedState
+
+constructor
+  :: [Co.EndpointId]
+  -> DerivedState
+constructor slaveEIds = DerivedState {
+  _slaveGroupRanges = Df.def,
+  _networkTaskManager = Df.def,
+  _slaveEIds = slaveEIds
+}

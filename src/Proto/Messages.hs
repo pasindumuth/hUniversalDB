@@ -16,7 +16,6 @@ import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.SlaveMessages as SM
 import qualified Proto.Messages.TabletMessages as TM
 
--- TODO maybe we can use prisms to construct Message from one of the constituents
 data Message =
   ClientRequest CRq.ClientRequest |
   ClientResponse CRs.ClientResponse |

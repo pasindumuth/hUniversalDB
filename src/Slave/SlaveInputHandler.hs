@@ -26,6 +26,7 @@ import qualified Slave.DerivedState as DS
 import qualified Slave.Env as En
 import qualified Slave.SlaveState as SS
 import qualified Slave.DerivedState as DS
+import qualified Slave.DerivedStateHandler as DSH
 import qualified Slave.KeySpaceManager as KSM
 import Infra.Lens
 import Infra.State
@@ -91,7 +92,7 @@ handleInputAction iAction =
                 then do
                   addA $ SAc.Print $ ppShow pl'
                   paxosId <- getL $ SS.multiPaxosInstance.MP.paxosId
-                  SS.derivedState .^ DS.handleDerivedState paxosId pl pl'
+                  SS.derivedState .^ DSH.handleDerivedState paxosId pl pl'
                   handlingState .^ PTM.handleInsert
                 else return ()
         Ms.TabletMessage keySpaceRange tabletMsg -> do

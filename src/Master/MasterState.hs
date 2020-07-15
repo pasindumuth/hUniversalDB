@@ -35,7 +35,7 @@ constructor
   -> MasterState
 constructor paxosId rand masterEIds slaveEIds = MasterState {
   _multiPaxosInstance = MP.constructor paxosId,
-  _derivedState = DS.DerivedState Df.def Df.def slaveEIds,
+  _derivedState = DS.constructor slaveEIds,
   _paxosTaskManager = Df.def,
   _env = En.Env rand masterEIds
 }

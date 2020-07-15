@@ -19,6 +19,7 @@ import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.Env as En
 import qualified Slave.Tablet.MultiVersionKVStore as MVS
 import qualified Slave.Tablet.DerivedState as DS
+import qualified Slave.Tablet.DerivedStateHandler as DSH
 import qualified Slave.Tablet.TabletState as TS
 import Infra.Lens
 import Infra.State
@@ -57,7 +58,7 @@ handleInputAction iAction = do
             then do
               addA $ TAc.Print $ ppShow pl'
               paxosId <- getL $ TS.multiPaxosInstance.MP.paxosId
-              TS.derivedState .^ DS.handleDerivedState paxosId pl pl'
+              TS.derivedState .^ DSH.handleDerivedState paxosId pl pl'
               handlingState .^ PTM.handleInsert
             else return ()
     TAc.RetryInput counterValue ->
