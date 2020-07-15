@@ -44,9 +44,9 @@ startSlaveThread rg iActionChan connM = do
           SAc.Send eIds msg -> do
             Mo.forM_ eIds $ \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
             return (g', tabletMap)
-          SAc.RetryOutput counterValue -> do
+          SAc.RetryOutput counterValue delay -> do
             Ct.forkIO $ do
-              Ct.threadDelay 100000
+              Ct.threadDelay (delay * 1000)
               Ct.writeChan iActionChan $ SAc.RetryInput counterValue
             return (g', tabletMap)
           SAc.Print message -> do

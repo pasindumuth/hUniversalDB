@@ -11,4 +11,4 @@ import qualified Proto.Messages as Ms
 class OutputAction a where
   send :: [Co.EndpointId] -> Ms.Message -> a
   print :: String -> a
-  retry :: Int -> a
+  retry :: Int -> Int -> a

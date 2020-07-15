@@ -39,9 +39,9 @@ startTabletThread rg keySpaceRange iActionChan connM = do
         case action of
           TAc.Send eIds msg -> Mo.forM_ eIds $
             \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-          TAc.RetryOutput counterValue -> do
+          TAc.RetryOutput counterValue delay -> do
             Ct.forkIO $ do
-              Ct.threadDelay 100000
+              Ct.threadDelay (delay * 1000)
               Ct.writeChan iActionChan $ TAc.RetryInput counterValue
             return ()
           TAc.Print message -> do

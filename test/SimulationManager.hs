@@ -112,9 +112,9 @@ runTabletIAction eId range iAction = do
   Mo.forM_ msgsO $ \msgO -> do
     case msgO of
       TAc.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
-      TAc.RetryOutput counterValue -> do
+      TAc.RetryOutput counterValue delay -> do
         currentTime <- getT $ Tt.clocks . ix eId
-        Tt.tabletAsyncQueues . ix eId . ix range .^^.* U.push (TAc.RetryInput counterValue, currentTime + 100)
+        Tt.tabletAsyncQueues . ix eId . ix range .^^.* U.push (TAc.RetryInput counterValue, currentTime + delay)
         return ()
       _ -> return ()
 
@@ -124,9 +124,9 @@ runIAction eId iAction = do
   Mo.forM_ msgsO $ \msgO -> do
     case msgO of
       SAc.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
-      SAc.RetryOutput counterValue -> do
+      SAc.RetryOutput counterValue delay -> do
         currentTime <- getT $ Tt.clocks . ix eId
-        Tt.slaveAsyncQueues . ix eId .^^.* U.push (SAc.RetryInput counterValue, currentTime + 100)
+        Tt.slaveAsyncQueues . ix eId .^^.* U.push (SAc.RetryInput counterValue, currentTime + delay)
         return ()
       SAc.Slave_CreateTablet ranges' -> do
         ranges <- getT $ Tt.tabletStates . ix eId

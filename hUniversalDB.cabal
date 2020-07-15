@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0d97a475cfcbf0bc431ff7e4b46f0dfe259d2cbe643ad8d762f0e0cc0990f93f
+-- hash: c78f204d75cae4efb78c58197120b1e91b1e9dca55f97501615da4dd4941297a
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -72,6 +72,7 @@ library
       Slave.Tablet.MultiVersionKVStore
       Slave.Tablet.TabletInputHandler
       Slave.Tablet.TabletState
+      Thread.MasterThread
       Thread.SlaveThread
       Thread.TabletThread
   other-modules:

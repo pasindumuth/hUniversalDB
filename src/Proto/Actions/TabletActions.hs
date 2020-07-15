@@ -21,7 +21,7 @@ data InputAction =
 
 data OutputAction =
   Send { eIds :: [Co.EndpointId], msg :: Ms.Message} |
-  RetryOutput { counterValue :: Int } |
+  RetryOutput { counterValue :: Int, delay :: Int } |
   Print { message :: String }
   deriving (Gn.Generic, Bn.Binary, Show)
 

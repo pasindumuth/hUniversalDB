@@ -100,7 +100,7 @@ handleNextTask' task = do
       slaveEIds <- getL $ _5
       lp2 (_1, _4) .^ MP.insertMultiPaxos slaveEIds entry (Ta.msgWrapper task)
       counterValue <- _3.i'counter .^^. (+1)
-      addA $ Ac.retry counterValue
+      addA $ Ac.retry counterValue 100
 
 handleRetry
   :: (Ac.OutputAction outputActionT)
