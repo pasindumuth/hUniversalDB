@@ -39,7 +39,7 @@ import Infra.State
 --    of requests that were already sent. However, we add a slight bit of noise to this
 --    to simulate sending requests to the past (which sometimes we expect the system
 --    to reply with an error).
-generateRequest :: ST Tt.ClientState (Int, CRq.Payload)
+generateRequest :: STS Tt.ClientState (Int, CRq.Payload)
 generateRequest = do
   numTablets <- Tt.numTabletKeys .^^^ Mp.size
   slaveId :: Int <- Tt.clientRand .^^ Rn.randomR (0, 4)
@@ -110,7 +110,7 @@ generateRequest = do
       return $ trueTimestamp + noise
     makeRange i = Co.KeySpaceRange "d" ("t" ++ show i)
 
-analyzeResponses :: ST Tt.ClientState ()
+analyzeResponses :: STS Tt.ClientState ()
 analyzeResponses = do
   clientResponses <- Tt.clientResponses .^^^ Mp.toList
   Mo.forM_ clientResponses $ \(_, responses) ->
@@ -125,7 +125,7 @@ analyzeResponses = do
         CRs.RangeWrite CRsRW.Success -> Tt.requestStats.Tt.numRangeWriteSuccessRss .^^. (+1)
         CRs.RangeWrite CRsRW.BackwardsWrite -> Tt.requestStats.Tt.numRangeWriteBackwardsWriteRss .^^. (+1)
 
-test1 :: ST Tt.TestState ()
+test1 :: STS Tt.TestState ()
 test1 = do
   SM.addClientMsg 0 (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 0); SM.simulateAll
   SM.addClientMsg 1 (CRq.SlaveWrite "d" "t" "key1" "value1" 1); SM.simulateAll
@@ -133,7 +133,7 @@ test1 = do
   SM.addClientMsg 3 (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateAll
   SM.addClientMsg 2 (CRq.SlaveRead "d" "t" "key2" 3); SM.simulateAll
 
-test2 :: ST Tt.TestState ()
+test2 :: STS Tt.TestState ()
 test2 = do
   SM.addClientMsg 0 (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 0); SM.simulateN 2
   SM.addClientMsg 1 (CRq.SlaveWrite "d" "t" "key1" "value1" 1); SM.simulateN 2
@@ -142,7 +142,7 @@ test2 = do
   SM.addClientMsg 4 (CRq.SlaveWrite "d" "t" "key4" "value4" 4); SM.simulateN 2
   SM.addClientMsg 0 (CRq.SlaveWrite "d" "t" "key5" "value5" 5); SM.simulateAll
 
-test3 :: ST Tt.TestState ()
+test3 :: STS Tt.TestState ()
 test3 = do
   Mo.forM_ [1..100] $
     \_ -> do
@@ -155,7 +155,7 @@ test3 = do
 
 -- TODO: maybe we should take statistics on insertion retries. This will help
 -- verify PaxosTaskManager and it will help us understand wasted cycles.
-test4 :: ST Tt.TestState ()
+test4 :: STS Tt.TestState ()
 test4 = do
   Mo.forM_ [1..50] $
     \_ -> do
@@ -184,7 +184,7 @@ verifyTrace msgs =
         Left errMsg -> Left errMsg
         Right _ -> Right ()
 
-driveTest :: Int -> ST Tt.TestState () -> IO ()
+driveTest :: Int -> STS Tt.TestState () -> IO ()
 driveTest testNum test = do
   let g = SM.createTestState 0 5 1
       (_, (_, traceMsgs, g')) = runST test g

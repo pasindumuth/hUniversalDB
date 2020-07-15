@@ -10,7 +10,8 @@ import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
-import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Actions.SlaveActions as SAc
+import qualified Proto.Actions.TabletActions as TAc
 import qualified Proto.Common as Co
 import qualified Slave.SlaveInputHandler as SIH
 import qualified Slave.Env as En
@@ -21,11 +22,11 @@ import Infra.State
 
 slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
 
-type TabletMap = Mp.Map Co.KeySpaceRange (Ct.Chan Ac.TabletInputAction)
+type TabletMap = Mp.Map Co.KeySpaceRange (Ct.Chan TAc.InputAction)
 
 startSlaveThread
   :: Rn.StdGen
-  -> Ct.Chan (Ac.InputAction)
+  -> Ct.Chan (SAc.InputAction)
   -> MV.MVar Cn.Connections
   -> IO ()
 startSlaveThread rg iActionChan connM = do
@@ -40,18 +41,18 @@ startSlaveThread rg iActionChan connM = do
       conn <- MV.readMVar connM
       (g'', tabletMap') <- U.s31 Mo.foldM (g', tabletMap) oActions $ \(g', tabletMap) action ->
         case action of
-          Ac.Send eIds msg -> do
+          SAc.Send eIds msg -> do
             Mo.forM_ eIds $ \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
             return (g', tabletMap)
-          Ac.RetryOutput counterValue -> do
+          SAc.RetryOutput counterValue -> do
             Ct.forkIO $ do
               Ct.threadDelay 100000
-              Ct.writeChan iActionChan $ Ac.RetryInput counterValue
+              Ct.writeChan iActionChan $ SAc.RetryInput counterValue
             return (g', tabletMap)
-          Ac.Print message -> do
+          SAc.Print message -> do
             putStrLn message
             return (g', tabletMap)
-          Ac.Slave_CreateTablet ranges ->
+          SAc.Slave_CreateTablet ranges ->
             U.s31 Mo.foldM (g', tabletMap) ranges $ \(g', tabletMap) range ->
               if tabletMap & Mp.member range
                 then return (g', tabletMap)
@@ -62,8 +63,8 @@ startSlaveThread rg iActionChan connM = do
                   tabletIActionChan <- Ct.newChan
                   Ct.forkIO $ TT.startTabletThread tabletRand range tabletIActionChan connM
                   return (g'', tabletMap & Mp.insert range tabletIActionChan)
-          Ac.TabletForward range eId msg -> do
+          SAc.TabletForward range eId msg -> do
             let tabletIActionChan = tabletMap ^?! ix range
-            Ct.writeChan tabletIActionChan $ Ac.TabletReceive eId msg
+            Ct.writeChan tabletIActionChan $ TAc.Receive eId msg
             return (g', tabletMap)
       handlePaxosMessage g'' tabletMap'

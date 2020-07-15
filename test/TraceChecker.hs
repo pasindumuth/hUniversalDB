@@ -141,7 +141,7 @@ derivedStateIncorrectlyWrittenE requestPayload response =
 -- Rather than checking whether the oepration would fail or not by using
 -- safe operations, it's more compact to just fail fatally.
 -- TODO: maybe change all of these to assertions
-checkMsg :: TrM.TraceMessage -> ST CheckState (Either Co.ErrorMsg ())
+checkMsg :: TrM.TraceMessage -> STS CheckState (Either Co.ErrorMsg ())
 checkMsg msg = do
   case msg of
     TrM.PaxosInsertion paxosId _ paxosLogEntry ->

@@ -10,7 +10,7 @@ import qualified System.Random as Rn
 
 import qualified Net.Connections as Cn
 import qualified Paxos.MultiPaxosInstance as MP
-import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Actions.TabletActions as TAc
 import qualified Proto.Common as Co
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.Env as En
@@ -23,7 +23,7 @@ slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7
 startTabletThread
   :: Rn.StdGen
   -> Co.KeySpaceRange
-  -> Ct.Chan (Ac.TabletInputAction)
+  -> Ct.Chan (TAc.InputAction)
   -> MV.MVar Cn.Connections
   -> IO ()
 startTabletThread rg keySpaceRange iActionChan connM = do
@@ -37,13 +37,13 @@ startTabletThread rg keySpaceRange iActionChan connM = do
       conn <- MV.readMVar connM
       Mo.forM_ oActions $ \action ->
         case action of
-          Ac.Send eIds msg -> Mo.forM_ eIds $
+          TAc.Send eIds msg -> Mo.forM_ eIds $
             \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-          Ac.RetryOutput counterValue -> do
+          TAc.RetryOutput counterValue -> do
             Ct.forkIO $ do
               Ct.threadDelay 100000
-              Ct.writeChan iActionChan $ Ac.TabletRetryInput counterValue
+              Ct.writeChan iActionChan $ TAc.RetryInput counterValue
             return ()
-          Ac.Print message -> do
+          TAc.Print message -> do
             putStrLn message
       handlePaxosMessage g'

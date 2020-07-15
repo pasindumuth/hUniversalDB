@@ -71,7 +71,7 @@ handleDerivedState
   :: Co.PaxosId
   -> PL.PaxosLog
   -> PL.PaxosLog
-  -> ST DerivedState ()
+  -> STM DerivedState ()
 handleDerivedState paxosId pl pl' = do
   Mo.forM_ (PL.newlyAddedEntries pl pl') $ \(index, plEntry) -> do
       trace $ TrM.PaxosInsertion paxosId index plEntry

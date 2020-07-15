@@ -14,7 +14,7 @@ import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Paxos.Tasks.PaxosTaskManager as PTM
 import qualified Paxos.Tasks.Task as Ta
-import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Actions.MasterActions as MAc
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
@@ -30,7 +30,7 @@ import Infra.State
 handlingState :: Lens' MS.MasterState (
   MP.MultiPaxosInstance,
   DS.DerivedState,
-  PTM.PaxosTaskManager DS.DerivedState,
+  PTM.PaxosTaskManager DS.DerivedState MAc.OutputAction,
   Rn.StdGen,
   [Co.EndpointId])
 handlingState =
@@ -42,11 +42,11 @@ handlingState =
     MS.env.En.slaveEIds))
 
 handleInputAction
-  :: Ac.MasterInputAction
-  -> ST MS.MasterState ()
+  :: MAc.InputAction
+  -> STM MS.MasterState ()
 handleInputAction iAction =
   case iAction of
-    Ac.MasterReceive eId msg ->
+    MAc.Receive eId msg ->
       case msg of
         Ms.ClientRequest request -> do
           let requestId = request ^. CRq.meta . CRq.requestId
@@ -68,7 +68,7 @@ handleInputAction iAction =
               pl' <- getL $ MS.multiPaxosInstance.MP.paxosLog
               if (pl /= pl')
                 then do
-                  addA $ Ac.Print $ ppShow pl'
+                  addA $ MAc.Print $ ppShow pl'
                   paxosId <- getL $ MS.multiPaxosInstance.MP.paxosId
                   MS.derivedState .^ DS.handleDerivedState paxosId pl pl'
                   handlingState .^ PTM.handleInsert
@@ -92,9 +92,9 @@ handleInputAction iAction =
                 _ -> return ()
             _ -> U.caseError
         _ -> U.caseError
-    Ac.MasterRetryInput counterValue ->
+    MAc.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
-    Ac.PerformInput uid -> do
+    MAc.PerformInput uid -> do
       taskManager <- getL $ MS.derivedState . DS.networkTaskManager
       slaveGroupRanges <- getL $ MS.derivedState . DS.slaveGroupRanges
       lp0 .^ NTM.performTask uid taskManager slaveGroupRanges
@@ -108,7 +108,7 @@ createDatabaseTask
   -> Co.Timestamp
   -> String
   -> Co.UID
-  -> Ta.Task DS.DerivedState
+  -> Ta.Task DS.DerivedState MAc.OutputAction
 createDatabaseTask eId requestId databaseId tableId timestamp description uid =
   let keySpaceRange = Co.KeySpaceRange databaseId tableId
       sendResponse responseValue = do
@@ -117,7 +117,7 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
                 (CRs.Meta requestId)
                 (CRs.CreateDatabase responseValue)
         trace $ TrM.ClientResponseSent response
-        addA $ Ac.Send [eId] $ Ms.ClientResponse response
+        addA $ MAc.Send [eId] $ Ms.ClientResponse response
       tryHandling derivedState = do
         let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
         if timestamp <= lat
@@ -175,7 +175,7 @@ createPickKeySpace
   -> Co.Choice
   -> Co.UID
   -> String
-  -> Ta.Task DS.DerivedState
+  -> Ta.Task DS.DerivedState MAc.OutputAction
 createPickKeySpace requestId eId slaveGroupId timestamp choice uid description =
   let tryHandling derivedState = do
         case derivedState ^. DS.slaveGroupRanges & SGR.staticRead slaveGroupId timestamp of
@@ -191,7 +191,7 @@ createPickKeySpace requestId eId slaveGroupId timestamp choice uid description =
                 (CRs.Meta requestId)
                 (CRs.CreateDatabase responseValue)
         trace $ TrM.ClientResponseSent response
-        addA $ Ac.Send [eId] $ Ms.ClientResponse response
+        addA $ MAc.Send [eId] $ Ms.ClientResponse response
         return ()
       createPLEntry derivedState =
         PM.Master $ PM.PickKeySpace slaveGroupId choice uid

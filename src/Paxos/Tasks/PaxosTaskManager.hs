@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Paxos.Tasks.PaxosTaskManager (
   PaxosTaskManager,
@@ -27,29 +28,32 @@ import qualified Proto.Messages.PaxosMessages as PM
 import Infra.Lens
 import Infra.State
 
-data CurrentInsert derivedStateT = CurrentInsert {
+data CurrentInsert derivedStateT outputActionT = CurrentInsert {
   _i'index :: Int,
   _i'entry :: PM.PaxosLogEntry,
-  _i'task :: Ta.Task derivedStateT
+  _i'task :: Ta.Task derivedStateT outputActionT
 } deriving (Show)
 
-data PaxosTaskManager derivedStateT = PaxosTaskManager {
-  _i'currentInsert :: Maybe (CurrentInsert derivedStateT),
-  _i'taskQueue :: Sq.Seq (Ta.Task derivedStateT),
+data PaxosTaskManager derivedStateT outputActionT = PaxosTaskManager {
+  _i'currentInsert :: Maybe (CurrentInsert derivedStateT outputActionT),
+  _i'taskQueue :: Sq.Seq (Ta.Task derivedStateT outputActionT),
   _i'counter :: Int
 } deriving (Gn.Generic, Df.Default, Show)
 
 makeLenses ''CurrentInsert
 makeLenses ''PaxosTaskManager
 
-type HandlingState derivedStateT = (
+type HandlingState derivedStateT outputActionT = (
   MP.MultiPaxosInstance,
   derivedStateT,
-  PaxosTaskManager derivedStateT,
+  PaxosTaskManager derivedStateT outputActionT,
   Rn.StdGen,
   [Co.EndpointId])
 
-handleTask :: Ta.Task derivedStateT -> ST (HandlingState derivedStateT) ()
+handleTask
+  :: (Ac.OutputAction outputActionT)
+  => Ta.Task derivedStateT outputActionT
+  -> ST outputActionT (HandlingState derivedStateT outputActionT) ()
 handleTask task = do
   derivedState <- getL $ _2
   requestHandled <- lp0 .^ Ta.tryHandling task derivedState
@@ -61,7 +65,9 @@ handleTask task = do
         then handleNextTask
         else return ()
 
-handleNextTask :: ST (HandlingState derivedStateT) ()
+handleNextTask
+  :: (Ac.OutputAction outputActionT)
+  => ST outputActionT (HandlingState derivedStateT outputActionT) ()
 handleNextTask = do
   taskQueue <- getL $ _3.i'taskQueue
   if Sq.length taskQueue > 0
@@ -70,12 +76,17 @@ handleNextTask = do
       handleNextTask' task
     else return ()
 
-pollAndNext :: ST (HandlingState derivedStateT) ()
+pollAndNext
+  :: (Ac.OutputAction outputActionT)
+  => ST outputActionT (HandlingState derivedStateT outputActionT) ()
 pollAndNext = do
   _3 . i'taskQueue .^^ U.poll
   handleNextTask
 
-handleNextTask' :: Ta.Task derivedStateT -> ST (HandlingState derivedStateT) ()
+handleNextTask'
+  :: (Ac.OutputAction outputActionT)
+  => Ta.Task derivedStateT outputActionT
+  -> ST outputActionT (HandlingState derivedStateT outputActionT) ()
 handleNextTask' task = do
   _3.i'currentInsert .^^. \_ -> Nothing
   derivedState <- getL $ _2
@@ -89,9 +100,12 @@ handleNextTask' task = do
       slaveEIds <- getL $ _5
       lp2 (_1, _4) .^ MP.insertMultiPaxos slaveEIds entry (Ta.msgWrapper task)
       counterValue <- _3.i'counter .^^. (+1)
-      addA $ Ac.RetryOutput counterValue
+      addA $ Ac.retry counterValue
 
-handleRetry :: Int -> ST (HandlingState derivedStateT) ()
+handleRetry
+  :: (Ac.OutputAction outputActionT)
+  => Int
+  -> ST outputActionT (HandlingState derivedStateT outputActionT) ()
 handleRetry counterValue = do
   currentInsertM <- getL $ _3.i'currentInsert
   counter <- getL $ _3.i'counter
@@ -100,7 +114,9 @@ handleRetry counterValue = do
       handleNextTask' task
     _ -> return ()
 
-handleInsert :: ST (HandlingState derivedStateT) ()
+handleInsert
+  :: (Ac.OutputAction outputActionT)
+  => ST outputActionT (HandlingState derivedStateT outputActionT) ()
 handleInsert = do
   currentInsertM <- getL $ _3.i'currentInsert
   case currentInsertM of

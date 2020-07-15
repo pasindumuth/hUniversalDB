@@ -12,6 +12,7 @@ import qualified System.Random as Rn
 
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.Tasks.PaxosTaskManager as PTM
+import qualified Proto.Actions.SlaveActions as SAc
 import qualified Proto.Common as Co
 import qualified Slave.DerivedState as DS
 import qualified Slave.Env as En
@@ -20,7 +21,7 @@ import Infra.Lens
 data SlaveState = SlaveState {
   _multiPaxosInstance :: MP.MultiPaxosInstance,
   _derivedState :: DS.DerivedState,
-  _paxosTaskManager :: PTM.PaxosTaskManager DS.DerivedState,
+  _paxosTaskManager :: PTM.PaxosTaskManager DS.DerivedState SAc.OutputAction,
   _env :: En.Env
 } deriving (Gn.Generic, Show)
 

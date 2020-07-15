@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Paxos.PaxosInstance (
   PaxosInstance,
@@ -56,12 +57,12 @@ data Action =
   Choose M.PaxosLogEntry |
   Stall
 
-propose :: M.Rnd -> M.Val -> ST ProposerState Action
+propose :: M.Rnd -> M.Val -> ST outputActionT ProposerState Action
 propose crnd cval = do
   id .^^. i'proposals %~ (Mp.insert crnd (Proposal crnd cval []))
   return $ Broadcast $ M.Prepare crnd
 
-prepare :: M.Rnd -> ST AcceptorState Action
+prepare :: M.Rnd -> ST outputActionT AcceptorState Action
 prepare crnd = do
   s <- getL id
   if s ^. i'rnd >= crnd
@@ -70,7 +71,7 @@ prepare crnd = do
       id .^^. i'rnd .~ crnd
       return $ Reply $ M.Promise crnd (s ^. i'vrnd) (s ^. i'vval)
 
-promise :: M.Rnd -> M.Rnd -> Maybe M.Val -> ST Proposal Action
+promise :: M.Rnd -> M.Rnd -> Maybe M.Val -> ST outputActionT Proposal Action
 promise rnd vrnd vval = do
   promises' <- i'promises .^^. ((vrnd, vval):)
   s <- getL id
@@ -85,7 +86,7 @@ promise rnd vrnd vval = do
                         in cval
       return $ Broadcast $ M.Accept (s ^. i'crnd) cval'
 
-accept :: M.Rnd -> M.Val -> ST AcceptorState Action
+accept :: M.Rnd -> M.Val -> ST outputActionT AcceptorState Action
 accept crnd cval = do
   rnd <- getL i'rnd
   if crnd < rnd
@@ -94,7 +95,7 @@ accept crnd cval = do
       id .^^. \_ -> AcceptorState crnd crnd (Just cval)
       return $ Broadcast $ M.Learn crnd cval
 
-learn :: M.Rnd -> M.Val -> ST LearnerState Action
+learn :: M.Rnd -> M.Val -> ST outputActionT LearnerState Action
 learn lrnd lval = do
   learns <- getL i'learns
   let count = case learns & Mp.lookup lrnd of
@@ -107,7 +108,7 @@ learn lrnd lval = do
 
 handlePaxos
   :: M.PaxosMessage
-  -> ST PaxosInstance Action
+  -> ST outputActionT PaxosInstance Action
 handlePaxos msg = do
   case msg of
     M.Propose crnd cval -> i'proposerState .^ propose crnd cval

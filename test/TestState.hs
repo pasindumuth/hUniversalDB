@@ -10,7 +10,8 @@ import qualified Data.Set as St
 import qualified Data.Sequence as Sq
 import qualified System.Random as Rn
 
-import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Actions.SlaveActions as SAc
+import qualified Proto.Actions.TabletActions as TAc
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Slave.SlaveState as SS
@@ -67,8 +68,8 @@ data TestState = TestState {
   _tabletStates :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange TS.TabletState),
   -- The following are everything related to asynchronous computation
   -- done at a node.
-  _slaveAsyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (Ac.InputAction, Int)),
-  _tabletAsyncQueues :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange (Sq.Seq (Ac.TabletInputAction, Int))),
+  _slaveAsyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (SAc.InputAction, Int)),
+  _tabletAsyncQueues :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange (Sq.Seq (TAc.InputAction, Int))),
   _clocks :: Mp.Map Co.EndpointId Int,
   -- Client field
   _clientState :: ClientState

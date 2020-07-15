@@ -15,7 +15,7 @@ import qualified Data.Map as Mp
 import qualified GHC.Generics as Gn
 
 import qualified Master.SlaveGroupRanges as SGR
-import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Actions.MasterActions as MAc
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
@@ -36,7 +36,7 @@ makeLenses ''NetworkTaskManager
 taskMap :: Lens' NetworkTaskManager (Mp.Map Co.UID NetworkTask)
 taskMap = i'taskMap
 
-performTask :: Co.UID -> NetworkTaskManager -> SGR.SlaveGroupRanges -> ST () ()
+performTask :: Co.UID -> NetworkTaskManager -> SGR.SlaveGroupRanges -> STM () ()
 performTask uid taskManager slaveGroupRanges = do
   case Mp.lookup uid (taskManager ^. i'taskMap) of
     Just task ->
@@ -55,7 +55,7 @@ performTask uid taskManager slaveGroupRanges = do
                   -- and then picking a slave that's not dead. Also, we need to know if this master should even
                   -- be doing this (since this might be a backup master).
                   slaveEId = "universal0"
-              addA $ Ac.Send [slaveEId] request
-              addA $ Ac.PerformOutput uid 100
+              addA $ MAc.Send [slaveEId] request
+              addA $ MAc.PerformOutput uid 100
             _ -> return ()
     _ -> return ()

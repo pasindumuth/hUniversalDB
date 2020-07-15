@@ -18,7 +18,7 @@ import qualified System.Random as Rn
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
-import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Actions.SlaveActions as SAc
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Slave.Tablet.TabletInputHandler as TIH
@@ -78,12 +78,12 @@ acceptClientConn connM receiveChan =
 
 handleReceive
   :: Ct.Chan (Co.EndpointId, Ms.Message)
-  -> Ct.Chan (Ac.InputAction)
+  -> Ct.Chan (SAc.InputAction)
   -> IO ()
 handleReceive receiveChan iActionChan = do
   Mo.forever $ do
     (eId, msg) <- Ct.readChan receiveChan
-    Ct.writeChan iActionChan $ Ac.Receive eId msg
+    Ct.writeChan iActionChan $ SAc.Receive eId msg
 
 startSlave :: String -> String -> [String] -> IO ()
 startSlave seedStr curIP otherIPs = do

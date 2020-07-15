@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Paxos.MultiPaxosInstance (
   MultiPaxosInstance,
@@ -50,7 +51,9 @@ paxosId = i'paxosId
 paxosLog :: Lens' MultiPaxosInstance PL.PaxosLog
 paxosLog = i'paxosLog
 
-getPaxosInstance :: PM.IndexT -> ST MultiPaxosInstance PI.PaxosInstance
+getPaxosInstance
+  :: PM.IndexT
+  -> ST outputActionT MultiPaxosInstance PI.PaxosInstance
 getPaxosInstance index = do
   pIM <- getL $ i'paxosInstances . at index
   case pIM of
@@ -61,10 +64,11 @@ getPaxosInstance index = do
       return paxosInstance
 
 insertMultiPaxos
-  :: [Co.EndpointId]
+  :: (Ac.OutputAction outputActionT)
+  => [Co.EndpointId]
   -> PM.PaxosLogEntry
   -> (PM.MultiPaxosMessage -> Ms.Message)
-  -> ST (MultiPaxosInstance, Rn.StdGen) ()
+  -> ST outputActionT (MultiPaxosInstance, Rn.StdGen) ()
 insertMultiPaxos slaveEIds entry msgWrapper = do
   r <- _2 .^^ Rn.randomR (1, maxRndIncrease)
   index <- _1.i'paxosLog .^^^ PL.nextAvailableIndex
@@ -74,21 +78,22 @@ insertMultiPaxos slaveEIds entry msgWrapper = do
                  Nothing -> r
   action <- _1 . i'paxosInstances . ix index .^* (PI.handlePaxos $ PM.Propose nextRnd entry)
   case action of
-    PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
+    PI.Broadcast paxosMessage -> addA $ Ac.send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
     _ -> U.caseError
 
 handleMultiPaxos
-  :: Co.EndpointId
+  :: (Ac.OutputAction outputActionT)
+  => Co.EndpointId
   -> [Co.EndpointId]
   -> PM.MultiPaxosMessage
   -> (PM.MultiPaxosMessage -> Ms.Message)
-  -> ST (MultiPaxosInstance, Rn.StdGen) ()
+  -> ST outputActionT (MultiPaxosInstance, Rn.StdGen) ()
 handleMultiPaxos fromEId slaveEIds (PM.PaxosMessage index pMsg) msgWrapper = do
   _1 .^ getPaxosInstance index
   action <- _1 . i'paxosInstances . ix index .^* (PI.handlePaxos pMsg)
   case action of
-    PI.Reply paxosMessage -> addA $ Ac.Send [fromEId] $ msgWrapper $ PM.PaxosMessage index paxosMessage
-    PI.Broadcast paxosMessage -> addA $ Ac.Send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
+    PI.Reply paxosMessage -> addA $ Ac.send [fromEId] $ msgWrapper $ PM.PaxosMessage index paxosMessage
+    PI.Broadcast paxosMessage -> addA $ Ac.send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
     PI.Choose chosenValue -> do
       _1.i'paxosLog .^^. (PL.insert index chosenValue)
       return ()

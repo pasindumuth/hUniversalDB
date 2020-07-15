@@ -9,7 +9,8 @@ import qualified Data.Sequence as Sq
 import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
-import qualified Proto.Actions.Actions as Ac
+import qualified Proto.Actions.SlaveActions as SAc
+import qualified Proto.Actions.TabletActions as TAc
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
@@ -84,7 +85,7 @@ createTestState seed numSlaves numClients =
       }
     }
 
-addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> ST Tt.TestState ()
+addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> STS Tt.TestState ()
 addMsg msg (fromEId, toEId) = do
   queue <- Tt.queues . ix fromEId . ix toEId .^^.* U.push msg
   if Sq.length queue == 1
@@ -92,7 +93,7 @@ addMsg msg (fromEId, toEId) = do
     else Tt.nonemptyQueues .^^. id
   return ()
 
-pollMsg :: (Co.EndpointId, Co.EndpointId) -> ST Tt.TestState Ms.Message
+pollMsg :: (Co.EndpointId, Co.EndpointId) -> STS Tt.TestState Ms.Message
 pollMsg (fromEId, toEId) = do
   msg <- Tt.queues . ix fromEId . ix toEId .^^* U.poll
   queueLength <- Tt.queues . ix fromEId . ix toEId .^^^* Sq.length
@@ -104,30 +105,30 @@ pollMsg (fromEId, toEId) = do
 runTabletIAction
   :: Co.EndpointId
   -> Co.KeySpaceRange
-  -> Ac.TabletInputAction
-  -> ST Tt.TestState ()
+  -> TAc.InputAction
+  -> STS Tt.TestState ()
 runTabletIAction eId range iAction = do
   (_, msgsO) <- runT (Tt.tabletStates . ix eId . ix range) (TIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
     case msgO of
-      Ac.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
-      Ac.RetryOutput counterValue -> do
+      TAc.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
+      TAc.RetryOutput counterValue -> do
         currentTime <- getT $ Tt.clocks . ix eId
-        Tt.tabletAsyncQueues . ix eId . ix range .^^.* U.push (Ac.TabletRetryInput counterValue, currentTime + 100)
+        Tt.tabletAsyncQueues . ix eId . ix range .^^.* U.push (TAc.RetryInput counterValue, currentTime + 100)
         return ()
       _ -> return ()
 
-runIAction :: Co.EndpointId -> Ac.InputAction -> ST Tt.TestState ()
+runIAction :: Co.EndpointId -> SAc.InputAction -> STS Tt.TestState ()
 runIAction eId iAction = do
   (_, msgsO) <- runT (Tt.slaveState . ix eId) (SIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
     case msgO of
-      Ac.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
-      Ac.RetryOutput counterValue -> do
+      SAc.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
+      SAc.RetryOutput counterValue -> do
         currentTime <- getT $ Tt.clocks . ix eId
-        Tt.slaveAsyncQueues . ix eId .^^.* U.push (Ac.RetryInput counterValue, currentTime + 100)
+        Tt.slaveAsyncQueues . ix eId .^^.* U.push (SAc.RetryInput counterValue, currentTime + 100)
         return ()
-      Ac.Slave_CreateTablet ranges' -> do
+      SAc.Slave_CreateTablet ranges' -> do
         ranges <- getT $ Tt.tabletStates . ix eId
         Mo.forM_ ranges' $ \range -> do
           if Mp.member range ranges
@@ -138,21 +139,21 @@ runIAction eId iAction = do
               let tabletState = TS.constructor (show range) (Rn.mkStdGen r) slaveEIds range
               Tt.tabletStates . ix eId .^^.* Mp.insert range tabletState
               return ()
-      Ac.TabletForward range clientEId tabletMsg -> do
-        runTabletIAction eId range (Ac.TabletReceive clientEId tabletMsg)
+      SAc.TabletForward range clientEId tabletMsg -> do
+        runTabletIAction eId range (TAc.Receive clientEId tabletMsg)
       _ -> return ()
 
-deliverMessage :: (Co.EndpointId, Co.EndpointId) -> ST Tt.TestState ()
+deliverMessage :: (Co.EndpointId, Co.EndpointId) -> STS Tt.TestState ()
 deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
   slaveEIds' <- getL $ Tt.slaveEIds
   if Li.elem toEId slaveEIds'
-    then runIAction toEId $ Ac.Receive fromEId msg
+    then runIAction toEId $ SAc.Receive fromEId msg
     else do
       Tt.clientState . Tt.clientResponses . ix toEId .^^.* (msg:)
       return ()
 
-dropMessages :: Int -> ST Tt.TestState ()
+dropMessages :: Int -> STS Tt.TestState ()
 dropMessages numMessages = do
   Mo.forM_ [1..numMessages] $ \_ -> do
     length <- Tt.nonemptyQueues .^^^ St.size
@@ -169,7 +170,7 @@ skewProb = 95
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
 -- `numMessages` number of messages.
-simulateOnce :: Int -> ST Tt.TestState ()
+simulateOnce :: Int -> STS Tt.TestState ()
 simulateOnce numMessages = do
   -- increment each slave's clocks and run async tasks that are now ready
   eIds <- getL Tt.slaveEIds
@@ -211,14 +212,14 @@ simulateOnce numMessages = do
         deliverMessage queueId
 
 -- Simulate `n` milliseconds of execution
-simulateN :: Int -> ST Tt.TestState ()
+simulateN :: Int -> STS Tt.TestState ()
 simulateN n = do
   numChans <- lp2 (Tt.slaveEIds, Tt.clientEIds) .^^^ \(s, c) -> (length s) + (length c)
   Mo.forM_ [1..n] $ \_ -> simulateOnce (numChans * (numChans + 1) `div` 2)
 
 -- Simulate execution until there are no more messages in any channel
 -- or any asyncQueue.
-simulateAll :: ST Tt.TestState ()
+simulateAll :: STS Tt.TestState ()
 simulateAll = do
   numChans <- lp2 (Tt.slaveEIds, Tt.clientEIds) .^^^ \(s, c) -> (length s) + (length c)
   let simulate =
@@ -236,7 +237,7 @@ simulateAll = do
 addClientMsg
   :: Int
   -> CRq.Payload
-  -> ST Tt.TestState ()
+  -> STS Tt.TestState ()
 addClientMsg slaveId payload = do
   uid <- Tt.clientState . Tt.nextUid .^^. (+1)
   let (clientEId, slaveEId) = (mkClientEId 0, mkSlaveEId slaveId)

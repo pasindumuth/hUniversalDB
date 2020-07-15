@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a6cfd599ad888129fd7c89e421e909d59b63476ccd44d8beb084b6a2e575c717
+-- hash: 0d97a475cfcbf0bc431ff7e4b46f0dfe259d2cbe643ad8d762f0e0cc0990f93f
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -45,6 +45,9 @@ library
       Paxos.Tasks.PaxosTaskManager
       Paxos.Tasks.Task
       Proto.Actions.Actions
+      Proto.Actions.MasterActions
+      Proto.Actions.SlaveActions
+      Proto.Actions.TabletActions
       Proto.Common
       Proto.Messages
       Proto.Messages.ClientRequests
