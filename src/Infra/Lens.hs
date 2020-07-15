@@ -2,24 +2,20 @@
 
 module Infra.Lens (
   makeLenses,
-  (%~),
-  (.~),
-  (^.),
-  (&),
-  (?~),
-  (^?!),
-  (%^^),
-  (%^^*),
-  (%^^^),
-  (%^^^*),
-  Lens',
-  at,
-  ix,
+  (%~), (.~), (^.), (&), (?~), (^?!),
+  (%^^), (%^^*), (%^^^), (%^^^*),
+  Lens', Getter,
+  at, ix,
   lp0, lp2, lp3, lp4, lp5, lp6,
   _1, _2, _3, _4, _5, _6,
 ) where
 
-import Control.Lens (makeLenses, (%~), (.~), (^.), (&), (?~), (^?!), Lens', Traversal', _1, _2, _3, _4, _5, _6, ALens', ASetter, (^#), (<&>), (#~))
+import Control.Lens (
+  makeLenses,
+  (%~), (.~), (^.), (&), (?~), (^?!),
+  Lens', Traversal', ALens', ASetter, Getter,
+  _1, _2, _3, _4, _5, _6,
+  (^#), (<&>), (#~))
 import Control.Lens.At (at, ix)
 
 infixr 4 %^^

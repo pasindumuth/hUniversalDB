@@ -6,6 +6,7 @@ import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
 import qualified Master.DerivedState as DS
+import qualified Master.DerivedStateHandler as DSH
 import qualified Master.Env as En
 import qualified Master.MasterState as MS
 import qualified Master.SlaveGroupRanges as SGR
@@ -70,7 +71,7 @@ handleInputAction iAction =
                 then do
                   addA $ MAc.Print $ ppShow pl'
                   paxosId <- getL $ MS.multiPaxosInstance.MP.paxosId
-                  MS.derivedState .^ DS.handleDerivedState paxosId pl pl'
+                  MS.derivedState .^ DSH.handleDerivedState paxosId pl pl'
                   handlingState .^ PTM.handleInsert
                 else return ()
         Ms.ClientResponse response -> do
@@ -130,7 +131,7 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
             return True
           else do
             let latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
-                exists = DS.rangeExists keySpaceRange latestValues
+                exists = DSH.rangeExists keySpaceRange latestValues
             if Mb.isJust exists
               -- We return False so that the entry the PL entry can be inserted, which
               -- will then update the lat before sending back AlreadyExists.
@@ -146,7 +147,7 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
                                 elem keySpaceRange (changingKeySpace ^. Co.oldKeySpace) ||
                                 elem keySpaceRange (changingKeySpace ^. Co.newKeySpace)
                               _ -> False
-                    freeGroupM = DS.findFreeGroupM latestValues
+                    freeGroupM = DSH.findFreeGroupM latestValues
                 if maybeExists || Mb.isNothing freeGroupM
                   then do
                     sendResponse CRsCD.NothingChanged
@@ -155,7 +156,7 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
       done derivedState = do
         let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
             latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
-            exists = DS.rangeExists keySpaceRange latestValues
+            exists = DSH.rangeExists keySpaceRange latestValues
         if Mb.isJust exists
           then sendResponse CRsCD.AlreadyExists
           else
