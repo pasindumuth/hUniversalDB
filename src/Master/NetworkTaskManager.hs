@@ -24,8 +24,9 @@ import Infra.Lens
 import Infra.State
 
 data NetworkTask =
-  CreateDatabase Co.EndpointId Co.RequestId Co.Timestamp Co.SlaveGroupId
-  deriving (Gn.Generic, Df.Default, Show)
+  CreateDatabase Co.EndpointId Co.RequestId Co.Timestamp Co.SlaveGroupId |
+  DeleteDatabase Co.EndpointId Co.RequestId Co.Timestamp Co.SlaveGroupId
+  deriving (Show)
 
 data NetworkTaskManager = NetworkTaskManager {
   _i'taskMap :: Mp.Map Co.UID NetworkTask
@@ -46,21 +47,24 @@ performTask uid taskManager slaveGroupRanges slaveEIds = do
   case Mp.lookup uid (taskManager ^. i'taskMap) of
     Just task ->
       case task of
-        CreateDatabase _ _ timestamp slaveGroupId -> do
-          case SGR.staticRead slaveGroupId timestamp slaveGroupRanges of
-            Just (_, SGR.Changing changingKeySpace) -> do
-              -- TODO: we should probably have a different type of message for communication between
-              -- the Datamaster and the slaves.
-              let request =
-                    Ms.ClientRequest
-                      (CRq.ClientRequest
-                        (CRq.Meta uid)
-                        (CRq.RangeWrite (changingKeySpace ^. Co.newKeySpace) timestamp))
-                  -- TODO: This is so wrong in so many ways. We should be accessing a table indexed by SlaveGroupId,
-                  -- and then picking a slave that's not dead. Also, we need to know if this master should even
-                  -- be doing this (since this might be a backup master).
-                  (slaveEId:_) = slaveEIds
-              addA $ MAc.Send [slaveEId] request
-              addA $ MAc.PerformOutput uid 100
-            _ -> return ()
+        CreateDatabase _ _ timestamp slaveGroupId -> handleRangeWrite timestamp slaveGroupId
+        DeleteDatabase _ _ timestamp slaveGroupId -> handleRangeWrite timestamp slaveGroupId
     _ -> return ()
+  where
+    handleRangeWrite timestamp slaveGroupId = do
+      case SGR.staticRead slaveGroupId timestamp slaveGroupRanges of
+        Just (_, SGR.Changing changingKeySpace) -> do
+          -- TODO: we should probably have a different type of message for communication between
+          -- the Datamaster and the slaves.
+          let request =
+                Ms.ClientRequest
+                  (CRq.ClientRequest
+                    (CRq.Meta uid)
+                    (CRq.RangeWrite (changingKeySpace ^. Co.newKeySpace) timestamp))
+              -- TODO: This is so wrong in so many ways. We should be accessing a table indexed by SlaveGroupId,
+              -- and then picking a slave that's not dead. Also, we need to know if this master should even
+              -- be doing this (since this might be a backup master).
+              (slaveEId:_) = slaveEIds
+          addA $ MAc.Send [slaveEId] request
+          addA $ MAc.PerformOutput uid 100
+        _ -> return ()

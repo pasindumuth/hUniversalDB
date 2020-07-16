@@ -36,6 +36,10 @@ data Payload =
   CreateDatabase {
     databaseId :: Co.DatabaseId,
     tableId :: Co.TableId,
+    timestamp :: Co.Timestamp } |
+  DeleteDatabase {
+    databaseId :: Co.DatabaseId,
+    tableId :: Co.TableId,
     timestamp :: Co.Timestamp }
   deriving (Gn.Generic, Bn.Binary, Show)
 

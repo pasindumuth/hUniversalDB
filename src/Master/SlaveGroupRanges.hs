@@ -9,6 +9,7 @@ module Master.SlaveGroupRanges (
   Master.SlaveGroupRanges.read,
   staticReadLat,
   staticRead,
+  readAll,
   staticReadAll,
   write,
   pick
@@ -75,6 +76,15 @@ staticRead slaveGroupId timestamp s =
         [] -> Nothing
     Nothing -> Ex.assert False Nothing
 
+readAll
+  :: Co.Timestamp
+  -> SlaveGroupRanges
+  -> (Mp.Map Co.SlaveGroupId (Maybe (Co.Timestamp, Value)), SlaveGroupRanges)
+readAll timestamp s =
+  (staticReadAll timestamp s, s & i'lat .~ (max (s ^. i'lat) timestamp))
+
+-- TODO: call this unsafeReadAll, since it doesn't assert the timestamp
+-- to be less than lat.
 staticReadAll
   :: Co.Timestamp
   -> SlaveGroupRanges

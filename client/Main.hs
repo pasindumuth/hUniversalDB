@@ -8,6 +8,7 @@ module Main where
 
 import qualified Control.Concurrent as Ct
 import qualified Control.Monad as Mo
+import qualified Data.List as Li
 import qualified Network.Simple.TCP as TCP
 import qualified System.Environment as SE
 
@@ -24,6 +25,7 @@ import Infra.State
 -- w d t k v 0
 -- wr d t 1
 -- c d t 1
+-- d d t 1
 startClient :: String -> String -> IO ()
 startClient mip sip = do
   Lg.infoM Lg.main "Starting client"
@@ -71,6 +73,14 @@ startClient mip sip = do
                       (CRq.ClientRequest
                         (CRq.Meta uid)
                         (CRq.CreateDatabase databaseId tableId (read timestamp)))
+                  return ranges'
+                ["d", databaseId, tableId, timestamp] -> do
+                  let ranges' = Li.delete (Co.KeySpaceRange databaseId tableId) ranges
+                  Cn.sendMessage masterSocket $
+                    Ms.ClientRequest
+                      (CRq.ClientRequest
+                        (CRq.Meta uid)
+                        (CRq.DeleteDatabase databaseId tableId (read timestamp)))
                   return ranges'
                 _ -> do
                   putStrLn $ ppShow "Unrecognized command or number of arguments"

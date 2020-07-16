@@ -21,6 +21,7 @@ import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.ClientResponses.CreateDatabase as CRsCD
+import qualified Proto.Messages.ClientResponses.DeleteDatabase as CRsDD
 import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.MasterMessages as MM
@@ -58,6 +59,11 @@ handleInputAction iAction =
               let description = show (eId, request)
                   task = createDatabaseTask eId requestId databaseId tableId timestamp description uid
               handlingState .^ (PTM.handleTask task)
+            CRq.DeleteDatabase databaseId tableId timestamp -> do
+              uid <- MS.env . En.rand .^^ U.mkUID
+              let description = show (eId, request)
+                  task = deleteDatabaseTask eId requestId databaseId tableId timestamp description uid
+              handlingState .^ (PTM.handleTask task)
             _ -> U.caseError
         Ms.MasterMessage masterMsg ->
           case masterMsg of
@@ -80,15 +86,34 @@ handleInputAction iAction =
               let uid = response ^. CRs.meta . CRs.requestId
               taskMap <- getL $ MS.derivedState . DS.networkTaskManager . NTM.taskMap
               case Mp.lookup uid taskMap of
-                Just task ->
+                Just task -> do
+                  let choice =
+                        case rangeWrite of
+                          CRsRW.Success -> Co.NewChoice
+                          _ -> Co.OldChoice
                   case task of
                     NTM.CreateDatabase eId requestId timestamp slaveGroupId -> do
                       let description = show (eId, response)
-                          choice =
-                            case rangeWrite of
-                              CRsRW.Success -> Co.NewChoice
-                              _ -> Co.OldChoice
-                          task = createPickKeySpace requestId eId slaveGroupId timestamp choice uid description
+                          response =
+                            CRs.ClientResponse
+                              (CRs.Meta requestId)
+                              (CRs.CreateDatabase (
+                                case choice of
+                                  Co.NewChoice -> CRsCD.Success
+                                  Co.OldChoice -> CRsCD.BackwardsWrite))
+                          task = createPickKeySpace response eId slaveGroupId timestamp choice uid description
+                      handlingState .^ (PTM.handleTask task)
+                      return ()
+                    NTM.DeleteDatabase eId requestId timestamp slaveGroupId -> do
+                      let description = show (eId, response)
+                          response =
+                            CRs.ClientResponse
+                              (CRs.Meta requestId)
+                              (CRs.DeleteDatabase (
+                                case choice of
+                                  Co.NewChoice -> CRsDD.Success
+                                  Co.OldChoice -> CRsDD.BackwardsWrite))
+                          task = createPickKeySpace response eId slaveGroupId timestamp choice uid description
                       handlingState .^ (PTM.handleTask task)
                       return ()
                 _ -> return ()
@@ -137,19 +162,11 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
               -- will then update the lat before sending back AlreadyExists.
               then return False
               else do
-                let maybeExists =
-                      U.s31 Mp.foldl False latestValues $ \maybeExists value ->
-                        if maybeExists
-                          then maybeExists
-                          else
-                            case value of
-                              Just (_, SGR.Changing changingKeySpace) ->
-                                elem keySpaceRange (changingKeySpace ^. Co.oldKeySpace) ||
-                                elem keySpaceRange (changingKeySpace ^. Co.newKeySpace)
-                              _ -> False
+                let maybeExists = DSH.rangeMaybeExists keySpaceRange latestValues
                     freeGroupM = DSH.findFreeGroupM latestValues
                 if maybeExists || Mb.isNothing freeGroupM
                   then do
+                    -- In this case, we can't fullfill the request, so respond with an error.
                     sendResponse CRsCD.NothingChanged
                     return True
                   else return False
@@ -160,7 +177,7 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
         if Mb.isJust exists
           then sendResponse CRsCD.AlreadyExists
           else
-            -- The only reason we can be here is if we can go ahead and finish the creation
+            -- The only reason we can be here is if we can go ahead and finish the creation.
             NTM.performTask uid
               (derivedState ^. DS.networkTaskManager)
               (derivedState ^. DS.slaveGroupRanges)
@@ -170,29 +187,81 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
       msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage
   in Ta.Task description tryHandling done createPLEntry msgWrapper
 
-createPickKeySpace
-  :: Co.SlaveGroupId
+deleteDatabaseTask
+  :: Co.EndpointId
   -> Co.RequestId
+  -> Co.DatabaseId
+  -> Co.TableId
+  -> Co.Timestamp
+  -> String
+  -> Co.UID
+  -> Ta.Task DS.DerivedState MAc.OutputAction
+deleteDatabaseTask eId requestId databaseId tableId timestamp description uid =
+  let keySpaceRange = Co.KeySpaceRange databaseId tableId
+      sendResponse responseValue = do
+        let response =
+              CRs.ClientResponse
+                (CRs.Meta requestId)
+                (CRs.DeleteDatabase responseValue)
+        trace $ TrM.ClientResponseSent response
+        addA $ MAc.Send [eId] $ Ms.ClientResponse response
+      tryHandling derivedState = do
+        let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
+        if timestamp <= lat
+          then do
+            sendResponse CRsDD.BackwardsWrite
+            return True
+          else do
+            let latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
+                exists = DSH.rangeExists keySpaceRange latestValues
+            if Mb.isJust exists
+              -- We return False, since this is the only valid case for deleting a KeySpaceRange.
+              then return False
+              else
+                if DSH.rangeMaybeExists keySpaceRange latestValues
+                  then do
+                    -- In this case, we can't fullfill the request due to uncertainty,
+                    -- so respond with an error.
+                    sendResponse CRsDD.NothingChanged
+                    return True
+                  -- In this case, the KeySpaceRange doesn't exist or have potential for exists,
+                  -- so w return False so that the entry the PL entry can be inserted, which
+                  -- will then update the lat before sending back DoesNotExist.
+                  else return False
+      done derivedState = do
+        let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
+            latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
+        -- We only got here because the keySpaceRange didn't exist or didn't maybeExist, or because
+        -- it existed. If it did exist, DSH would made a NewKeySpace out of it by now. Thus, to know
+        -- how to processeed, we look for a NewKeySpace with the KeySpaceRange.
+        if DSH.rangeMaybeExists keySpaceRange latestValues
+          then
+            -- The only reason we can be here is if we can go ahead and finish the deletion.
+            NTM.performTask uid
+              (derivedState ^. DS.networkTaskManager)
+              (derivedState ^. DS.slaveGroupRanges)
+              (derivedState ^. DS.slaveEIds)
+          else sendResponse CRsDD.DoesNotExist
+      createPLEntry derivedState =
+        PM.Master $ PM.DeleteDatabase requestId databaseId tableId timestamp eId uid
+      msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage
+  in Ta.Task description tryHandling done createPLEntry msgWrapper
+
+createPickKeySpace
+  :: CRs.ClientResponse
   -> Co.EndpointId
+  -> Co.SlaveGroupId
   -> Co.Timestamp
   -> Co.Choice
   -> Co.UID
   -> String
   -> Ta.Task DS.DerivedState MAc.OutputAction
-createPickKeySpace requestId eId slaveGroupId timestamp choice uid description =
+createPickKeySpace response eId slaveGroupId timestamp choice uid description =
   let tryHandling derivedState = do
         case derivedState ^. DS.slaveGroupRanges & SGR.staticRead slaveGroupId timestamp of
           Just (_, SGR.Changing _) -> return False
           _ -> return True
       done derivedState = do
-        let responseValue =
-              case choice of
-                Co.NewChoice -> CRsCD.Success
-                Co.OldChoice -> CRsCD.BackwardsWrite
-            response =
-              CRs.ClientResponse
-                (CRs.Meta requestId)
-                (CRs.CreateDatabase responseValue)
         trace $ TrM.ClientResponseSent response
         addA $ MAc.Send [eId] $ Ms.ClientResponse response
         return ()

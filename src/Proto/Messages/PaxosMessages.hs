@@ -41,6 +41,13 @@ data Master_Entry =
     timestamp :: Co.Timestamp,
     eId :: Co.EndpointId,
     uid :: Co.UID } |
+  DeleteDatabase {
+    requestId :: Co.RequestId,
+    databaseId :: Co.DatabaseId,
+    tableId :: Co.TableId,
+    timestamp :: Co.Timestamp,
+    eId :: Co.EndpointId,
+    uid :: Co.UID } |
   PickKeySpace {
     slaveGroupId :: Co.SlaveGroupId,
     choice :: Co.Choice,
