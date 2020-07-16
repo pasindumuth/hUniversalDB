@@ -14,6 +14,7 @@ import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.ClientResponses.CreateDatabase as CRsCD
+import qualified Proto.Messages.ClientResponses.DeleteDatabase as CRsDD
 import qualified Proto.Messages.ClientResponses.RangeRead as CRsRR
 import qualified Proto.Messages.ClientResponses.RangeWrite as CRsRW
 import qualified Proto.Messages.ClientResponses.SlaveRead as CRsSR
@@ -175,9 +176,23 @@ analyzeResponses = do
         CRs.CreateDatabase CRsCD.AlreadyExists -> Tt.requestStats.Tt.numCreateDatabaseAlreadyExistsRss .^^. (+1)
         CRs.CreateDatabase CRsCD.NothingChanged -> Tt.requestStats.Tt.numCreateDatabaseNothingChangedRss .^^. (+1)
         CRs.CreateDatabase CRsCD.Success -> Tt.requestStats.Tt.numCreateDatabaseSuccessRss .^^. (+1)
+        CRs.DeleteDatabase CRsDD.BackwardsWrite -> Tt.requestStats.Tt.numDeleteDatabaseBackwardsWriteRss .^^. (+1)
+        CRs.DeleteDatabase CRsDD.DoesNotExist -> Tt.requestStats.Tt.numDeleteDatabaseAlreadyExistsRss .^^. (+1)
+        CRs.DeleteDatabase CRsDD.NothingChanged -> Tt.requestStats.Tt.numDeleteDatabaseNothingChangedRss .^^. (+1)
+        CRs.DeleteDatabase CRsDD.Success -> Tt.requestStats.Tt.numDeleteDatabaseSuccessRss .^^. (+1)
 
 test1 :: STS Tt.TestState ()
 test1 = do
+  SM.addClientMsg (SM.Slave 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
+  Tt.clientState .^ analyzeResponses
+
+test2 :: STS Tt.TestState ()
+test2 = do
   Mo.forM_ [1..100] $
     \_ -> do
       (endpoint, payload) <- Tt.clientState .^ genRequest slaveDist
@@ -189,8 +204,8 @@ test1 = do
 
 -- TODO: maybe we should take statistics on insertion retries. This will help
 -- verify PaxosTaskManager and it will help us understand wasted cycles.
-test2 :: STS Tt.TestState ()
-test2 = do
+test3 :: STS Tt.TestState ()
+test3 = do
   Mo.forM_ [1..50] $
     \_ -> do
       Mo.forM_ [1..5] $
@@ -202,8 +217,19 @@ test2 = do
   SM.simulateAll
   Tt.clientState .^ analyzeResponses
 
-test3 :: STS Tt.TestState ()
-test3 = do
+test4 :: STS Tt.TestState ()
+test4 = do
+  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateAll
+  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 2); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 4); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 5); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 6); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 7); SM.simulateAll
+  Tt.clientState .^ analyzeResponses
+
+test5 :: STS Tt.TestState ()
+test5 = do
   Mo.forM_ [1..50] $
     \_ -> do
       Mo.forM_ [1..5] $
@@ -215,8 +241,8 @@ test3 = do
   SM.simulateAll
   Tt.clientState .^ analyzeResponses
 
-test4 :: STS Tt.TestState ()
-test4 = do
+test6 :: STS Tt.TestState ()
+test6 = do
   Mo.forM_ [1..50] $
     \_ -> do
       Mo.forM_ [1..5] $
@@ -226,6 +252,17 @@ test4 = do
       SM.simulateN 2
       SM.dropMessages 2
   SM.simulateAll
+  Tt.clientState .^ analyzeResponses
+
+test7 :: STS Tt.TestState ()
+test7 = do
+  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t1" 1); SM.simulateAll
+  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t1" 2); SM.simulateAll
+  SM.addClientMsg (SM.Master 0) (CRq.DeleteDatabase "d" "t1" 3); SM.simulateAll
+  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t2" 4); SM.simulateAll
+  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t2" "key1" "value1" 5); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t2" "key1" "value2" 6); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 2) (CRq.SlaveRead "d" "t2" "key1" 7); SM.simulateAll
   Tt.clientState .^ analyzeResponses
 
 -- This list of trace messages includes all events across all slaves.
@@ -265,6 +302,9 @@ testDriver = do
   driveTest 2 test2
   driveTest 3 test3
   driveTest 4 test4
+  driveTest 5 test5
+  driveTest 6 test6
+  driveTest 7 test7
 
 main :: IO ()
 main = testDriver

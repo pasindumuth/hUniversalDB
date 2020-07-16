@@ -30,6 +30,7 @@ data RequestStats = RequestStats {
   _numReadRqs :: Int,
   _numWriteRqs :: Int,
   _numCreateDatabaseRqs :: Int,
+  _numDeleteDatabaseRqs :: Int,
   _numReadSuccessRss :: Int,
   _numReadUnknownDBRss :: Int,
   _numWriteSuccessRss :: Int,
@@ -41,7 +42,11 @@ data RequestStats = RequestStats {
   _numCreateDatabaseBackwardsWriteRss :: Int,
   _numCreateDatabaseAlreadyExistsRss :: Int,
   _numCreateDatabaseNothingChangedRss :: Int,
-  _numCreateDatabaseSuccessRss :: Int
+  _numCreateDatabaseSuccessRss :: Int,
+  _numDeleteDatabaseBackwardsWriteRss :: Int,
+  _numDeleteDatabaseAlreadyExistsRss :: Int,
+  _numDeleteDatabaseNothingChangedRss :: Int,
+  _numDeleteDatabaseSuccessRss :: Int
 } deriving (Show)
 
 makeLenses ''RequestStats

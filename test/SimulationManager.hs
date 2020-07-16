@@ -96,6 +96,7 @@ createTestState seed numMasters numSlaves numClients =
           Tt._numReadRqs = 0,
           Tt._numWriteRqs = 0,
           Tt._numCreateDatabaseRqs = 0,
+          Tt._numDeleteDatabaseRqs = 0,
           Tt._numReadSuccessRss = 0,
           Tt._numReadUnknownDBRss = 0,
           Tt._numWriteSuccessRss = 0,
@@ -107,7 +108,11 @@ createTestState seed numMasters numSlaves numClients =
           Tt._numCreateDatabaseBackwardsWriteRss = 0,
           Tt._numCreateDatabaseAlreadyExistsRss = 0,
           Tt._numCreateDatabaseNothingChangedRss = 0,
-          Tt._numCreateDatabaseSuccessRss = 0
+          Tt._numCreateDatabaseSuccessRss = 0,
+          Tt._numDeleteDatabaseBackwardsWriteRss = 0,
+          Tt._numDeleteDatabaseAlreadyExistsRss = 0,
+          Tt._numDeleteDatabaseNothingChangedRss = 0,
+          Tt._numDeleteDatabaseSuccessRss = 0
         },
         Tt._clientResponses = clientResponses
       }
@@ -324,4 +329,5 @@ addClientMsg toEndpoint payload = do
     CRq.SlaveRead _ _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numReadRqs .^^. (+1)
     CRq.SlaveWrite _ _ _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numWriteRqs .^^. (+1)
     CRq.CreateDatabase _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numCreateDatabaseRqs .^^. (+1)
+    CRq.DeleteDatabase _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numDeleteDatabaseRqs .^^. (+1)
   return ()
