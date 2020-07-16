@@ -26,10 +26,34 @@ import Infra.Lens
 import Infra.State
 
 data RequestType =
+       CreateDatabase |
        RangeRead |
        RangeWrite |
        SlaveRead |
        SlaveWrite
+
+type RequestTypeDist = Int -> RequestType
+
+slaveDist :: RequestTypeDist
+slaveDist r
+  | r < 15 = RangeRead
+  | r < 30 = RangeWrite
+  | r < 65 = SlaveRead
+  | otherwise = SlaveWrite
+
+allRequestsDist :: RequestTypeDist
+allRequestsDist r
+  | r < 10 = CreateDatabase
+  | r < 20 = RangeRead
+  | r < 30 = RangeWrite
+  | r < 65 = SlaveRead
+  | otherwise = SlaveWrite
+
+masterDist :: RequestTypeDist
+masterDist r
+  | r < 30 = CreateDatabase
+  | r < 65 = SlaveRead
+  | otherwise = SlaveWrite
 
 -- We pass in a number of requests to send. There is a for loop.
 -- On each iteration, we randomly selects the type of request to send.
@@ -46,10 +70,10 @@ data RequestType =
 --    of requests that were already sent. However, we add a slight bit of noise to this
 --    to simulate sending requests to the past (which sometimes we expect the system
 --    to reply with an error).
-genRequest :: (Int -> RequestType) -> STS Tt.ClientState (Int, CRq.Payload)
+genRequest :: RequestTypeDist -> STS Tt.ClientState (SM.Endpoint, CRq.Payload)
 genRequest requestDist = do
   numTablets <- Tt.numTabletKeys .^^^ Mp.size
-  slaveId :: Int <- Tt.clientRand .^^ Rn.randomR (0, 4)
+  eIdIdx :: Int <- Tt.clientRand .^^ Rn.randomR (0, 4)
   let pickRangeAndKey = do
         newTableProb :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
         curRanges <- getL $ Tt.curRanges
@@ -76,9 +100,28 @@ genRequest requestDist = do
             return (range, keyIdx)
   r <- Tt.clientRand .^^ Rn.randomR (0, 99)
   case requestDist r of
+    CreateDatabase -> do
+      curRanges <- getL $ Tt.curRanges
+      addNewRangeProb :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
+      (Co.KeySpaceRange databaseId tableId, curRanges) <-
+        if addNewRangeProb > 50 || (St.size curRanges) == 0
+          then do
+            let range = makeRange numTablets
+            Tt.numTabletKeys .^^. Mp.insert range 0
+            return (range, curRanges & St.insert range)
+          else do
+            tabletIdx :: Int <- Tt.clientRand .^^ Rn.randomR (0, (St.size curRanges) - 1)
+            let range = St.elemAt tabletIdx curRanges
+            return (range, curRanges)
+      Tt.curRanges .^^. \_ -> curRanges
+      timestamp <- makeTimestamp
+      -- We make the Database in the future to avoid racing other requests.
+      -- We might need a more sophisticated approach of locking the slaves before
+      -- trying to CreateDatabase
+      return (SM.Master eIdIdx, CRq.CreateDatabase databaseId tableId (timestamp + 20))
     RangeRead -> do
       timestamp <- makeTimestamp
-      return (slaveId, CRq.RangeRead timestamp)
+      return (SM.Slave eIdIdx, CRq.RangeRead timestamp)
     RangeWrite -> do
       allRanges <- Tt.numTabletKeys .^^^ Mp.keys
       curRanges <- U.s31 Mo.foldM St.empty allRanges $ \curRanges range -> do
@@ -95,18 +138,18 @@ genRequest requestDist = do
                       else return $ curRanges
       Tt.curRanges .^^. \_ -> curRanges
       timestamp <- makeTimestamp
-      return (slaveId, CRq.RangeWrite (St.toList curRanges) timestamp)
+      return (SM.Slave eIdIdx, CRq.RangeWrite (St.toList curRanges) timestamp)
     SlaveRead -> do
       (Co.KeySpaceRange databaseId tableId, keyIdx) <- pickRangeAndKey
       let key = "k" ++ show keyIdx
           value = "v" ++ show keyIdx
       timestamp <- makeTimestamp
-      return (slaveId, CRq.SlaveWrite databaseId tableId key value timestamp)
+      return (SM.Slave eIdIdx, CRq.SlaveWrite databaseId tableId key value timestamp)
     SlaveWrite -> do
       (Co.KeySpaceRange databaseId tableId, keyIdx) <- pickRangeAndKey
       let key = "k" ++ show keyIdx
       timestamp <- makeTimestamp
-      return (slaveId, CRq.SlaveRead databaseId tableId key timestamp)
+      return (SM.Slave eIdIdx, CRq.SlaveRead databaseId tableId key timestamp)
   where
     makeTimestamp = do
       noise <- Tt.clientRand .^^ Rn.randomR (-2, 2)
@@ -135,36 +178,10 @@ analyzeResponses = do
 
 test1 :: STS Tt.TestState ()
 test1 = do
-  SM.addClientMsg (SM.Slave 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateAll
-  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateAll
-  SM.addClientMsg (SM.Slave 2) (CRq.SlaveRead "d" "t" "key1" 4); SM.simulateAll
-  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateAll
-  SM.addClientMsg (SM.Slave 2) (CRq.SlaveRead "d" "t" "key2" 4); SM.simulateAll
-  Tt.clientState .^ analyzeResponses
-
-test2 :: STS Tt.TestState ()
-test2 = do
-  SM.addClientMsg (SM.Slave 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
-  Tt.clientState .^ analyzeResponses
-
-slaveMsgDist :: Int -> RequestType
-slaveMsgDist r
-  | r < 15 = RangeRead
-  | r < 30 = RangeWrite
-  | r < 65 = SlaveRead
-  | otherwise = SlaveWrite
-
-test3 :: STS Tt.TestState ()
-test3 = do
   Mo.forM_ [1..100] $
     \_ -> do
-      (slaveId, payload) <- Tt.clientState .^ genRequest slaveMsgDist
-      SM.addClientMsg (SM.Slave slaveId) payload
+      (endpoint, payload) <- Tt.clientState .^ genRequest slaveDist
+      SM.addClientMsg endpoint payload
       SM.simulateN 2
       SM.dropMessages 1
   SM.simulateAll
@@ -172,28 +189,43 @@ test3 = do
 
 -- TODO: maybe we should take statistics on insertion retries. This will help
 -- verify PaxosTaskManager and it will help us understand wasted cycles.
+test2 :: STS Tt.TestState ()
+test2 = do
+  Mo.forM_ [1..50] $
+    \_ -> do
+      Mo.forM_ [1..5] $
+        \_ -> do
+          (endpoint, payload) <- Tt.clientState .^ genRequest slaveDist
+          SM.addClientMsg endpoint payload
+      SM.simulateN 2
+      SM.dropMessages 2
+  SM.simulateAll
+  Tt.clientState .^ analyzeResponses
+
+test3 :: STS Tt.TestState ()
+test3 = do
+  Mo.forM_ [1..50] $
+    \_ -> do
+      Mo.forM_ [1..5] $
+        \_ -> do
+          (endpoint, payload) <- Tt.clientState .^ genRequest allRequestsDist
+          SM.addClientMsg endpoint payload
+      SM.simulateN 2
+      SM.dropMessages 2
+  SM.simulateAll
+  Tt.clientState .^ analyzeResponses
+
 test4 :: STS Tt.TestState ()
 test4 = do
   Mo.forM_ [1..50] $
     \_ -> do
       Mo.forM_ [1..5] $
         \_ -> do
-          (slaveId, payload) <- Tt.clientState .^ genRequest slaveMsgDist
-          SM.addClientMsg (SM.Slave slaveId) payload
+          (endpoint, payload) <- Tt.clientState .^ genRequest masterDist
+          SM.addClientMsg endpoint payload
       SM.simulateN 2
       SM.dropMessages 2
   SM.simulateAll
-  Tt.clientState .^ analyzeResponses
-
-test5 :: STS Tt.TestState ()
-test5 = do
-  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateAll
-  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 2); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 4); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 5); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 6); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 7); SM.simulateAll
   Tt.clientState .^ analyzeResponses
 
 -- This list of trace messages includes all events across all slaves.
@@ -233,7 +265,6 @@ testDriver = do
   driveTest 2 test2
   driveTest 3 test3
   driveTest 4 test4
-  driveTest 5 test5
 
 main :: IO ()
 main = testDriver

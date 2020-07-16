@@ -50,7 +50,9 @@ data ClientState = ClientState {
   _clientRand :: Rn.StdGen,
   _nextUid :: Int,
   _trueTimestamp :: Int,
-  -- contains the current set of ranges
+  -- contains the set of ranges that was last written (or tried to be written)
+  -- to the system. This need not be the keyset of _curRanges, since we must
+  -- simulate deletion.
   _curRanges :: St.Set Co.KeySpaceRange,
   -- contains all ranges and the maximum key that was inserted
   _numTabletKeys :: Mp.Map Co.KeySpaceRange Int,
