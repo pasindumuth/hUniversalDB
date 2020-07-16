@@ -25,6 +25,12 @@ import qualified TraceChecker as TC
 import Infra.Lens
 import Infra.State
 
+data RequestType =
+       RangeRead |
+       RangeWrite |
+       SlaveRead |
+       SlaveWrite
+
 -- We pass in a number of requests to send. There is a for loop.
 -- On each iteration, we randomly selects the type of request to send.
 --
@@ -40,36 +46,13 @@ import Infra.State
 --    of requests that were already sent. However, we add a slight bit of noise to this
 --    to simulate sending requests to the past (which sometimes we expect the system
 --    to reply with an error).
-generateRequest :: STS Tt.ClientState (Int, CRq.Payload)
-generateRequest = do
+genRequest :: (Int -> RequestType) -> STS Tt.ClientState (Int, CRq.Payload)
+genRequest requestDist = do
   numTablets <- Tt.numTabletKeys .^^^ Mp.size
   slaveId :: Int <- Tt.clientRand .^^ Rn.randomR (0, 4)
-  requestType :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
-  case requestType of
-    _ | requestType < 15 -> do
-      timestamp <- makeTimestamp
-      return (slaveId, CRq.RangeRead timestamp)
-    _ | requestType < 30 -> do
-      allRanges <- Tt.numTabletKeys .^^^ Mp.keys
-      curRanges <- U.s31 Mo.foldM St.empty allRanges $ \curRanges range -> do
-        addRange <- Tt.clientRand .^^ Rn.random
-        if addRange
-          then return $ curRanges & St.insert range
-          else return $ curRanges
-      addNewRange <- Tt.clientRand .^^ Rn.random
-      curRanges <- if addNewRange
-                      then do
-                        let range = makeRange numTablets
-                        Tt.numTabletKeys .^^. Mp.insert range 0
-                        return $ curRanges & St.insert range
-                      else return $ curRanges
-      Tt.curRanges .^^. \_ -> curRanges
-      timestamp <- makeTimestamp
-      return (slaveId, CRq.RangeWrite (St.toList curRanges) timestamp)
-    _ -> do
-      newTableProb :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
-      curRanges <- getL $ Tt.curRanges
-      (range, keyIdx) <-
+  let pickRangeAndKey = do
+        newTableProb :: Int <- Tt.clientRand .^^ Rn.randomR (0, 99)
+        curRanges <- getL $ Tt.curRanges
         if newTableProb >= 75 || (St.size curRanges) == 0
           then return (makeRange numTablets, 0)
           else do
@@ -91,15 +74,39 @@ generateRequest = do
                   Tt.numTabletKeys .^^. Mp.insert range 1
                   return 0
             return (range, keyIdx)
-      let (Co.KeySpaceRange databaseId tableId) = range
-          key = "k" ++ show keyIdx
+  r <- Tt.clientRand .^^ Rn.randomR (0, 99)
+  case requestDist r of
+    RangeRead -> do
       timestamp <- makeTimestamp
-      case requestType of
-        _ | requestType < 65 -> do
-          let value = "v" ++ show keyIdx
-          return (slaveId, CRq.SlaveWrite databaseId tableId key value timestamp)
-        _ -> do
-          return (slaveId, CRq.SlaveRead databaseId tableId key timestamp)
+      return (slaveId, CRq.RangeRead timestamp)
+    RangeWrite -> do
+      allRanges <- Tt.numTabletKeys .^^^ Mp.keys
+      curRanges <- U.s31 Mo.foldM St.empty allRanges $ \curRanges range -> do
+        addRange <- Tt.clientRand .^^ Rn.random
+        if addRange
+          then return $ curRanges & St.insert range
+          else return $ curRanges
+      addNewRange <- Tt.clientRand .^^ Rn.random
+      curRanges <- if addNewRange
+                      then do
+                        let range = makeRange numTablets
+                        Tt.numTabletKeys .^^. Mp.insert range 0
+                        return $ curRanges & St.insert range
+                      else return $ curRanges
+      Tt.curRanges .^^. \_ -> curRanges
+      timestamp <- makeTimestamp
+      return (slaveId, CRq.RangeWrite (St.toList curRanges) timestamp)
+    SlaveRead -> do
+      (Co.KeySpaceRange databaseId tableId, keyIdx) <- pickRangeAndKey
+      let key = "k" ++ show keyIdx
+          value = "v" ++ show keyIdx
+      timestamp <- makeTimestamp
+      return (slaveId, CRq.SlaveWrite databaseId tableId key value timestamp)
+    SlaveWrite -> do
+      (Co.KeySpaceRange databaseId tableId, keyIdx) <- pickRangeAndKey
+      let key = "k" ++ show keyIdx
+      timestamp <- makeTimestamp
+      return (slaveId, CRq.SlaveRead databaseId tableId key timestamp)
   where
     makeTimestamp = do
       noise <- Tt.clientRand .^^ Rn.randomR (-2, 2)
@@ -145,11 +152,18 @@ test2 = do
   SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
   Tt.clientState .^ analyzeResponses
 
+slaveMsgDist :: Int -> RequestType
+slaveMsgDist r
+  | r < 15 = RangeRead
+  | r < 30 = RangeWrite
+  | r < 65 = SlaveRead
+  | otherwise = SlaveWrite
+
 test3 :: STS Tt.TestState ()
 test3 = do
   Mo.forM_ [1..100] $
     \_ -> do
-      (slaveId, payload) <- Tt.clientState .^ generateRequest
+      (slaveId, payload) <- Tt.clientState .^ genRequest slaveMsgDist
       SM.addClientMsg (SM.Slave slaveId) payload
       SM.simulateN 2
       SM.dropMessages 1
@@ -164,7 +178,7 @@ test4 = do
     \_ -> do
       Mo.forM_ [1..5] $
         \_ -> do
-          (slaveId, payload) <- Tt.clientState .^ generateRequest
+          (slaveId, payload) <- Tt.clientState .^ genRequest slaveMsgDist
           SM.addClientMsg (SM.Slave slaveId) payload
       SM.simulateN 2
       SM.dropMessages 2
