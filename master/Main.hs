@@ -18,14 +18,12 @@ import qualified System.Random as Rn
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
-import qualified Proto.Actions.MasterActions as SAc
+import qualified Proto.Actions.MasterActions as MAc
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
-import qualified Thread.MasterThread as ST
+import qualified Thread.MasterThread as MT
 import Infra.Lens
 import Infra.State
-
-slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
 
 handleSelfConn
   :: MV.MVar Cn.Connections
@@ -68,12 +66,12 @@ connect ip connM receiveChan =
 
 handleReceive
   :: Ct.Chan (Co.EndpointId, Ms.Message)
-  -> Ct.Chan (SAc.InputAction)
+  -> Ct.Chan (MAc.InputAction)
   -> IO ()
 handleReceive receiveChan iActionChan = do
   Mo.forever $ do
     (eId, msg) <- Ct.readChan receiveChan
-    Ct.writeChan iActionChan $ SAc.Receive eId msg
+    Ct.writeChan iActionChan $ MAc.Receive eId msg
 
 startMaster :: String -> String -> [String] -> IO ()
 startMaster seedStr curIP otherIPs = do
@@ -95,7 +93,7 @@ startMaster seedStr curIP otherIPs = do
   Mo.forM_ otherIPs $ \ip -> Ct.forkIO $ connect ip connM receiveChan
 
   -- Initiate connections with all of the slaves
-  Mo.forM_ slaveEIds $ \ip -> Ct.forkIO $ connect ip connM receiveChan
+  Mo.forM_ MT.slaveEIds $ \ip -> Ct.forkIO $ connect ip connM receiveChan
 
   -- Setup message routing thread
   iActionChan <- Ct.newChan
@@ -104,7 +102,7 @@ startMaster seedStr curIP otherIPs = do
   -- Start Paxos handling thread
   let seed = read seedStr :: Int
       rg = Rn.mkStdGen seed
-  ST.startMasterThread rg iActionChan connM
+  MT.startMasterThread rg iActionChan connM
 
 main :: IO ()
 main = do

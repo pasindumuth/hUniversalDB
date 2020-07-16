@@ -112,7 +112,7 @@ pick
   -> ((), SlaveGroupRanges)
 pick slaveGroupId choice s =
   case Mp.lookup slaveGroupId (s ^. i'ranges) of
-    Just ((timestamp', Changing (Co.ChangingKeySpace newKeySpace oldKeySpace)):rest) ->
+    Just ((timestamp', Changing (Co.ChangingKeySpace oldKeySpace newKeySpace)):rest) ->
       let keySpace =
             case choice of
               Co.NewChoice -> newKeySpace

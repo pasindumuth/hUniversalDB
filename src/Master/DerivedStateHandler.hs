@@ -38,7 +38,7 @@ rangeExists
 rangeExists keySpaceRange latestValues =
   U.s31 Mp.foldlWithKey Nothing latestValues $ \exists slaveGroupId value ->
     case exists of
-      Just slaveGroupId -> Just slaveGroupId
+      Just _ -> exists
       Nothing -> do
         case value of
           Just (_, SGR.Old keySpace) | elem keySpaceRange keySpace ->

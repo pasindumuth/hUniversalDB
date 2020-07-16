@@ -56,7 +56,7 @@ generateRequest = do
         if addRange
           then return $ curRanges & St.insert range
           else return $ curRanges
-      addNewRange <-  Tt.clientRand .^^ Rn.random
+      addNewRange <- Tt.clientRand .^^ Rn.random
       curRanges <- if addNewRange
                       then do
                         let range = makeRange numTablets
@@ -173,12 +173,13 @@ test4 = do
 
 test5 :: STS Tt.TestState ()
 test5 = do
-  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateN 2
-  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
+  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateAll
+  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 2); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 4); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 5); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 6); SM.simulateN 2
+  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 7); SM.simulateAll
   Tt.clientState .^ analyzeResponses
 
 -- This list of trace messages includes all events across all slaves.
