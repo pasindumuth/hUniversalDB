@@ -1,6 +1,8 @@
 module Infra.Utils where
 
+import qualified Control.Exception as Ex
 import qualified Data.Sequence as Sq
+import qualified Data.Set as St
 import qualified System.Random as Rn
 
 import qualified Proto.Common as Co
@@ -31,6 +33,18 @@ prefix s (x:xs) =
   if s == x
     then []
     else x : prefix s xs
+
+randomS :: St.Set a -> Rn.StdGen -> (a, Rn.StdGen)
+randomS set rg =
+  Ex.assert (St.size set > 0) $
+  let (r, rg') = Rn.randomR (0, (St.size set) - 1) rg
+  in (St.elemAt r set, rg')
+
+randomL :: [a] -> Rn.StdGen -> (a, Rn.StdGen)
+randomL list rg =
+  Ex.assert (length list > 0) $
+  let (r, rg') = Rn.randomR (0, (length list) - 1) rg
+  in (list !! r, rg')
 
 -- To see the location of the case error, build the program using the
 -- --profile flag. The INLINE pragma helps improve the callstack.

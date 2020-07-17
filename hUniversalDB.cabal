@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3b8fd780c326277f0b9b257bb918f5c3aa46cb3de84f0daec18b10629e8cac7c
+-- hash: 65cc592877b67aa5756323b663a034f291fcb35be79e96b45985f1acd2010f5c
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -180,6 +180,7 @@ test-suite hUniversalDB-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      ClientState
       SimulationManager
       TestState
       TraceChecker
