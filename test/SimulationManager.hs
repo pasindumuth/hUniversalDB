@@ -6,10 +6,13 @@ module SimulationManager (
   simulateN,
   simulateAll,
   addClientMsg,
-  Endpoint(..),
+  mkMasterEId,
+  mkSlaveEId,
+  mkClientEId,
 ) where
 
 import qualified Control.Monad as Mo
+import qualified Data.Default as Df
 import qualified Data.List as Li
 import qualified Data.Map as Mp
 import qualified Data.Set as St
@@ -25,11 +28,14 @@ import qualified Proto.Actions.TabletActions as TAc
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
+import qualified Proto.Messages.ClientResponses as CRs
 import qualified Slave.Env as En
 import qualified Slave.SlaveInputHandler as SIH
 import qualified Slave.SlaveState as SS
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.TabletState as TS
+import qualified ClientState as CS
+import qualified RequestStats as RS
 import qualified TestState as Tt
 import Infra.Lens
 import Infra.State
@@ -66,10 +72,12 @@ createTestState seed numMasters numSlaves numClients =
       slaveAsyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Sq.empty)
       tabletAsyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
       clocks = Mp.fromList $ U.for (masterEIds ++ slaveEIds) $ \eId -> (eId, 0)
-      clientResponses = Mp.fromList $ U.for clientEIds $ \eId -> (eId, [])
-      (clientRand, rand''') = rand'' & \rand ->
-        let (r, rand') = Rn.random rand
-        in (Rn.mkStdGen r, rand')
+      (clients, rand''') = U.s31 foldl ([], rand'') clientEIds $
+        \(clients, rand) eId ->
+          let (r, rand')  = Rn.random rand
+              client = CS.ClientState St.empty slaveEIds masterEIds (Rn.mkStdGen r)
+          in ((eId, client):clients, rand')
+      clientState = Mp.fromList clients
   in Tt.TestState {
       Tt._rand = rand''',
       Tt._masterEIds = masterEIds,
@@ -84,38 +92,10 @@ createTestState seed numMasters numSlaves numClients =
       Tt._slaveAsyncQueues = slaveAsyncQueues,
       Tt._tabletAsyncQueues = tabletAsyncQueues,
       Tt._clocks = clocks,
-      Tt._clientState = Tt.ClientState {
-        Tt._clientRand = clientRand,
-        Tt._nextUid = 0,
-        Tt._trueTimestamp = 0,
-        Tt._curRanges = St.empty,
-        Tt._numTabletKeys = Mp.empty,
-        Tt._requestStats = Tt.RequestStats {
-          Tt._numRangeReadRqs = 0,
-          Tt._numRangeWriteRqs = 0,
-          Tt._numReadRqs = 0,
-          Tt._numWriteRqs = 0,
-          Tt._numCreateDatabaseRqs = 0,
-          Tt._numDeleteDatabaseRqs = 0,
-          Tt._numReadSuccessRss = 0,
-          Tt._numReadUnknownDBRss = 0,
-          Tt._numWriteSuccessRss = 0,
-          Tt._numWriteUnknownDBRss = 0,
-          Tt._numBackwardsWriteRss = 0,
-          Tt._numRangeReadSuccessRss = 0,
-          Tt._numRangeWriteSuccessRss = 0,
-          Tt._numRangeWriteBackwardsWriteRss = 0,
-          Tt._numCreateDatabaseBackwardsWriteRss = 0,
-          Tt._numCreateDatabaseAlreadyExistsRss = 0,
-          Tt._numCreateDatabaseNothingChangedRss = 0,
-          Tt._numCreateDatabaseSuccessRss = 0,
-          Tt._numDeleteDatabaseBackwardsWriteRss = 0,
-          Tt._numDeleteDatabaseAlreadyExistsRss = 0,
-          Tt._numDeleteDatabaseNothingChangedRss = 0,
-          Tt._numDeleteDatabaseSuccessRss = 0
-        },
-        Tt._clientResponses = clientResponses
-      }
+      Tt._clientState = clientState,
+      Tt._nextUid = 0,
+      Tt._trueTimestamp = 0,
+      Tt._requestStats = Df.def
     }
 
 addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> STS Tt.TestState ()
@@ -197,14 +177,19 @@ deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
   masterEIds' <- getL $ Tt.masterEIds
   slaveEIds' <- getL $ Tt.slaveEIds
+  clientEIds' <- getL $ Tt.clientEIds
   let route
         | Li.elem toEId masterEIds' =
             runMasterIAction toEId $ MAc.Receive fromEId msg
         | Li.elem toEId slaveEIds' =
             runSlaveIAction toEId $ SAc.Receive fromEId msg
-        | otherwise = do
-            Tt.clientState . Tt.clientResponses . ix toEId .^^.* (msg:)
-            return ()
+        | Li.elem toEId clientEIds' = do
+            case msg of
+              Ms.ClientResponse response -> do
+                Tt.requestStats .^ RS.recordResponse (response ^. CRs.payload)
+                Tt.clientState . ix toEId .^* CS.handleResponse response
+              _ -> U.caseError -- Any messages coming to a clientEId must be a response.
+        | otherwise = U.caseError
   route
 
 dropMessages :: Int -> STS Tt.TestState ()
@@ -233,7 +218,7 @@ simulateOnce numMessages = do
       -- We have to put this behind a randPercentage with the the same
       -- probability of success as the Tt.clocks to prevent the trueTime from
       -- pulling away.
-      Tt.clientState . Tt.trueTimestamp .^^. (+1)
+      Tt.trueTimestamp .^^. (+1)
       return ()
     else return ()
   masterEIds <- getL Tt.masterEIds
@@ -340,32 +325,16 @@ simulateAll = do
             else return ()
   simulate
 
-data Endpoint =
-  Master Int |
-  Slave Int
-  deriving (Show)
-
 addClientMsg
-  :: Endpoint
+  :: Co.EndpointId
+  -> Co.EndpointId
   -> CRq.Payload
   -> STS Tt.TestState ()
-addClientMsg toEndpoint payload = do
-  uid <- Tt.clientState . Tt.nextUid .^^. (+1)
-  let toEId =
-        case toEndpoint of
-          Master endpoint -> mkMasterEId endpoint
-          Slave endpoint -> mkSlaveEId endpoint
-      (clientEId, slaveEId) = (mkClientEId 0, toEId)
-      msg = Ms.ClientRequest
+addClientMsg fromEId toEId payload = do
+  uid <- Tt.nextUid .^^. (+1)
+  let msg = Ms.ClientRequest
               (CRq.ClientRequest
                 (CRq.Meta (show uid))
                 payload)
-  addMsg msg (clientEId, slaveEId)
-  case payload of
-    CRq.RangeRead _ -> Tt.clientState.Tt.requestStats.Tt.numRangeReadRqs .^^. (+1)
-    CRq.RangeWrite _ _ -> Tt.clientState.Tt.requestStats.Tt.numRangeWriteRqs .^^. (+1)
-    CRq.SlaveRead _ _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numReadRqs .^^. (+1)
-    CRq.SlaveWrite _ _ _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numWriteRqs .^^. (+1)
-    CRq.CreateDatabase _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numCreateDatabaseRqs .^^. (+1)
-    CRq.DeleteDatabase _ _ _ -> Tt.clientState.Tt.requestStats.Tt.numDeleteDatabaseRqs .^^. (+1)
-  return ()
+  addMsg msg (fromEId, toEId)
+  Tt.requestStats .^ RS.recordRequest payload

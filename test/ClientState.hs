@@ -60,9 +60,15 @@ masterDist r
   | r < 65 = SlaveRead
   | otherwise = SlaveWrite
 
-maxTable = 1000
-maxKey = 1000
-maxValue = 1000
+createDatabaseDist :: RequestTypeDist
+createDatabaseDist _ = CreateDatabase
+
+rangeReadDist :: RequestTypeDist
+rangeReadDist _ = RangeRead
+
+maxTable = 200
+maxKey = 200
+maxValue = 200
 
 -- We randomly produce:
 -- 1. Ranges: KeySpaceRanges "d" "t<n>" where 0 <= n < 1000
@@ -90,7 +96,7 @@ genRequest trueTimestamp requestDist = do
     DeleteDatabase -> do
       deleteNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
       Co.KeySpaceRange databaseId tableId <-
-        if deleteNonExistingProb >= 80 || St.size curRanges > 0
+        if deleteNonExistingProb >= 80 || St.size curRanges == 0
           -- Here, we attempt to do the erronous task of trying to delete a
           -- KeySpaceRange that doesn't exist by randomly selecting a range.
           then makeRange
@@ -115,7 +121,7 @@ genRequest trueTimestamp requestDist = do
     SlaveRead -> do
       pickNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
       Co.KeySpaceRange databaseId tableId <-
-        if pickNonExistingProb >= 80 || St.size curRanges > 0
+        if pickNonExistingProb >= 80 || St.size curRanges == 0
           -- Here, we attempt to do the erronous task of trying to read from a
           -- KeySpaceRange that doesn't exist by randomly selecting a range.
           then makeRange
@@ -127,7 +133,7 @@ genRequest trueTimestamp requestDist = do
     SlaveWrite -> do
       pickNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
       Co.KeySpaceRange databaseId tableId <-
-        if pickNonExistingProb >= 80 || St.size curRanges > 0
+        if pickNonExistingProb >= 80 || St.size curRanges == 0
           -- Here, we attempt to do the erronous task of trying to write to a
           -- KeySpaceRange that doesn't exist by randomly selecting a range.
           then makeRange

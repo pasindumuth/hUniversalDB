@@ -18,54 +18,13 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Slave.SlaveState as SS
 import qualified Slave.Tablet.TabletState as TS
+import qualified ClientState as CS
+import qualified RequestStats as RS
 import Infra.Lens
 import Infra.State
 
 type Queues = Mp.Map Co.EndpointId (Mp.Map Co.EndpointId (Sq.Seq Ms.Message))
 type NonemptyQueues = St.Set (Co.EndpointId, Co.EndpointId)
-
-data RequestStats = RequestStats {
-  _numRangeReadRqs :: Int,
-  _numRangeWriteRqs :: Int,
-  _numReadRqs :: Int,
-  _numWriteRqs :: Int,
-  _numCreateDatabaseRqs :: Int,
-  _numDeleteDatabaseRqs :: Int,
-  _numReadSuccessRss :: Int,
-  _numReadUnknownDBRss :: Int,
-  _numWriteSuccessRss :: Int,
-  _numWriteUnknownDBRss :: Int,
-  _numBackwardsWriteRss :: Int,
-  _numRangeReadSuccessRss :: Int,
-  _numRangeWriteSuccessRss :: Int,
-  _numRangeWriteBackwardsWriteRss :: Int,
-  _numCreateDatabaseBackwardsWriteRss :: Int,
-  _numCreateDatabaseAlreadyExistsRss :: Int,
-  _numCreateDatabaseNothingChangedRss :: Int,
-  _numCreateDatabaseSuccessRss :: Int,
-  _numDeleteDatabaseBackwardsWriteRss :: Int,
-  _numDeleteDatabaseAlreadyExistsRss :: Int,
-  _numDeleteDatabaseNothingChangedRss :: Int,
-  _numDeleteDatabaseSuccessRss :: Int
-} deriving (Show)
-
-makeLenses ''RequestStats
-
-data ClientState = ClientState {
-  _clientRand :: Rn.StdGen,
-  _nextUid :: Int,
-  _trueTimestamp :: Int,
-  -- contains the set of ranges that was last written (or tried to be written)
-  -- to the system. This need not be the keyset of _curRanges, since we must
-  -- simulate deletion.
-  _curRanges :: St.Set Co.KeySpaceRange,
-  -- contains all ranges and the maximum key that was inserted
-  _numTabletKeys :: Mp.Map Co.KeySpaceRange Int,
-  _requestStats :: RequestStats,
-  _clientResponses :: Mp.Map Co.EndpointId [Ms.Message]
-} deriving (Show)
-
-makeLenses ''ClientState
 
 data TestState = TestState {
   -- General
@@ -90,7 +49,10 @@ data TestState = TestState {
   _tabletAsyncQueues :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange (Sq.Seq (TAc.InputAction, Int))),
   _clocks :: Mp.Map Co.EndpointId Int,
   -- Client field
-  _clientState :: ClientState
+  _clientState :: Mp.Map Co.EndpointId CS.ClientState,
+  _nextUid :: Int,
+  _trueTimestamp :: Int,
+  _requestStats :: RS.RequestStats
 } deriving (Show)
 
 makeLenses ''TestState
