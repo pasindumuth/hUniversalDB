@@ -74,8 +74,7 @@ clientTask keySpaceRange eId request =
       requestId = request ^. TM.meta.TM.requestId
   in case request ^. TM.payload of
     TM.TabletRead key timestamp ->
-      let description = description
-          tryHandling derivedState = do
+      let tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MVS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 done derivedState
@@ -96,8 +95,7 @@ clientTask keySpaceRange eId request =
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done createPLEntry msgWrapper
     TM.TabletWrite key value timestamp ->
-      let description = description
-          tryHandling derivedState = do
+      let tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MVS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 let response =

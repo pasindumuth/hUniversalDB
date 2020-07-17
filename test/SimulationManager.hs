@@ -151,6 +151,7 @@ runSlaveIAction eId iAction = do
               slaveEIds <- getL $ Tt.slaveEIds
               let tabletState = TS.constructor (show range) (Rn.mkStdGen r) slaveEIds range
               Tt.tabletStates . ix eId .^^.* Mp.insert range tabletState
+              Tt.tabletAsyncQueues . ix eId .^^.* Mp.insert range Sq.empty
               return ()
       SAc.TabletForward range clientEId tabletMsg -> do
         runTabletIAction eId range (TAc.Receive clientEId tabletMsg)
@@ -304,14 +305,14 @@ simulateOnce numMessages = do
 -- Simulate `n` milliseconds of execution
 simulateN :: Int -> STS Tt.TestState ()
 simulateN n = do
-  numChans <- lp2 (Tt.slaveEIds, Tt.clientEIds) .^^^ \(s, c) -> (length s) + (length c)
+  numChans <- lp3 (Tt.slaveEIds, Tt.clientEIds, Tt.masterEIds) .^^^ \(s, c, m) -> (length s) + (length c) + (length m)
   Mo.forM_ [1..n] $ \_ -> simulateOnce (numChans * (numChans + 1) `div` 2)
 
 -- Simulate execution until there are no more messages in any channel
 -- or any asyncQueue.
 simulateAll :: STS Tt.TestState ()
 simulateAll = do
-  numChans <- lp2 (Tt.slaveEIds, Tt.clientEIds) .^^^ \(s, c) -> (length s) + (length c)
+  numChans <- lp3 (Tt.slaveEIds, Tt.clientEIds, Tt.masterEIds) .^^^ \(s, c, m) -> (length s) + (length c) + (length m)
   let simulate =
         do
           length <- Tt.nonemptyQueues .^^^ St.size

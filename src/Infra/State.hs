@@ -46,7 +46,7 @@ trace traceMsg =  St.state $ \((as, cnt, trace), s) ->((), ((as, cnt, traceMsg:t
 
 -- Dig, update state, and return the return value and actions.
 -- This function also reverses that actions before returning them.
-runL :: Lens' s1 s2 -> ST o s2 a -> ST o s1 (a, [o])
+runL :: Lens' s1 s2 -> ST o1 s2 a -> ST o2 s1 (a, [o1])
 runL lens st = St.state $ \((as, cnt, trace), state) ->
   let (ret, ((as', cnt', trace'), subState)) = St.runState st (([], cnt, trace), state ^?! lens)
   in ((ret, reverse as'), ((as, cnt', trace'), state & lens .~ subState))

@@ -48,7 +48,8 @@ slaveDist r
 
 allRequestsDist :: RequestTypeDist
 allRequestsDist r
-  | r < 10 = CreateDatabase
+  | r < 5 = CreateDatabase
+  | r < 10 = DeleteDatabase
   | r < 20 = RangeRead
   | r < 30 = RangeWrite
   | r < 65 = SlaveRead
@@ -92,7 +93,8 @@ genRequest trueTimestamp requestDist = do
           else makeRange
       eId <- makeMasterEId
       timestamp <- makeTimestamp
-      return (eId, CRq.CreateDatabase databaseId tableId timestamp)
+      -- TODO: we should make these tests such that this is unecessary
+      return (eId, CRq.CreateDatabase databaseId tableId (timestamp + 10))
     DeleteDatabase -> do
       deleteNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
       Co.KeySpaceRange databaseId tableId <-
@@ -103,7 +105,7 @@ genRequest trueTimestamp requestDist = do
           else i'rand .^^ U.randomS curRanges
       eId <- makeMasterEId
       timestamp <- makeTimestamp
-      return (eId, CRq.DeleteDatabase databaseId tableId timestamp)
+      return (eId, CRq.DeleteDatabase databaseId tableId (timestamp + 10))
     RangeRead -> do
       eId <- makeSlaveEId
       timestamp <- makeTimestamp

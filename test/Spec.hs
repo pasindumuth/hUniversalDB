@@ -8,16 +8,16 @@ import qualified Data.Map as Mp
 import qualified Data.Set as St
 import qualified System.Random as Rn
 
+import qualified ClientState as CS
 import qualified Infra.Utils as U
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.ClientRequests as CRq
 import qualified Proto.Messages.ClientResponses as CRs
 import qualified Proto.Messages.TraceMessages as TrM
-import qualified TestState as Tt
 import qualified SimulationManager as SM
+import qualified TestState as Tt
 import qualified TraceChecker as TC
-import qualified ClientState as CS
 import Infra.Lens
 import Infra.State
 
@@ -115,7 +115,7 @@ test0 = do
     SM.addClientMsg fromEId toEId payload
     SM.simulateAll
   -- Finally, randomly pick clients to run, and run them.
-  Mo.forM_ [1..50] $
+  Mo.forM_ [1..200] $
     \_ -> do
       Mo.forM_ [1..5] $
         \_ -> do

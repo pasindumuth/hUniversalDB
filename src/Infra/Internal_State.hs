@@ -70,6 +70,9 @@ getT traversal = St.state $ \(aux, state) -> (state ^?! traversal, (aux, state))
   in (subState, (aux, state & lens .~ subState))
 
 -- Dig and update from a Traversal.
+-- TODO: if we use ix to access a value that's not there, but the value
+-- is a type of Monoid, we won't get an error here; it will automatically
+-- create one. Maybe add some error checking here.
 (.^^.*) :: Traversal' s1 s2 -> (s2 -> s2) -> STI aux s1 s2
 (.^^.*) traversal func = St.state $ \(aux, state) ->
   let subState = state ^?! traversal & func
