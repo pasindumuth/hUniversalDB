@@ -8,7 +8,7 @@ module Infra.State (
 
 import qualified Control.Monad.State as St
 import qualified Debug.Trace as Tr
-import Control.Lens (Lens', Traversal', (.~), (&), (^?!))
+import Control.Lens (Lens', Traversal', (.~), (&), (^?!), has)
 import Text.Show.Pretty (ppShow)
 
 import qualified Proto.Actions.Actions as Ac
@@ -55,5 +55,6 @@ runL lens st = St.state $ \((as, cnt, trace), state) ->
 -- This function also reverses that actions before returning them.
 runT :: Traversal' s1 s2 -> ST o1 s2 a -> ST o2 s1 (a, [o1])
 runT traversal st = St.state $ \((as, cnt, trace), state) ->
+  existsAssert (has traversal state) $
   let (ret, ((as', cnt', trace'), subState)) = St.runState st (([], cnt, trace), state ^?! traversal)
   in ((ret, reverse as'), ((as, cnt', trace'), state & traversal .~ subState))
