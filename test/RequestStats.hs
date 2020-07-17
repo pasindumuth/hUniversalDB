@@ -42,21 +42,21 @@ data RangeReadStats = RangeReadStats {
 
 data RangeWriteStats = RangeWriteStats {
   _numRangeWriteRqs :: Int,
-  _numRangeWriteSuccessRss :: Int,
-  _numRangeWriteBackwardsWriteRss :: Int
+  _numRangeWriteBackwardsWriteRss :: Int,
+  _numRangeWriteSuccessRss :: Int
 } deriving (Gn.Generic, Df.Default, Show)
 
 data SlaveReadStats = SlaveReadStats {
   _numSlaveReadRqs :: Int,
-  _numSlaveReadSuccessRss :: Int,
-  _numSlaveReadUnknownDBRss :: Int
+  _numSlaveReadUnknownDBRss :: Int,
+  _numSlaveReadSuccessRss :: Int
 } deriving (Gn.Generic, Df.Default, Show)
 
 data SlaveWriteStats = SlaveWriteStats {
   _numSlaveWriteRqs :: Int,
-  _numSlaveWriteSuccessRss :: Int,
   _numSlaveWriteUnknownDBRss :: Int,
-  _numBackwardsWriteRss :: Int
+  _numBackwardsWriteRss :: Int,
+  _numSlaveWriteSuccessRss :: Int
 } deriving (Gn.Generic, Df.Default, Show)
 
 data RequestStats = RequestStats {
@@ -87,14 +87,14 @@ recordResponse payload = do
     CRs.DeleteDatabase CRsDD.DoesNotExist -> deleteDatabaseStats . numDeleteDatabaseAlreadyExistsRss .^^. (+1)
     CRs.DeleteDatabase CRsDD.NothingChanged -> deleteDatabaseStats . numDeleteDatabaseNothingChangedRss .^^. (+1)
     CRs.DeleteDatabase CRsDD.Success -> deleteDatabaseStats . numDeleteDatabaseSuccessRss .^^. (+1)
-    CRs.SlaveRead (CRsSR.Success _) -> slaveReadStats . numSlaveReadSuccessRss .^^. (+1)
+    CRs.RangeRead (CRsRR.Success _) -> rangeReadStats . numRangeReadSuccessRss .^^. (+1)
+    CRs.RangeWrite CRsRW.BackwardsWrite -> rangeWriteStats . numRangeWriteBackwardsWriteRss .^^. (+1)
+    CRs.RangeWrite CRsRW.Success -> rangeWriteStats . numRangeWriteSuccessRss .^^. (+1)
     CRs.SlaveRead CRsSR.UnknownDB -> slaveReadStats . numSlaveReadUnknownDBRss .^^. (+1)
-    CRs.SlaveWrite CRsSW.Success -> slaveWriteStats . numSlaveWriteSuccessRss .^^. (+1)
+    CRs.SlaveRead (CRsSR.Success _) -> slaveReadStats . numSlaveReadSuccessRss .^^. (+1)
     CRs.SlaveWrite CRsSW.UnknownDB -> slaveWriteStats . numSlaveWriteUnknownDBRss .^^. (+1)
     CRs.SlaveWrite CRsSW.BackwardsWrite -> slaveWriteStats . numBackwardsWriteRss .^^. (+1)
-    CRs.RangeRead (CRsRR.Success _) -> rangeReadStats . numRangeReadSuccessRss .^^. (+1)
-    CRs.RangeWrite CRsRW.Success -> rangeWriteStats . numRangeWriteSuccessRss .^^. (+1)
-    CRs.RangeWrite CRsRW.BackwardsWrite -> rangeWriteStats . numRangeWriteBackwardsWriteRss .^^. (+1)
+    CRs.SlaveWrite CRsSW.Success -> slaveWriteStats . numSlaveWriteSuccessRss .^^. (+1)
   return ()
 
 recordRequest :: CRq.Payload -> STS RequestStats ()

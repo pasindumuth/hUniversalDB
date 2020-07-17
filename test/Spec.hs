@@ -108,7 +108,7 @@ test0 = do
     (toEId, payload) <- Tt.clientState . ix fromEId .^* CS.genRequest trueTimestamp CS.createDatabaseDist
     SM.addClientMsg fromEId toEId payload
     SM.simulateAll
-  -- Next, Make sure e
+  -- Next, make sure the clients know about each database.
   Mo.forM_ clientEIds $ \fromEId -> do
     trueTimestamp <- getL $ Tt.trueTimestamp
     (toEId, payload) <- Tt.clientState . ix fromEId .^* CS.genRequest trueTimestamp CS.rangeReadDist
@@ -145,7 +145,7 @@ verifyTrace msgs =
 
 driveTest :: Int -> STS Tt.TestState () -> IO ()
 driveTest testNum test = do
-  let g = SM.createTestState 0 5 5 1
+  let g = SM.createTestState 0 5 5 5
       (_, (_, traceMsgs, g')) = runST test g
       -- We must reverse traceMsgs since that's created in reverse order,
       -- with the most recent message first
