@@ -126,7 +126,7 @@ handleInputAction iAction =
         MS.derivedState . (lp3 (
           DS.networkTaskManager,
           DS.slaveGroupRanges,
-          DS.slaveEIds))
+          DS.slaveGroupEIds))
       lp0 .^ NTM.performTask uid taskManager slaveGroupRanges slaveEIds
       return ()
 
@@ -181,7 +181,7 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
             NTM.performTask uid
               (derivedState ^. DS.networkTaskManager)
               (derivedState ^. DS.slaveGroupRanges)
-              (derivedState ^. DS.slaveEIds)
+              (derivedState ^. DS.slaveGroupEIds)
       createPLEntry derivedState =
         PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp eId uid
       msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage
@@ -240,7 +240,7 @@ deleteDatabaseTask eId requestId databaseId tableId timestamp description uid =
             NTM.performTask uid
               (derivedState ^. DS.networkTaskManager)
               (derivedState ^. DS.slaveGroupRanges)
-              (derivedState ^. DS.slaveEIds)
+              (derivedState ^. DS.slaveGroupEIds)
           else sendResponse CRsDD.DoesNotExist
       createPLEntry derivedState =
         PM.Master $ PM.DeleteDatabase requestId databaseId tableId timestamp eId uid

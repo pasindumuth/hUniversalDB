@@ -59,7 +59,7 @@ createTestState seed numMasters numSlaves numClients =
       (masters, rand') = U.s31 foldl ([], rand) masterEIds $
         \(masters, rand) eId ->
           let (r, rand')  = Rn.random rand
-              g = MS.constructor "master" (Rn.mkStdGen r) masterEIds slaveEIds
+              g = MS.constructor "master" (Rn.mkStdGen r) masterEIds (Mp.fromList [("slaveGroup1", slaveEIds)])
           in ((eId, g):masters, rand')
       masterState = Mp.fromList masters
       (slaves, rand'') = U.s31 foldl ([], rand') slaveEIds $

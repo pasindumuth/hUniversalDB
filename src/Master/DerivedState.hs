@@ -6,6 +6,7 @@
 module Master.DerivedState where
 
 import qualified Data.Default as Df
+import qualified Data.Map as Mp
 import qualified GHC.Generics as Gn
 
 import qualified Master.SlaveGroupRanges as SGR
@@ -16,16 +17,16 @@ import Infra.Lens
 data DerivedState = DerivedState {
   _slaveGroupRanges :: SGR.SlaveGroupRanges,
   _networkTaskManager :: NTM.NetworkTaskManager,
-  _slaveEIds :: [Co.EndpointId]
+  _slaveGroupEIds :: Mp.Map Co.SlaveGroupId [Co.EndpointId]
 } deriving (Gn.Generic, Show)
 
 makeLenses ''DerivedState
 
 constructor
-  :: [Co.EndpointId]
+  :: Mp.Map Co.SlaveGroupId [Co.EndpointId]
   -> DerivedState
-constructor slaveEIds = DerivedState {
-  _slaveGroupRanges = Df.def,
+constructor slaveGroupEIds = DerivedState {
+  _slaveGroupRanges = SGR.constructor $ Mp.keys slaveGroupEIds,
   _networkTaskManager = Df.def,
-  _slaveEIds = slaveEIds
+  _slaveGroupEIds = slaveGroupEIds
 }

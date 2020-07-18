@@ -93,7 +93,8 @@ startMaster seedStr curIP otherIPs = do
   Mo.forM_ otherIPs $ \ip -> Ct.forkIO $ connect ip connM receiveChan
 
   -- Initiate connections with all of the slaves
-  Mo.forM_ MT.slaveEIds $ \ip -> Ct.forkIO $ connect ip connM receiveChan
+  Mo.forM_ MT.slaveEIds $ \slaveEIds ->
+    Mo.forM_ slaveEIds $ \ip -> Ct.forkIO $ connect ip connM receiveChan
 
   -- Setup message routing thread
   iActionChan <- Ct.newChan

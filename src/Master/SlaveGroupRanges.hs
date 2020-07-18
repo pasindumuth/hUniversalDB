@@ -5,6 +5,7 @@
 
 module Master.SlaveGroupRanges (
   SlaveGroupRanges,
+  constructor,
   Value(..),
   Master.SlaveGroupRanges.read,
   staticReadLat,
@@ -38,12 +39,13 @@ makeLenses ''SlaveGroupRanges
 
 -- TODO: eventually, this manual default definition should be made obselete
 -- by an admin client API that allows for reconfiguration.
-instance Df.Default SlaveGroupRanges where
-  def =
-    SlaveGroupRanges {
-      _i'lat = Df.def,
-      _i'ranges = Mp.fromList [("slaveGroup1", [])]
-    }
+constructor
+  :: [Co.SlaveGroupId]
+  -> SlaveGroupRanges
+constructor slaveGroupIds = SlaveGroupRanges {
+  _i'lat = Df.def,
+  _i'ranges = Mp.fromList $ map (\sGId -> (sGId, [])) slaveGroupIds
+}
 
 read
   :: Co.SlaveGroupId

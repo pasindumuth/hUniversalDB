@@ -41,9 +41,9 @@ performTask
   :: Co.UID
   -> NetworkTaskManager
   -> SGR.SlaveGroupRanges
-  -> [Co.EndpointId]
+  -> Mp.Map Co.SlaveGroupId [Co.EndpointId]
   -> STM () ()
-performTask uid taskManager slaveGroupRanges slaveEIds = do
+performTask uid taskManager slaveGroupRanges slaveGroupEIds = do
   case Mp.lookup uid (taskManager ^. i'taskMap) of
     Just task ->
       case task of
@@ -64,6 +64,7 @@ performTask uid taskManager slaveGroupRanges slaveEIds = do
               -- TODO: This is so wrong in so many ways. We should be accessing a table indexed by SlaveGroupId,
               -- and then picking a slave that's not dead. Also, we need to know if this master should even
               -- be doing this (since this might be a backup master).
+              Just slaveEIds = Mp.lookup slaveGroupId slaveGroupEIds
               (slaveEId:_) = slaveEIds
           addA $ MAc.Send [slaveEId] request
           addA $ MAc.PerformOutput uid 100
