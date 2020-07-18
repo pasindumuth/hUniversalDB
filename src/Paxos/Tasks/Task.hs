@@ -12,11 +12,10 @@ import Infra.State
 
 data Task derivedStateT outputActionT = Task {
   description :: String,
-  tryHandling :: derivedStateT -> ST outputActionT () Bool,
+  tryHandling :: derivedStateT -> ST outputActionT () (Either PM.PaxosLogEntry ()),
   done :: derivedStateT -> ST outputActionT () (),
-  createPLEntry :: derivedStateT -> PM.PaxosLogEntry,
   msgWrapper :: (PM.MultiPaxosMessage -> Ms.Message)
 }
 
 instance Show (Task derivedStateT outputActionT) where
-  show (Task description _ _ _ _) = description
+  show (Task description _ _ _) = description

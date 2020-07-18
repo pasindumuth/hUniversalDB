@@ -57,13 +57,14 @@ handleTask
 handleTask task = do
   derivedState <- getL $ _2
   requestHandled <- lp0 .^ Ta.tryHandling task derivedState
-  if requestHandled
-    then return ()
-    else do
-      taskQueue <- _3.i'taskQueue .^^. U.push task
-      if Sq.length taskQueue == 1
-        then handleNextTask
-        else return ()
+  case requestHandled of
+    Right _ -> return ()
+    Left _ -> 
+      do
+        taskQueue <- _3.i'taskQueue .^^. U.push task
+        if Sq.length taskQueue == 1
+          then handleNextTask
+          else return ()
 
 handleNextTask
   :: (Ac.OutputAction outputActionT)
@@ -91,16 +92,16 @@ handleNextTask' task = do
   _3.i'currentInsert .^^. \_ -> Nothing
   derivedState <- getL $ _2
   requestHandled <- lp0 .^ Ta.tryHandling task derivedState
-  if requestHandled
-    then pollAndNext
-    else do
-      index <- _1.MP.paxosLog .^^^ PL.nextAvailableIndex
-      let entry = Ta.createPLEntry task derivedState
-      _3.i'currentInsert .^^. \_ -> Just $ CurrentInsert index entry task
-      slaveEIds <- getL $ _5
-      lp2 (_1, _4) .^ MP.insertMultiPaxos slaveEIds entry (Ta.msgWrapper task)
-      counterValue <- _3.i'counter .^^. (+1)
-      addA $ Ac.retry counterValue 100
+  case requestHandled of
+    Right _ -> pollAndNext
+    Left entry -> 
+      do
+        index <- _1.MP.paxosLog .^^^ PL.nextAvailableIndex
+        _3.i'currentInsert .^^. \_ -> Just $ CurrentInsert index entry task
+        slaveEIds <- getL $ _5
+        lp2 (_1, _4) .^ MP.insertMultiPaxos slaveEIds entry (Ta.msgWrapper task)
+        counterValue <- _3.i'counter .^^. (+1)
+        addA $ Ac.retry counterValue 100
 
 handleRetry
   :: (Ac.OutputAction outputActionT)

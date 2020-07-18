@@ -74,12 +74,13 @@ clientTask keySpaceRange eId request =
       requestId = request ^. TM.meta.TM.requestId
   in case request ^. TM.payload of
     TM.TabletRead key timestamp ->
-      let tryHandling derivedState = do
+      let entry = PM.Tablet $ PM.Read requestId key timestamp
+          tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MVS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 done derivedState
-                return True
-              _ -> return False
+                return $ Right ()
+              _ -> return $ Left entry
           done derivedState = do
             let value = case (derivedState ^. DS.kvStore) &  MVS.staticRead key timestamp of
                           Just (value, _, _) -> Just value
@@ -91,11 +92,11 @@ clientTask keySpaceRange eId request =
                       (CRsSR.Success value))
             trace $ TrM.ClientResponseSent response
             addA $ TAc.Send [eId] $ Ms.ClientResponse response
-          createPLEntry _ = PM.Tablet $ PM.Read requestId key timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
-      in Ta.Task description tryHandling done createPLEntry msgWrapper
+      in Ta.Task description tryHandling done msgWrapper
     TM.TabletWrite key value timestamp ->
-      let tryHandling derivedState = do
+      let entry = PM.Tablet $ PM.Write requestId key value timestamp
+          tryHandling derivedState = do
             case (derivedState ^. DS.kvStore) & MVS.staticReadLat key of
               Just lat | timestamp <= lat -> do
                 let response =
@@ -110,8 +111,8 @@ clientTask keySpaceRange eId request =
                             (CRs.SlaveWrite CRsSW.BackwardsWrite)
                 trace $ TrM.ClientResponseSent response
                 addA $ TAc.Send [eId] $ Ms.ClientResponse response
-                return True
-              _ -> return False
+                return $ Right ()
+              _ -> return $ Left entry
           done derivedState = do
             let response =
                   CRs.ClientResponse
@@ -119,6 +120,5 @@ clientTask keySpaceRange eId request =
                     (CRs.SlaveWrite CRsSW.Success)
             trace $ TrM.ClientResponseSent response
             addA $ TAc.Send [eId] $ Ms.ClientResponse response
-          createPLEntry _ = PM.Tablet $ PM.Write requestId key value timestamp
           msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
-      in Ta.Task description tryHandling done createPLEntry msgWrapper
+      in Ta.Task description tryHandling done msgWrapper

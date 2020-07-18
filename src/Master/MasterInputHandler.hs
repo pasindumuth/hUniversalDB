@@ -140,7 +140,8 @@ createDatabaseTask
   -> Co.UID
   -> Ta.Task DS.DerivedState MAc.OutputAction
 createDatabaseTask eId requestId databaseId tableId timestamp description uid =
-  let keySpaceRange = Co.KeySpaceRange databaseId tableId
+  let entry = PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp eId uid
+      keySpaceRange = Co.KeySpaceRange databaseId tableId
       sendResponse responseValue = do
         let response =
               CRs.ClientResponse
@@ -153,14 +154,14 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
         if timestamp <= lat
           then do
             sendResponse CRsCD.BackwardsWrite
-            return True
+            return $ Right ()
           else do
             let latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
                 exists = DSH.rangeExists keySpaceRange latestValues
             if Mb.isJust exists
               -- We return False so that the entry the PL entry can be inserted, which
               -- will then update the lat before sending back AlreadyExists.
-              then return False
+              then return $ Left entry
               else do
                 let maybeExists = DSH.rangeMaybeExists keySpaceRange latestValues
                     freeGroupM = DSH.findFreeGroupM latestValues
@@ -168,8 +169,8 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
                   then do
                     -- In this case, we can't fullfill the request, so respond with an error.
                     sendResponse CRsCD.NothingChanged
-                    return True
-                  else return False
+                    return $ Right ()
+                  else return $ Left entry
       done derivedState = do
         let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
             latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
@@ -182,10 +183,8 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
               (derivedState ^. DS.networkTaskManager)
               (derivedState ^. DS.slaveGroupRanges)
               (derivedState ^. DS.slaveGroupEIds)
-      createPLEntry derivedState =
-        PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp eId uid
       msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage
-  in Ta.Task description tryHandling done createPLEntry msgWrapper
+  in Ta.Task description tryHandling done msgWrapper
 
 deleteDatabaseTask
   :: Co.EndpointId
@@ -197,7 +196,8 @@ deleteDatabaseTask
   -> Co.UID
   -> Ta.Task DS.DerivedState MAc.OutputAction
 deleteDatabaseTask eId requestId databaseId tableId timestamp description uid =
-  let keySpaceRange = Co.KeySpaceRange databaseId tableId
+  let entry = PM.Master $ PM.DeleteDatabase requestId databaseId tableId timestamp eId uid
+      keySpaceRange = Co.KeySpaceRange databaseId tableId
       sendResponse responseValue = do
         let response =
               CRs.ClientResponse
@@ -210,24 +210,24 @@ deleteDatabaseTask eId requestId databaseId tableId timestamp description uid =
         if timestamp <= lat
           then do
             sendResponse CRsDD.BackwardsWrite
-            return True
+            return $ Right ()
           else do
             let latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
                 exists = DSH.rangeExists keySpaceRange latestValues
             if Mb.isJust exists
               -- We return False, since this is the only valid case for deleting a KeySpaceRange.
-              then return False
+              then return $ Left entry
               else
                 if DSH.rangeMaybeExists keySpaceRange latestValues
                   then do
                     -- In this case, we can't fullfill the request due to uncertainty,
                     -- so respond with an error.
                     sendResponse CRsDD.NothingChanged
-                    return True
+                    return $ Right ()
                   -- In this case, the KeySpaceRange doesn't exist or have potential for exists,
                   -- so w return False so that the entry the PL entry can be inserted, which
                   -- will then update the lat before sending back DoesNotExist.
-                  else return False
+                  else return $ Left entry
       done derivedState = do
         let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
             latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
@@ -242,10 +242,8 @@ deleteDatabaseTask eId requestId databaseId tableId timestamp description uid =
               (derivedState ^. DS.slaveGroupRanges)
               (derivedState ^. DS.slaveGroupEIds)
           else sendResponse CRsDD.DoesNotExist
-      createPLEntry derivedState =
-        PM.Master $ PM.DeleteDatabase requestId databaseId tableId timestamp eId uid
       msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage
-  in Ta.Task description tryHandling done createPLEntry msgWrapper
+  in Ta.Task description tryHandling done msgWrapper
 
 createPickKeySpace
   :: CRs.ClientResponse
@@ -257,15 +255,14 @@ createPickKeySpace
   -> String
   -> Ta.Task DS.DerivedState MAc.OutputAction
 createPickKeySpace response eId slaveGroupId timestamp choice uid description =
-  let tryHandling derivedState = do
+  let entry = PM.Master $ PM.PickKeySpace slaveGroupId choice uid
+      tryHandling derivedState = do
         case derivedState ^. DS.slaveGroupRanges & SGR.staticRead slaveGroupId timestamp of
-          Just (_, SGR.Changing _) -> return False
-          _ -> return True
+          Just (_, SGR.Changing _) -> return $ Left entry
+          _ -> return $ Right ()
       done derivedState = do
         trace $ TrM.ClientResponseSent response
         addA $ MAc.Send [eId] $ Ms.ClientResponse response
         return ()
-      createPLEntry derivedState =
-        PM.Master $ PM.PickKeySpace slaveGroupId choice uid
       msgWrapper = Ms.MasterMessage . MM.MultiPaxosMessage
-  in Ta.Task description tryHandling done createPLEntry msgWrapper
+  in Ta.Task description tryHandling done msgWrapper
