@@ -256,51 +256,33 @@ simulateOnce numMessages = do
       else return ()
   -- Deliver messages
   --
-  -- Here, we are delivering approximately as many messages as there are currently instance
+  -- Here, we are delivering approximately as many messages as there are currently
   -- in the channels. We select which channels to deliver by first building a distribution,
-  -- lenDis, of the number of messages they are in every nonemptyQueue. Then, we select which
+  -- lenDis, of the number of messages that are in every nonemptyQueue. Then, we select which
   -- queue to deliver from according to this distribution.
   --
   -- We use this scheme to model the fact that channels have about a 1 millisecond latency,
   -- but much higher bandwidth. Thus, between two cycles of simulateOnce, all messages in a channel
   -- should have been delivered.
+  nonemptyQueues <- getL $ Tt.nonemptyQueues
+  lenDist <-
+    U.s31 Mo.foldM [] nonemptyQueues $ \lenDist queueId -> do
+      let (fromEId, toEId) = queueId
+      queue <- getT $ Tt.queues . ix fromEId . ix toEId
+      return $ (queueId, Sq.length queue):lenDist
 
--- Turns out this isn't that important... I should have created the above
--- distribution and printed it out first to see if it was warranted to even
--- pick queueIds according to that.
--- The problem might be the retry delay or something. Gotta figure out why that
--- shit happens at nothing so much.
--- TODO: But this might be useful for creating a realistic simulation. Keep it for now.
-
---  nonemptyQueues <- getL $ Tt.nonemptyQueues
---  lenDist <-
---    U.s31 Mo.foldM [] nonemptyQueues $ \lenDist queueId -> do
---      let (fromEId, toEId) = queueId
---      queue <- getT $ Tt.queues . ix fromEId . ix toEId
---      return $ (queueId, Sq.length queue):lenDist
---
---  let numMessages = foldl (\s (_, a) -> s + a) 0 lenDist
---  numMessages' <- debugP (ppShow lenDist) numMessages
---  Mo.forM_ [1..numMessages'] $ \_ -> do
---    r :: Int <- Tt.rand .^^ Rn.randomR (0, numMessages - 1)
---    let loop left ((queueId, distVal):xs)
---          | distVal <= left = loop (left - distVal) xs
---          | otherwise = queueId
---        queueId = loop r lenDist
---    nonemptyQueues <- getL $ Tt.nonemptyQueues
---    if St.member queueId nonemptyQueues
---      then deliverMessage queueId
---      else return ()
-
-  -- Deliver `numMessages` messages
+  let numMessages = foldl (\s (_, a) -> s + a) 0 lenDist
   Mo.forM_ [1..numMessages] $ \_ -> do
-    length <- Tt.nonemptyQueues .^^^ St.size
-    if length == 0
-      then return ()
-      else do
-        randQueueIndex <- Tt.rand .^^ Rn.randomR (0, length - 1)
-        queueId <- Tt.nonemptyQueues .^^^  St.elemAt randQueueIndex
-        deliverMessage queueId
+    r :: Int <- Tt.rand .^^ Rn.randomR (0, numMessages - 1)
+    let loop left ((queueId, distVal):xs)
+          | distVal <= left = loop (left - distVal) xs
+          | otherwise = queueId
+        loop left [] = U.caseError
+        queueId = loop r lenDist
+    nonemptyQueues <- getL $ Tt.nonemptyQueues
+    if St.member queueId nonemptyQueues
+      then deliverMessage queueId
+      else return ()
 
 -- Simulate `n` milliseconds of execution
 simulateN :: Int -> STS Tt.TestState ()

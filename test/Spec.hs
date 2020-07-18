@@ -98,8 +98,8 @@ import Infra.State
 --  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t2" "key1" "value2" 6); SM.simulateN 2
 --  SM.addClientMsg (SM.Slave 2) (CRq.SlaveRead "d" "t2" "key1" 7); SM.simulateAll
 
-test0 :: STS Tt.TestState ()
-test0 = do
+setupInitialDBs :: STS Tt.TestState ()
+setupInitialDBs = do
   clientEIds <- getL $ Tt.clientEIds
   -- First, fully create a few databases to help improve liveness of the test
   let fromEId = SM.mkClientEId 0
@@ -114,7 +114,11 @@ test0 = do
     (toEId, payload) <- Tt.clientState . ix fromEId .^* CS.genRequest trueTimestamp CS.rangeReadDist
     SM.addClientMsg fromEId toEId payload
     SM.simulateAll
-  -- Finally, randomly pick clients to run, and run them.
+
+test0 :: STS Tt.TestState ()
+test0 = do
+  setupInitialDBs
+  clientEIds <- getL $ Tt.clientEIds
   Mo.forM_ [1..200] $
     \_ -> do
       Mo.forM_ [1..5] $
