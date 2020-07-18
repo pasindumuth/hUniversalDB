@@ -21,82 +21,14 @@ import qualified TraceChecker as TC
 import Infra.Lens
 import Infra.State
 
---test1 :: STS Tt.TestState ()
---test1 = do
---  SM.addClientMsg (SM.Slave 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
---
---test2 :: STS Tt.TestState ()
---test2 = do
---  Mo.forM_ [1..100] $
---    \_ -> do
---      (endpoint, payload) <- Tt.clientState .^ genRequest slaveDist
---      SM.addClientMsg endpoint payload
---      SM.simulateN 2
---      SM.dropMessages 1
---  SM.simulateAll
---
----- TODO: maybe we should take statistics on insertion retries. This will help
----- verify PaxosTaskManager and it will help us understand wasted cycles.
---test3 :: STS Tt.TestState ()
---test3 = do
---  Mo.forM_ [1..50] $
---    \_ -> do
---      Mo.forM_ [1..5] $
---        \_ -> do
---          (endpoint, payload) <- Tt.clientState .^ genRequest slaveDist
---          SM.addClientMsg endpoint payload
---      SM.simulateN 2
---      SM.dropMessages 2
---  SM.simulateAll
-
---test4 :: STS Tt.TestState ()
---test4 = do
---  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateAll
---  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t" 2); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 4); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 5); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 6); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 7); SM.simulateAll
---
---test5 :: STS Tt.TestState ()
---test5 = do
---  Mo.forM_ [1..50] $
---    \_ -> do
---      Mo.forM_ [1..5] $
---        \_ -> do
---          (endpoint, payload) <- Tt.clientState .^ genRequest allRequestsDist
---          SM.addClientMsg endpoint payload
---      SM.simulateN 2
---      SM.dropMessages 2
---  SM.simulateAll
---
---test6 :: STS Tt.TestState ()
---test6 = do
---  Mo.forM_ [1..50] $
---    \_ -> do
---      Mo.forM_ [1..5] $
---        \_ -> do
---          (endpoint, payload) <- Tt.clientState .^ genRequest masterDist
---          SM.addClientMsg endpoint payload
---      SM.simulateN 2
---      SM.dropMessages 2
---  SM.simulateAll
---
---test7 :: STS Tt.TestState ()
---test7 = do
---  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t1" 1); SM.simulateAll
---  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t1" 2); SM.simulateAll
---  SM.addClientMsg (SM.Master 0) (CRq.DeleteDatabase "d" "t1" 3); SM.simulateAll
---  SM.addClientMsg (SM.Master 0) (CRq.CreateDatabase "d" "t2" 4); SM.simulateAll
---  SM.addClientMsg (SM.Slave 0) (CRq.SlaveWrite "d" "t2" "key1" "value1" 5); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 1) (CRq.SlaveWrite "d" "t2" "key1" "value2" 6); SM.simulateN 2
---  SM.addClientMsg (SM.Slave 2) (CRq.SlaveRead "d" "t2" "key1" 7); SM.simulateAll
+addGenRequest
+  :: Co.EndpointId
+  -> CS.RequestTypeDist
+  -> STS Tt.TestState ()
+addGenRequest fromEId requestDist = do
+    trueTimestamp <- getL $ Tt.trueTimestamp
+    (toEId, payload) <- Tt.clientState . ix fromEId .^* CS.genRequest trueTimestamp requestDist
+    SM.addClientMsg fromEId toEId payload
 
 setupInitialDBs :: STS Tt.TestState ()
 setupInitialDBs = do
@@ -104,19 +36,108 @@ setupInitialDBs = do
   -- First, fully create a few databases to help improve liveness of the test
   let fromEId = SM.mkClientEId 0
   Mo.forM_ [1..5] $ \_ -> do
-    trueTimestamp <- getL $ Tt.trueTimestamp
-    (toEId, payload) <- Tt.clientState . ix fromEId .^* CS.genRequest trueTimestamp CS.createDatabaseDist
-    SM.addClientMsg fromEId toEId payload
+    addGenRequest fromEId CS.createDatabaseDist
     SM.simulateAll
   -- Next, make sure the clients know about each database.
   Mo.forM_ clientEIds $ \fromEId -> do
-    trueTimestamp <- getL $ Tt.trueTimestamp
-    (toEId, payload) <- Tt.clientState . ix fromEId .^* CS.genRequest trueTimestamp CS.rangeReadDist
-    SM.addClientMsg fromEId toEId payload
+    addGenRequest fromEId CS.rangeReadDist
     SM.simulateAll
 
-test0 :: STS Tt.TestState ()
-test0 = do
+test1 :: STS Tt.TestState ()
+test1 = do
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 2) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 3) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 4) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
+
+-- Tasks 100ms of execution at 1 requests per second, where
+-- the requests that are sent are only slave requests.
+test2 :: STS Tt.TestState ()
+test2 = do
+  setupInitialDBs
+  clientEIds <- getL $ Tt.clientEIds
+  Mo.forM_ [1..100] $
+    \_ -> do
+      fromEId <- Tt.rand .^^ U.randomL clientEIds
+      addGenRequest fromEId CS.slaveDist
+      SM.simulate1ms
+      SM.dropMessages 1
+  SM.simulateAll
+
+-- Tasks 50ms of execution at 5 requests per second, where
+-- the requests that are sent are only slave requests.
+test3 :: STS Tt.TestState ()
+test3 = do
+  setupInitialDBs
+  clientEIds <- getL $ Tt.clientEIds
+  Mo.forM_ [1..50] $
+    \_ -> do
+      Mo.forM_ [1..5] $
+        \_ -> do
+          fromEId <- Tt.rand .^^ U.randomL clientEIds
+          addGenRequest fromEId CS.slaveDist
+      SM.simulate1ms
+      SM.dropMessages 2
+  SM.simulateAll
+
+test4 :: STS Tt.TestState ()
+test4 = do
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t" 2); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 4); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 6); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 7); SM.simulateAll
+
+-- Tasks 50ms of execution at 5 requests per second, where
+-- the requests that are all possible requests.
+test5 :: STS Tt.TestState ()
+test5 = do
+  setupInitialDBs
+  clientEIds <- getL $ Tt.clientEIds
+  Mo.forM_ [1..50] $
+    \_ -> do
+      Mo.forM_ [1..5] $
+        \_ -> do
+          fromEId <- Tt.rand .^^ U.randomL clientEIds
+          addGenRequest fromEId CS.allRequestsDist
+      SM.simulate1ms
+      SM.dropMessages 2
+  SM.simulateAll
+
+-- Tasks 50ms of execution at 5 requests per second, where
+-- the requests that are only master requests.
+test6 :: STS Tt.TestState ()
+test6 = do
+  setupInitialDBs
+  clientEIds <- getL $ Tt.clientEIds
+  Mo.forM_ [1..50] $
+    \_ -> do
+      Mo.forM_ [1..5] $
+        \_ -> do
+          fromEId <- Tt.rand .^^ U.randomL clientEIds
+          addGenRequest fromEId CS.masterDist
+      SM.simulate1ms
+      SM.dropMessages 2
+  SM.simulateAll
+
+
+test7 :: STS Tt.TestState ()
+test7 = do
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t1" 1); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t1" 2); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.DeleteDatabase "d" "t1" 3); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t2" 4); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0) (CRq.SlaveWrite "d" "t2" "key1" "value1" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 1) (CRq.SlaveWrite "d" "t2" "key1" "value2" 6); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 2) (CRq.SlaveRead "d" "t2" "key1" 7); SM.simulateAll
+
+-- Stress test with more requests
+test8 :: STS Tt.TestState ()
+test8 = do
   setupInitialDBs
   clientEIds <- getL $ Tt.clientEIds
   Mo.forM_ [1..200] $
@@ -124,10 +145,8 @@ test0 = do
       Mo.forM_ [1..5] $
         \_ -> do
           fromEId <- Tt.rand .^^ U.randomL clientEIds
-          trueTimestamp <- getL $ Tt.trueTimestamp
-          (toEId, payload) <- Tt.clientState . ix fromEId .^* CS.genRequest trueTimestamp CS.allRequestsDist
-          SM.addClientMsg fromEId toEId payload
-      SM.simulateN 2
+          addGenRequest fromEId CS.allRequestsDist
+      SM.simulate1ms
       SM.dropMessages 2
   SM.simulateAll
 
@@ -164,14 +183,14 @@ driveTest testNum test = do
 
 testDriver :: IO ()
 testDriver = do
-  driveTest 0 test0
---  driveTest 1 test1
---  driveTest 2 test2
---  driveTest 3 test3
---  driveTest 4 test4
---  driveTest 5 test5
---  driveTest 6 test6
---  driveTest 7 test7
+  driveTest 1 test1
+  driveTest 2 test2
+  driveTest 3 test3
+  driveTest 4 test4
+  driveTest 5 test5
+  driveTest 6 test6
+  driveTest 7 test7
+  driveTest 8 test8
 
 main :: IO ()
 main = testDriver

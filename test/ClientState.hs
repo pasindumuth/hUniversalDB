@@ -148,12 +148,10 @@ genRequest trueTimestamp requestDist = do
   where
     makeMasterEId = do
       masterEIds <- getL $ i'masterEIds
-      eId <- i'rand .^^ U.randomL masterEIds
-      return eId
+      i'rand .^^ U.randomL masterEIds
     makeSlaveEId = do
       slaveEIds <- getL $ i'slaveEIds
-      eId <- i'rand .^^ U.randomL slaveEIds
-      return eId
+      i'rand .^^ U.randomL slaveEIds
     makeTimestamp = do
       noise <- i'rand .^^ Rn.randomR (-2, 2)
       return $ trueTimestamp + noise

@@ -3,7 +3,8 @@
 module SimulationManager (
   createTestState,
   dropMessages,
-  simulateN,
+  simulate1ms,
+  simulateNms,
   simulateAll,
   addClientMsg,
   mkMasterEId,
@@ -210,8 +211,8 @@ skewProb = 95
 -- Simulate one millisecond of execution. This involves incrementing the slave's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
 -- `numMessages` number of messages.
-simulateOnce :: Int -> STS Tt.TestState ()
-simulateOnce numMessages = do
+simulate1ms :: STS Tt.TestState ()
+simulate1ms = do
   -- increment each slave's clocks and run async tasks that are now ready
   randPercent :: Int <- Tt.rand .^^ Rn.randomR (1, 100)
   if randPercent <= skewProb
@@ -262,7 +263,7 @@ simulateOnce numMessages = do
   -- queue to deliver from according to this distribution.
   --
   -- We use this scheme to model the fact that channels have about a 1 millisecond latency,
-  -- but much higher bandwidth. Thus, between two cycles of simulateOnce, all messages in a channel
+  -- but much higher bandwidth. Thus, between two cycles of simulate1ms, all messages in a channel
   -- should have been delivered.
   nonemptyQueues <- getL $ Tt.nonemptyQueues
   lenDist <-
@@ -285,16 +286,14 @@ simulateOnce numMessages = do
       else return ()
 
 -- Simulate `n` milliseconds of execution
-simulateN :: Int -> STS Tt.TestState ()
-simulateN n = do
-  numChans <- lp3 (Tt.slaveEIds, Tt.clientEIds, Tt.masterEIds) .^^^ \(s, c, m) -> (length s) + (length c) + (length m)
-  Mo.forM_ [1..n] $ \_ -> simulateOnce (numChans * (numChans + 1) `div` 2)
+simulateNms :: Int -> STS Tt.TestState ()
+simulateNms n = do
+  Mo.forM_ [1..n] $ \_ -> simulate1ms
 
 -- Simulate execution until there are no more messages in any channel
 -- or any asyncQueue.
 simulateAll :: STS Tt.TestState ()
 simulateAll = do
-  numChans <- lp3 (Tt.slaveEIds, Tt.clientEIds, Tt.masterEIds) .^^^ \(s, c, m) -> (length s) + (length c) + (length m)
   let simulate =
         do
           length <- Tt.nonemptyQueues .^^^ St.size
@@ -303,7 +302,7 @@ simulateAll = do
           anyTabletTasks <- Tt.tabletAsyncQueues .^^^ any (\tablets -> tablets & any (\q -> Sq.length q > 0))
           if length > 0 || anyMasterTasks || anySlaveTasks || anyTabletTasks
             then do
-              simulateOnce (numChans * (numChans + 1) `div` 2)
+              simulate1ms
               simulate
             else return ()
   simulate
