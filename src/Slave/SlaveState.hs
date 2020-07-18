@@ -19,6 +19,7 @@ import qualified Slave.Env as En
 import Infra.Lens
 
 data SlaveState = SlaveState {
+  _slaveGroupId :: Co.SlaveGroupId,
   _multiPaxosInstance :: MP.MultiPaxosInstance,
   _derivedState :: DS.DerivedState,
   _paxosTaskManager :: PTM.PaxosTaskManager DS.DerivedState SAc.OutputAction,
@@ -28,11 +29,13 @@ data SlaveState = SlaveState {
 makeLenses ''SlaveState
 
 constructor
-  :: Co.PaxosId
+  :: Co.SlaveGroupId -- Right now, this is only used for testing
+  -> Co.PaxosId -- Right now, this is only used for testing
   -> Rn.StdGen
   -> [Co.EndpointId]
   -> SlaveState
-constructor paxosId rand slaveEIds = SlaveState {
+constructor slaveGroupId paxosId rand slaveEIds = SlaveState {
+  _slaveGroupId = slaveGroupId, 
   _multiPaxosInstance = MP.constructor paxosId,
   _derivedState = Df.def,
   _paxosTaskManager = Df.def,

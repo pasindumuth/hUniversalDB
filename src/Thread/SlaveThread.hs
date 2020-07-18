@@ -30,7 +30,7 @@ startSlaveThread
   -> MV.MVar Cn.Connections
   -> IO ()
 startSlaveThread rg iActionChan connM = do
-  let g = SS.constructor "" rg slaveEIds
+  let g = SS.constructor "slaveGroup1" "" rg slaveEIds
       tabletMap = Mp.empty
   handlePaxosMessage g tabletMap
   where

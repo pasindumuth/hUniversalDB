@@ -42,15 +42,23 @@ import Infra.Lens
 import Infra.State
 
 mkMasterEId i = "m" ++ show i
-mkSlaveEId i = "s" ++ show i
+mkSlaveGroupId i = "sg" ++ show i
+mkSlaveEId i j = mkSlaveGroupId i ++ "sl" ++ show j
 mkClientEId i = "c" ++ show i
 
-createTestState :: Int -> Int -> Int -> Int -> Tt.TestState
-createTestState seed numMasters numSlaves numClients =
-  let masterEIds = U.for [0..(numMasters - 1)] $ mkMasterEId
-      slaveEIds = U.for [0..(numSlaves - 1)] $ mkSlaveEId
-      clientEIds = U.for [0..(numClients - 1)] $ mkClientEId
-      eIds = masterEIds ++ slaveEIds ++ clientEIds
+numPerGroup :: Int = 5
+
+createTestState :: Int -> Int -> Int -> Tt.TestState
+createTestState seed numSlaveGroups numClients =
+  let masterEIds = U.for
+        [0..(numPerGroup - 1)] $ mkMasterEId
+      slaveGroupEIds = Mp.fromList $ U.for
+        [0..(numSlaveGroups - 1)] $ \i -> (mkSlaveGroupId i, U.for
+        [0..(numPerGroup - 1)] $ \j -> mkSlaveEId i j)
+      allSlaveEIds = Mp.foldl (\slaveEIds eIds -> slaveEIds ++ eIds) [] slaveGroupEIds
+      clientEIds = U.for
+        [0..(numClients - 1)] $ mkClientEId
+      eIds = masterEIds ++ allSlaveEIds ++ clientEIds
       queues = Mp.fromList $ U.for eIds $ \eId1 ->
         (eId1, Mp.fromList $ U.for eIds $ \eId2 ->
         (eId2, Sq.empty))
@@ -59,30 +67,33 @@ createTestState seed numMasters numSlaves numClients =
       (masters, rand') = U.s31 foldl ([], rand) masterEIds $
         \(masters, rand) eId ->
           let (r, rand')  = Rn.random rand
-              g = MS.constructor "master" (Rn.mkStdGen r) masterEIds (Mp.fromList [("slaveGroup1", slaveEIds)])
+              g = MS.constructor "master" (Rn.mkStdGen r) masterEIds slaveGroupEIds
           in ((eId, g):masters, rand')
       masterState = Mp.fromList masters
-      (slaves, rand'') = U.s31 foldl ([], rand') slaveEIds $
-        \(slaves, rand) eId ->
-          let (r, rand')  = Rn.random rand
-              g = SS.constructor "" (Rn.mkStdGen r) slaveEIds
-          in ((eId, g):slaves, rand')
+      (slaves, rand'') = U.s31 Mp.foldlWithKey ([], rand') slaveGroupEIds $
+        \(slaves, rand) slaveGroupId slaveEIds ->
+          U.s31 foldl (slaves, rand) slaveEIds $
+            \(slaves, rand) eId ->
+              let (r, rand')  = Rn.random rand
+                  g = SS.constructor slaveGroupId "" (Rn.mkStdGen r) slaveEIds
+              in ((eId, g):slaves, rand')
       slaveState = Mp.fromList slaves
-      tabletStates = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
+      tabletStates = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Mp.empty)
       masterAsyncQueues = Mp.fromList $ U.for masterEIds $ \eId -> (eId, Sq.empty)
-      slaveAsyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Sq.empty)
-      tabletAsyncQueues = Mp.fromList $ U.for slaveEIds $ \eId -> (eId, Mp.empty)
-      clocks = Mp.fromList $ U.for (masterEIds ++ slaveEIds) $ \eId -> (eId, 0)
+      slaveAsyncQueues = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Sq.empty)
+      tabletAsyncQueues = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Mp.empty)
+      clocks = Mp.fromList $ U.for (masterEIds ++ allSlaveEIds) $ \eId -> (eId, 0)
       (clients, rand''') = U.s31 foldl ([], rand'') clientEIds $
         \(clients, rand) eId ->
           let (r, rand')  = Rn.random rand
-              client = CS.ClientState St.empty slaveEIds masterEIds (Rn.mkStdGen r)
+              client = CS.ClientState St.empty allSlaveEIds masterEIds (Rn.mkStdGen r)
           in ((eId, client):clients, rand')
       clientState = Mp.fromList clients
   in Tt.TestState {
       Tt._rand = rand''',
       Tt._masterEIds = masterEIds,
-      Tt._slaveEIds = slaveEIds,
+      Tt._slaveGroupEIds = slaveGroupEIds,
+      Tt._allSlaveEIds = allSlaveEIds,
       Tt._clientEIds = clientEIds,
       Tt._queues = queues,
       Tt._nonemptyQueues = nonemptyQueues,
@@ -149,7 +160,8 @@ runSlaveIAction eId iAction = do
             then return ()
             else do
               r <- Tt.slaveState . ix eId . SS.env . En.rand .^^* Rn.random
-              slaveEIds <- getL $ Tt.slaveEIds
+              slaveGroupId <- getT $ Tt.slaveState . ix eId . SS.slaveGroupId
+              slaveEIds <- getT $ Tt.slaveGroupEIds . ix slaveGroupId
               let tabletState = TS.constructor (show range) (Rn.mkStdGen r) slaveEIds range
               Tt.tabletStates . ix eId .^^.* Mp.insert range tabletState
               Tt.tabletAsyncQueues . ix eId .^^.* Mp.insert range Sq.empty
@@ -178,7 +190,7 @@ deliverMessage :: (Co.EndpointId, Co.EndpointId) -> STS Tt.TestState ()
 deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
   masterEIds' <- getL $ Tt.masterEIds
-  slaveEIds' <- getL $ Tt.slaveEIds
+  slaveEIds' <- getL $ Tt.allSlaveEIds
   clientEIds' <- getL $ Tt.clientEIds
   let route
         | Li.elem toEId masterEIds' =
@@ -236,7 +248,7 @@ simulate1ms = do
         Tt.masterAsyncQueues . ix eId .^^.* \_ -> remainder
         Mo.forM_ readyActions $ \(iAction, _) -> runMasterIAction eId iAction
       else return ()
-  slaveEIds <- getL Tt.slaveEIds
+  slaveEIds <- getL Tt.allSlaveEIds
   Mo.forM_ slaveEIds $ \eId -> do
     randPercent :: Int <- Tt.rand .^^ Rn.randomR (1, 100)
     if randPercent <= skewProb

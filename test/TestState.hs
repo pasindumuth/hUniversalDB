@@ -30,7 +30,8 @@ data TestState = TestState {
   -- General
   _rand :: Rn.StdGen,
   _masterEIds :: [Co.EndpointId], -- EndpointIds for all masters in the system
-  _slaveEIds :: [Co.EndpointId], -- EndpointIds for all slaves in the system
+  _slaveGroupEIds :: Mp.Map Co.SlaveGroupId [Co.EndpointId], -- Slave Endpoints in each SlaveGroup
+  _allSlaveEIds :: [Co.EndpointId], -- All endpoints in slaveGroupEIds
   _clientEIds :: [Co.EndpointId], -- EndpointIds for all client's we use for testing
   -- `queues` contains 2 queues (in for each direction) for every pair of
   -- for both client EndpointIds and slave Endpoints.

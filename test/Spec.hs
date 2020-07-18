@@ -45,12 +45,12 @@ setupInitialDBs = do
 
 test1 :: STS Tt.TestState ()
 test1 = do
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 2) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 3) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 4) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 3) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 4) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
 
 -- Tasks 100ms of execution at 1 requests per second, where
 -- the requests that are sent are only slave requests.
@@ -86,11 +86,11 @@ test4 :: STS Tt.TestState ()
 test4 = do
   SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateAll
   SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t" 2); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 4); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 5); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 6); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 7); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 4); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 6); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 7); SM.simulateAll
 
 -- Tasks 50ms of execution at 5 requests per second, where
 -- the requests that are all possible requests.
@@ -131,9 +131,9 @@ test7 = do
   SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t1" 2); SM.simulateAll
   SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.DeleteDatabase "d" "t1" 3); SM.simulateAll
   SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t2" 4); SM.simulateAll
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0) (CRq.SlaveWrite "d" "t2" "key1" "value1" 5); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 1) (CRq.SlaveWrite "d" "t2" "key1" "value2" 6); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 2) (CRq.SlaveRead "d" "t2" "key1" 7); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite "d" "t2" "key1" "value1" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite "d" "t2" "key1" "value2" 6); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveRead "d" "t2" "key1" 7); SM.simulateAll
 
 -- Stress test with more requests
 test8 :: STS Tt.TestState ()
@@ -168,7 +168,7 @@ verifyTrace msgs =
 
 driveTest :: Int -> STS Tt.TestState () -> IO ()
 driveTest testNum test = do
-  let g = SM.createTestState 0 5 5 5
+  let g = SM.createTestState 0 1 5
       (_, (_, traceMsgs, g')) = runST test g
       -- We must reverse traceMsgs since that's created in reverse order,
       -- with the most recent message first
