@@ -64,18 +64,20 @@ createTestState seed numSlaveGroups numClients =
         (eId2, Sq.empty))
       nonemptyQueues = St.empty
       rand = Rn.mkStdGen seed
-      (masters, rand') = U.s31 foldl ([], rand) masterEIds $
+      (masterPId, rand') = U.mkUID rand
+      (masters, rand'') = U.s31 foldl ([], rand') masterEIds $
         \(masters, rand) eId ->
           let (r, rand')  = Rn.random rand
-              g = MS.constructor "master" (Rn.mkStdGen r) masterEIds slaveGroupEIds
+              g = MS.constructor masterPId (Rn.mkStdGen r) masterEIds slaveGroupEIds
           in ((eId, g):masters, rand')
       masterState = Mp.fromList masters
-      (slaves, rand'') = U.s31 Mp.foldlWithKey ([], rand') slaveGroupEIds $
+      (slaves, rand''') = U.s31 Mp.foldlWithKey ([], rand'') slaveGroupEIds $
         \(slaves, rand) slaveGroupId slaveEIds ->
-          U.s31 foldl (slaves, rand) slaveEIds $
+          let (slavePId, rand') = U.mkUID rand
+          in U.s31 foldl (slaves, rand') slaveEIds $
             \(slaves, rand) eId ->
               let (r, rand')  = Rn.random rand
-                  g = SS.constructor slaveGroupId "" (Rn.mkStdGen r) slaveEIds
+                  g = SS.constructor slaveGroupId slavePId (Rn.mkStdGen r) slaveEIds
               in ((eId, g):slaves, rand')
       slaveState = Mp.fromList slaves
       tabletStates = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Mp.empty)
@@ -83,14 +85,14 @@ createTestState seed numSlaveGroups numClients =
       slaveAsyncQueues = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Sq.empty)
       tabletAsyncQueues = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Mp.empty)
       clocks = Mp.fromList $ U.for (masterEIds ++ allSlaveEIds) $ \eId -> (eId, 0)
-      (clients, rand''') = U.s31 foldl ([], rand'') clientEIds $
+      (clients, rand'''') = U.s31 foldl ([], rand''') clientEIds $
         \(clients, rand) eId ->
           let (r, rand')  = Rn.random rand
               client = CS.ClientState St.empty allSlaveEIds masterEIds (Rn.mkStdGen r)
           in ((eId, client):clients, rand')
       clientState = Mp.fromList clients
   in Tt.TestState {
-      Tt._rand = rand''',
+      Tt._rand = rand'''',
       Tt._masterEIds = masterEIds,
       Tt._slaveGroupEIds = slaveGroupEIds,
       Tt._allSlaveEIds = allSlaveEIds,
@@ -153,7 +155,7 @@ runSlaveIAction eId iAction = do
         currentTime <- getT $ Tt.clocks . ix eId
         Tt.slaveAsyncQueues . ix eId .^^.* U.push (SAc.RetryInput counterValue, currentTime + delay)
         return ()
-      SAc.Slave_CreateTablet ranges' -> do
+      SAc.Slave_CreateTablet requestId ranges' -> do
         ranges <- getT $ Tt.tabletStates . ix eId
         Mo.forM_ ranges' $ \range -> do
           if Mp.member range ranges
@@ -162,7 +164,8 @@ runSlaveIAction eId iAction = do
               r <- Tt.slaveState . ix eId . SS.env . En.rand .^^* Rn.random
               slaveGroupId <- getT $ Tt.slaveState . ix eId . SS.slaveGroupId
               slaveEIds <- getT $ Tt.slaveGroupEIds . ix slaveGroupId
-              let tabletState = TS.constructor (show range) (Rn.mkStdGen r) slaveEIds range
+              let paxosId = requestId ++ (show range)
+              let tabletState = TS.constructor paxosId (Rn.mkStdGen r) slaveEIds range
               Tt.tabletStates . ix eId .^^.* Mp.insert range tabletState
               Tt.tabletAsyncQueues . ix eId .^^.* Mp.insert range Sq.empty
               return ()

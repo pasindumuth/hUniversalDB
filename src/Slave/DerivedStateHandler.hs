@@ -32,5 +32,5 @@ handleDerivedState paxosId pl pl' = do
             return ()
           PM.RangeWrite requestId timestamp ranges -> do
             DS.keySpaceManager .^^ KSM.write timestamp requestId ranges
-            addA $ SAc.Slave_CreateTablet ranges
+            addA $ SAc.Slave_CreateTablet requestId ranges
       _ -> U.caseError

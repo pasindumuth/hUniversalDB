@@ -52,7 +52,7 @@ startSlaveThread rg iActionChan connM = do
           SAc.Print message -> do
             putStrLn message
             return (g', tabletMap)
-          SAc.Slave_CreateTablet ranges ->
+          SAc.Slave_CreateTablet requestId ranges ->
             U.s31 Mo.foldM (g', tabletMap) ranges $ \(g', tabletMap) range ->
               if tabletMap & Mp.member range
                 then return (g', tabletMap)
@@ -60,8 +60,10 @@ startSlaveThread rg iActionChan connM = do
                   let (r, rg) = Rn.random $ g' ^. SS.env.En.rand
                       g'' = g' & SS.env.En.rand .~ rg
                       tabletRand = Rn.mkStdGen r
+                      -- This scheme for generating a requestId works. 
+                      paxosId = requestId ++ (show range)
                   tabletIActionChan <- Ct.newChan
-                  Ct.forkIO $ TT.startTabletThread tabletRand range tabletIActionChan connM
+                  Ct.forkIO $ TT.startTabletThread tabletRand paxosId range tabletIActionChan connM
                   return (g'', tabletMap & Mp.insert range tabletIActionChan)
           SAc.TabletForward range eId msg -> do
             let tabletIActionChan = tabletMap ^?! ix range

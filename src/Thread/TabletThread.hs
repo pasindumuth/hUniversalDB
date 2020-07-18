@@ -22,12 +22,13 @@ slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7
 
 startTabletThread
   :: Rn.StdGen
+  -> Co.PaxosId
   -> Co.KeySpaceRange
   -> Ct.Chan (TAc.InputAction)
   -> MV.MVar Cn.Connections
   -> IO ()
-startTabletThread rg keySpaceRange iActionChan connM = do
-  let g = TS.constructor (show keySpaceRange) rg slaveEIds keySpaceRange
+startTabletThread rg paxosId keySpaceRange iActionChan connM = do
+  let g = TS.constructor paxosId rg slaveEIds keySpaceRange
   handlePaxosMessage g
   where
     handlePaxosMessage :: TS.TabletState -> IO ()

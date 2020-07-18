@@ -57,7 +57,7 @@ handleInputAction iAction = do
           if (pl /= pl')
             then do
               addA $ TAc.Print $ ppShow pl'
-              paxosId <- getL $ TS.multiPaxosInstance.MP.paxosId
+              paxosId <- getL $ TS.multiPaxosInstance . MP.paxosId
               TS.derivedState .^ DSH.handleDerivedState paxosId pl pl'
               handlingState .^ PTM.handleInsert
             else return ()

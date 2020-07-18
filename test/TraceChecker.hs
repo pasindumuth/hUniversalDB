@@ -210,7 +210,7 @@ checkMsg msg = do
                       i'keySpaceManager .^^ KSM.write timestamp requestId ranges
                       -- Update the Checkstate with the new ranges
                       Mo.forM ranges $ \range -> do
-                        let paxosId = show range
+                        let paxosId = requestId ++ (show range)
                         hasRange <- i'rangeMap .^^^ Mp.member paxosId
                         if hasRange
                           then return ()

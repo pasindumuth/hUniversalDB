@@ -54,6 +54,6 @@ caseError = error "Case Error: reached an unhandled case in the case statement."
 
 mkUID :: Rn.StdGen -> (Co.UID, Rn.StdGen)
 mkUID rg =
-  s31 foldl ([], rg) [1..16] $ \(uid, rg) _ ->
+  s31 foldl ([], rg) [1..8] $ \(uid, rg) _ ->
     let (r, rg') = Rn.random rg
     in (r:uid, rg')

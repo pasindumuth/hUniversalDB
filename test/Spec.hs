@@ -168,7 +168,7 @@ verifyTrace msgs =
 
 driveTest :: Int -> STS Tt.TestState () -> IO ()
 driveTest testNum test = do
-  let g = SM.createTestState 0 1 5
+  let g = SM.createTestState 0 5 5
       (_, (_, traceMsgs, g')) = runST test g
       -- We must reverse traceMsgs since that's created in reverse order,
       -- with the most recent message first
