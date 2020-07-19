@@ -19,8 +19,7 @@ import Infra.Lens
 import Infra.State
 
 data ClientState = ClientState {
-  _i'curRanges :: St.Set Co.KeySpaceRange,
-  _i'slaveEIds :: [Co.EndpointId],
+  _i'slaveGroups :: Mp.Map Co.SlaveGroupId ([Co.EndpointId], (St.Set Co.KeySpaceRange)),
   _i'masterEIds :: [Co.EndpointId],
   -- TODO: We can keep track of keys we've successfully written so that
   -- we can focus on mostly reading them.
@@ -80,16 +79,17 @@ genRequest
   -> RequestTypeDist
   -> STS ClientState (Co.EndpointId, CRq.Payload)
 genRequest trueTimestamp requestDist = do
-  curRanges <- getL $ i'curRanges
+  slaveGroups <- getL $ i'slaveGroups
+  let allRanges = St.unions (map (snd . snd) $ Mp.toList slaveGroups)
   r <- i'rand .^^ Rn.randomR (0, 99)
   case requestDist r of
     CreateDatabase -> do
       createExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
       Co.KeySpaceRange databaseId tableId <-
-        if createExistingProb >= 80 && St.size curRanges > 0
+        if createExistingProb >= 80 && St.size allRanges > 0
           -- Here, we do the erronous task of trying to create a
           -- KeySpaceRange that already exists
-          then i'rand .^^ U.randomS curRanges
+          then i'rand .^^ U.randomS allRanges
           else makeRange
       eId <- makeMasterEId
       timestamp <- makeTimestamp
@@ -98,60 +98,66 @@ genRequest trueTimestamp requestDist = do
     DeleteDatabase -> do
       deleteNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
       Co.KeySpaceRange databaseId tableId <-
-        if deleteNonExistingProb >= 80 || St.size curRanges == 0
+        if deleteNonExistingProb >= 80 || St.size allRanges == 0
           -- Here, we attempt to do the erronous task of trying to delete a
           -- KeySpaceRange that doesn't exist by randomly selecting a range.
           then makeRange
-          else i'rand .^^ U.randomS curRanges
+          else i'rand .^^ U.randomS allRanges
       eId <- makeMasterEId
       timestamp <- makeTimestamp
       return (eId, CRq.DeleteDatabase databaseId tableId (timestamp + 20))
-    RangeRead -> do
-      eId <- makeSlaveEId
-      timestamp <- makeTimestamp
-      return (eId, CRq.RangeRead timestamp)
+    RangeRead -> rangeRead
     RangeWrite -> do
+      (slaveGroupId, (slaveEIds, curRanges)) <- i'rand .^^ U.randomM slaveGroups
+      eId <- i'rand .^^ U.randomL slaveEIds
       addNewRange <- i'rand .^^ Rn.random
-      curRanges <- if addNewRange
-                      then do
-                        range <- makeRange
-                        return $ curRanges & St.insert range
-                      else return $ curRanges
-      eId <- makeSlaveEId
+      curRanges <-
+        if addNewRange
+          then do
+            range <- makeRange
+            return $ curRanges & St.insert range
+          else return $ curRanges
       timestamp <- makeTimestamp
       return (eId, CRq.RangeWrite (St.toList curRanges) timestamp)
     SlaveRead -> do
-      pickNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
-      Co.KeySpaceRange databaseId tableId <-
-        if pickNonExistingProb >= 80 || St.size curRanges == 0
-          -- Here, we attempt to do the erronous task of trying to read from a
-          -- KeySpaceRange that doesn't exist by randomly selecting a range.
-          then makeRange
-          else i'rand .^^ U.randomS curRanges
-      key <- makeKey
-      eId <- makeSlaveEId
-      timestamp <- makeTimestamp
-      return (eId, CRq.SlaveRead databaseId tableId key timestamp)
+      let nonemptySlaveGroups = Mp.filter (\(_, ranges) -> St.size ranges > 0) slaveGroups
+      if Mp.size nonemptySlaveGroups > 0
+        then do
+          (slaveGroupId, (slaveEIds, curRanges)) <- i'rand .^^ U.randomM nonemptySlaveGroups
+          eId <- i'rand .^^ U.randomL slaveEIds
+          pickNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
+          Co.KeySpaceRange databaseId tableId <-
+            if pickNonExistingProb >= 80 || St.size curRanges == 0
+              -- Here, we attempt to do the erronous task of trying to read from a
+              -- KeySpaceRange that doesn't exist by randomly selecting a range.
+              then makeRange
+              else i'rand .^^ U.randomS curRanges
+          key <- makeKey
+          timestamp <- makeTimestamp
+          return (eId, CRq.SlaveRead databaseId tableId key timestamp)
+        else rangeRead
     SlaveWrite -> do
-      pickNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
-      Co.KeySpaceRange databaseId tableId <-
-        if pickNonExistingProb >= 80 || St.size curRanges == 0
-          -- Here, we attempt to do the erronous task of trying to write to a
-          -- KeySpaceRange that doesn't exist by randomly selecting a range.
-          then makeRange
-          else i'rand .^^ U.randomS curRanges
-      key <- makeKey
-      value <- makeValue
-      eId <- makeSlaveEId
-      timestamp <- makeTimestamp
-      return (eId, CRq.SlaveWrite databaseId tableId key value timestamp)
+      let nonemptySlaveGroups = Mp.filter (\(_, ranges) -> St.size ranges > 0) slaveGroups
+      if Mp.size nonemptySlaveGroups > 0
+        then do
+          (slaveGroupId, (slaveEIds, curRanges)) <- i'rand .^^ U.randomM nonemptySlaveGroups
+          eId <- i'rand .^^ U.randomL slaveEIds
+          pickNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
+          Co.KeySpaceRange databaseId tableId <-
+            if pickNonExistingProb >= 80 || St.size curRanges == 0
+              -- Here, we attempt to do the erronous task of trying to write to a
+              -- KeySpaceRange that doesn't exist by randomly selecting a range.
+              then makeRange
+              else i'rand .^^ U.randomS curRanges
+          key <- makeKey
+          value <- makeValue
+          timestamp <- makeTimestamp
+          return (eId, CRq.SlaveWrite databaseId tableId key value timestamp)
+        else rangeRead
   where
     makeMasterEId = do
       masterEIds <- getL $ i'masterEIds
       i'rand .^^ U.randomL masterEIds
-    makeSlaveEId = do
-      slaveEIds <- getL $ i'slaveEIds
-      i'rand .^^ U.randomL slaveEIds
     makeTimestamp = do
       noise <- i'rand .^^ Rn.randomR (-2, 2)
       return $ trueTimestamp + noise
@@ -164,13 +170,25 @@ genRequest trueTimestamp requestDist = do
     makeValue = do
       i :: Int <- i'rand .^^ Rn.randomR (0, maxValue)
       return $ "v" ++ show i
+    rangeRead = do
+      slaveGroups <- getL $ i'slaveGroups
+      (slaveGroupId, (slaveEIds, _)) <- i'rand .^^ U.randomM slaveGroups
+      eId <- i'rand .^^ U.randomL slaveEIds
+      timestamp <- makeTimestamp
+      return (eId, CRq.RangeRead timestamp)
 
 handleResponse
-  :: CRs.ClientResponse
+  :: Co.EndpointId
+  -> CRs.ClientResponse
   -> STS ClientState ()
-handleResponse response = do
+handleResponse fromEId response = do
   case response ^. CRs.payload of
     CRs.RangeRead (CRsRR.Success ranges) -> do
-      i'curRanges .^^. \_ -> St.fromList ranges
+      i'slaveGroups .^^. \slaveGroups ->
+        U.s12 Mp.map slaveGroups $
+          \(slaveEIds, curRanges) ->
+            if elem fromEId slaveEIds
+              then (slaveEIds, St.fromList ranges)
+              else (slaveEIds, curRanges)
       return ()
     _ -> return ()

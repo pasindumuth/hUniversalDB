@@ -30,7 +30,7 @@ data CreateDatabaseStats = CreateDatabaseStats {
 data DeleteDatabaseStats = DeleteDatabaseStats {
   _numDeleteDatabaseRqs :: Int,
   _numDeleteDatabaseBackwardsWriteRss :: Int,
-  _numDeleteDatabaseAlreadyExistsRss :: Int,
+  _numDeleteDatabaseDoesNotExistsRss :: Int,
   _numDeleteDatabaseNothingChangedRss :: Int,
   _numDeleteDatabaseSuccessRss :: Int
 } deriving (Gn.Generic, Df.Default, Show)
@@ -84,7 +84,7 @@ recordResponse payload = do
     CRs.CreateDatabase CRsCD.NothingChanged -> createDatabaseStats . numCreateDatabaseNothingChangedRss .^^. (+1)
     CRs.CreateDatabase CRsCD.Success -> createDatabaseStats . numCreateDatabaseSuccessRss .^^. (+1)
     CRs.DeleteDatabase CRsDD.BackwardsWrite -> deleteDatabaseStats . numDeleteDatabaseBackwardsWriteRss .^^. (+1)
-    CRs.DeleteDatabase CRsDD.DoesNotExist -> deleteDatabaseStats . numDeleteDatabaseAlreadyExistsRss .^^. (+1)
+    CRs.DeleteDatabase CRsDD.DoesNotExist -> deleteDatabaseStats . numDeleteDatabaseDoesNotExistsRss .^^. (+1)
     CRs.DeleteDatabase CRsDD.NothingChanged -> deleteDatabaseStats . numDeleteDatabaseNothingChangedRss .^^. (+1)
     CRs.DeleteDatabase CRsDD.Success -> deleteDatabaseStats . numDeleteDatabaseSuccessRss .^^. (+1)
     CRs.RangeRead (CRsRR.Success _) -> rangeReadStats . numRangeReadSuccessRss .^^. (+1)

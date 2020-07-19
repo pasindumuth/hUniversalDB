@@ -88,7 +88,8 @@ createTestState seed numSlaveGroups numClients =
       (clients, rand'''') = U.s31 foldl ([], rand''') clientEIds $
         \(clients, rand) eId ->
           let (r, rand')  = Rn.random rand
-              client = CS.ClientState St.empty allSlaveEIds masterEIds (Rn.mkStdGen r)
+              slaveGroups = Mp.map (\slaveEIds -> (slaveEIds, St.empty)) slaveGroupEIds 
+              client = CS.ClientState slaveGroups masterEIds (Rn.mkStdGen r)
           in ((eId, client):clients, rand')
       clientState = Mp.fromList clients
   in Tt.TestState {
@@ -203,7 +204,7 @@ deliverMessage (fromEId, toEId) = do
             case msg of
               Ms.ClientResponse response -> do
                 Tt.requestStats .^ RS.recordResponse (response ^. CRs.payload)
-                Tt.clientState . ix toEId .^* CS.handleResponse response
+                Tt.clientState . ix toEId .^* CS.handleResponse fromEId response
               _ -> U.caseError -- Any messages coming to a clientEId must be a response.
         | otherwise = U.caseError
   route
