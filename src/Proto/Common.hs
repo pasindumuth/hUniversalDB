@@ -13,10 +13,10 @@ import Infra.Lens
 
 type SlaveGroupId = String
 type EndpointId = String
-type PaxosId = String
--- Since a Tablet has exactly one MultiPaxos instance,
--- we can just use the PaxosId to identify the Tablet.
-type TabletId = PaxosId
+
+newtype UID = UID { getUid :: String } deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+newtype PaxosId = PaxosId { getUID :: UID } deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+newtype TabletId = TabletId { getPaxosId :: PaxosId } deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
 type RequestId = String
 type DatabaseId = String
@@ -27,7 +27,6 @@ type Key = String
 type Value = String
 
 type ErrorMsg = String
-type UID = String
 
 data KeySpaceRange = KeySpaceRange {
   _databaseId :: DatabaseId,

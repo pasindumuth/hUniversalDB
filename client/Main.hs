@@ -26,6 +26,7 @@ import Infra.State
 -- wr d t 1
 -- c d t 1
 -- d d t 1
+-- TODO: add randomness here to create UIDs.
 startClient :: String -> String -> IO ()
 startClient mip sip = do
   Lg.infoM Lg.main "Starting client"

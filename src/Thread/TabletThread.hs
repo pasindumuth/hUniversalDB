@@ -22,7 +22,7 @@ slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7
 
 startTabletThread
   :: Rn.StdGen
-  -> Co.PaxosId
+  -> Co.TabletId
   -> Ct.Chan (TAc.InputAction)
   -> MV.MVar Cn.Connections
   -> IO ()

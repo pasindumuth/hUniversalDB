@@ -27,7 +27,8 @@ startMasterThread
   -> MV.MVar Cn.Connections
   -> IO ()
 startMasterThread rg iActionChan connM = do
-  let g = MS.constructor "master" rg masterEIds slaveEIds
+  let (paxosId, rg') = U.mkUID rg & _1 %~ Co.PaxosId
+      g = MS.constructor paxosId rg' masterEIds slaveEIds
   handleMessage g
   where
     handleMessage :: MS.MasterState -> IO ()

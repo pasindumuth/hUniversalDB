@@ -148,7 +148,8 @@ checkMsg msg = do
     TrM.PaxosInsertion paxosId _ paxosLogEntry ->
       case paxosLogEntry of
         PM.Tablet entry -> do
-          range <- getT $ i'rangeMap . ix paxosId
+          let tabletId = (Co.TabletId paxosId)
+          range <- getT $ i'rangeMap . ix tabletId
           case entry of
             PM.Read requestId key timestamp -> do
               payloadM <- getL $ i'requestMap . at requestId
@@ -160,7 +161,7 @@ checkMsg msg = do
                       | (Co.KeySpaceRange databaseId' tableId') == range &&
                         key' == key &&
                         timestamp' == timestamp -> do
-                      i'tables . ix paxosId .^^* MVS.read key timestamp
+                      i'tables . ix tabletId .^^* MVS.read key timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
             PM.Write requestId key value timestamp -> do
@@ -174,7 +175,7 @@ checkMsg msg = do
                         key' == key &&
                         value' == value &&
                         timestamp' == timestamp -> do
-                      i'tables . ix paxosId .^^* MVS.write key value requestId timestamp
+                      i'tables . ix tabletId .^^* MVS.write key value requestId timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
         PM.Slave entry ->
@@ -268,7 +269,7 @@ checkMsg msg = do
             CRs.SlaveRead responsePayload -> do
               case requestPayload of
                 CRq.SlaveRead databaseId tableId key timestamp -> do
-                  tabletIdM <- tabletIdM databaseId tableId timestamp  
+                  tabletIdM <- tabletIdM databaseId tableId timestamp
                   case tabletIdM of
                     Just tabletId -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
@@ -285,7 +286,7 @@ checkMsg msg = do
             CRs.SlaveWrite responsePayload -> do
               case requestPayload of
                 CRq.SlaveWrite databaseId tableId key value timestamp -> do
-                  tabletIdM <- tabletIdM databaseId tableId timestamp  
+                  tabletIdM <- tabletIdM databaseId tableId timestamp
                   case tabletIdM of
                     Just tabletId -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`

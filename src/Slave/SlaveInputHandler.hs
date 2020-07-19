@@ -146,14 +146,14 @@ rangeWriteTask eId requestId ranges timestamp description = do
         let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
           then do
-            let oldRangeTIds = getRangeTIds lat $ derivedState ^. DS.keySpaceManager 
+            let oldRangeTIds = getRangeTIds lat $ derivedState ^. DS.keySpaceManager
                 oldRangeTIdMap = Mp.fromList oldRangeTIds
                 (newRangeTIds, rand') = U.s31 foldl ([], rand) ranges $
                   \(newRangeTIds, rand) range ->
                     case Mp.lookup range oldRangeTIdMap of
                       Just tabletId -> ((range, tabletId):newRangeTIds, rand)
                       Nothing ->
-                        let (tabletId, rand') = U.mkUID rand
+                        let (tabletId, rand') = U.mkUID rand & _1 %~ Co.PaxosId & _1 %~ Co.TabletId
                         in ((range, tabletId):newRangeTIds, rand')
             return $ Left $ PM.Slave $ PM.RangeWrite requestId timestamp newRangeTIds
           else do

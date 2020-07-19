@@ -32,7 +32,8 @@ startSlaveThread
   -> MV.MVar Cn.Connections
   -> IO ()
 startSlaveThread rg iActionChan connM = do
-  let g = SS.constructor "slaveGroup1" "" rg slaveEIds
+  let (paxosId, rg') = U.mkUID rg & _1 %~ Co.PaxosId
+      g = SS.constructor "slaveGroup1" paxosId rg' slaveEIds
       tabletMap = Mp.empty
   handleMessage g tabletMap
   where

@@ -64,7 +64,7 @@ createTestState seed numSlaveGroups numClients =
         (eId2, Sq.empty))
       nonemptyQueues = St.empty
       rand = Rn.mkStdGen seed
-      (masterPId, rand') = U.mkUID rand
+      (masterPId, rand') = U.mkUID rand & _1 %~ Co.PaxosId
       (masters, rand'') = U.s31 foldl ([], rand') masterEIds $
         \(masters, rand) eId ->
           let (r, rand')  = Rn.random rand
@@ -73,7 +73,7 @@ createTestState seed numSlaveGroups numClients =
       masterState = Mp.fromList masters
       (slaves, rand''') = U.s31 Mp.foldlWithKey ([], rand'') slaveGroupEIds $
         \(slaves, rand) slaveGroupId slaveEIds ->
-          let (slavePId, rand') = U.mkUID rand
+          let (slavePId, rand') = U.mkUID rand & _1 %~ Co.PaxosId
           in U.s31 foldl (slaves, rand') slaveEIds $
             \(slaves, rand) eId ->
               let (r, rand')  = Rn.random rand
