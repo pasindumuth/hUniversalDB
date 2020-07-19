@@ -166,9 +166,9 @@ verifyTrace msgs =
         Left errMsg -> Left errMsg
         Right _ -> Right ()
 
-driveTest :: Int -> STS Tt.TestState () -> IO ()
-driveTest testNum test = do
-  let g = SM.createTestState 0 5 5
+driveTest :: Int -> Int -> STS Tt.TestState () -> IO ()
+driveTest seed testNum test = do
+  let g = SM.createTestState seed 5 5
       (_, (_, traceMsgs, g')) = runST test g
       -- We must reverse traceMsgs since that's created in reverse order,
       -- with the most recent message first
@@ -183,14 +183,16 @@ driveTest testNum test = do
 
 testDriver :: IO ()
 testDriver = do
-  driveTest 1 test1
-  driveTest 2 test2
-  driveTest 3 test3
-  driveTest 4 test4
-  driveTest 5 test5
-  driveTest 6 test6
-  driveTest 7 test7
-  driveTest 8 test8
+  driveTest 0 1 test1
+  driveTest 0 2 test2
+  driveTest 0 3 test3
+  driveTest 0 4 test4
+  driveTest 0 5 test5
+  driveTest 0 6 test6
+  driveTest 0 7 test7
+  driveTest 0 8 test8
+  driveTest 1 8 test8
+  driveTest 2 8 test8
 
 main :: IO ()
 main = testDriver

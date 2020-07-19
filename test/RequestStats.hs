@@ -21,7 +21,8 @@ import Infra.State
 
 data CreateDatabaseStats = CreateDatabaseStats {
   _numCreateDatabaseRqs :: Int,
-  _numCreateDatabaseBackwardsWriteRss :: Int,
+  _numCreateDatabaseBackwardsWriteMasterRss :: Int,
+  _numCreateDatabaseBackwardsWriteSlaveRss :: Int,
   _numCreateDatabaseAlreadyExistsRss :: Int,
   _numCreateDatabaseNothingChangedRss :: Int,
   _numCreateDatabaseSuccessRss :: Int
@@ -29,7 +30,8 @@ data CreateDatabaseStats = CreateDatabaseStats {
 
 data DeleteDatabaseStats = DeleteDatabaseStats {
   _numDeleteDatabaseRqs :: Int,
-  _numDeleteDatabaseBackwardsWriteRss :: Int,
+  _numDeleteDatabaseBackwardsWriteMasterRss :: Int,
+  _numDeleteDatabaseBackwardsWriteSlaveRss :: Int,
   _numDeleteDatabaseDoesNotExistsRss :: Int,
   _numDeleteDatabaseNothingChangedRss :: Int,
   _numDeleteDatabaseSuccessRss :: Int
@@ -79,11 +81,13 @@ makeLenses ''RequestStats
 recordResponse :: CRs.Payload -> STS RequestStats ()
 recordResponse payload = do
   case payload of
-    CRs.CreateDatabase CRsCD.BackwardsWrite -> createDatabaseStats . numCreateDatabaseBackwardsWriteRss .^^. (+1)
+    CRs.CreateDatabase CRsCD.BackwardsWriteMaster -> createDatabaseStats . numCreateDatabaseBackwardsWriteMasterRss .^^. (+1)
+    CRs.CreateDatabase CRsCD.BackwardsWriteSlave -> createDatabaseStats . numCreateDatabaseBackwardsWriteSlaveRss .^^. (+1)
     CRs.CreateDatabase CRsCD.AlreadyExists -> createDatabaseStats . numCreateDatabaseAlreadyExistsRss .^^. (+1)
     CRs.CreateDatabase CRsCD.NothingChanged -> createDatabaseStats . numCreateDatabaseNothingChangedRss .^^. (+1)
     CRs.CreateDatabase CRsCD.Success -> createDatabaseStats . numCreateDatabaseSuccessRss .^^. (+1)
-    CRs.DeleteDatabase CRsDD.BackwardsWrite -> deleteDatabaseStats . numDeleteDatabaseBackwardsWriteRss .^^. (+1)
+    CRs.DeleteDatabase CRsDD.BackwardsWriteMaster -> deleteDatabaseStats . numDeleteDatabaseBackwardsWriteMasterRss .^^. (+1)
+    CRs.DeleteDatabase CRsDD.BackwardsWriteSlave -> deleteDatabaseStats . numDeleteDatabaseBackwardsWriteSlaveRss .^^. (+1)
     CRs.DeleteDatabase CRsDD.DoesNotExist -> deleteDatabaseStats . numDeleteDatabaseDoesNotExistsRss .^^. (+1)
     CRs.DeleteDatabase CRsDD.NothingChanged -> deleteDatabaseStats . numDeleteDatabaseNothingChangedRss .^^. (+1)
     CRs.DeleteDatabase CRsDD.Success -> deleteDatabaseStats . numDeleteDatabaseSuccessRss .^^. (+1)

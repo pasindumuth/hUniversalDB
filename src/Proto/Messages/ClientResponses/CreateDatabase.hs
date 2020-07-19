@@ -11,7 +11,8 @@ import qualified GHC.Generics as Gn
 import qualified Proto.Common as Co
 
 data CreateDatabase =
-  BackwardsWrite |
+  BackwardsWriteMaster |
+  BackwardsWriteSlave |
   AlreadyExists |
   NothingChanged |
   Success

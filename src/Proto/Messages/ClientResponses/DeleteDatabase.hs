@@ -11,7 +11,8 @@ import qualified GHC.Generics as Gn
 import qualified Proto.Common as Co
 
 data DeleteDatabase =
-  BackwardsWrite |
+  BackwardsWriteMaster |
+  BackwardsWriteSlave |
   DoesNotExist |
   NothingChanged |
   Success

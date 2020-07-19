@@ -94,7 +94,7 @@ genRequest trueTimestamp requestDist = do
       eId <- makeMasterEId
       timestamp <- makeTimestamp
       -- TODO: we should make these tests such that using a future timestamp is unecessary.
-      return (eId, CRq.CreateDatabase databaseId tableId (timestamp + 20))
+      return (eId, CRq.CreateDatabase databaseId tableId (timestamp))
     DeleteDatabase -> do
       deleteNonExistingProb :: Int <- i'rand .^^ Rn.randomR (0, 99)
       Co.KeySpaceRange databaseId tableId <-
@@ -105,7 +105,7 @@ genRequest trueTimestamp requestDist = do
           else i'rand .^^ U.randomS allRanges
       eId <- makeMasterEId
       timestamp <- makeTimestamp
-      return (eId, CRq.DeleteDatabase databaseId tableId (timestamp + 20))
+      return (eId, CRq.DeleteDatabase databaseId tableId (timestamp))
     RangeRead -> rangeRead
     RangeWrite -> do
       (slaveGroupId, (slaveEIds, curRanges)) <- i'rand .^^ U.randomM slaveGroups

@@ -100,7 +100,7 @@ handleInputAction iAction =
                               (CRs.CreateDatabase (
                                 case choice of
                                   Co.NewChoice -> CRsCD.Success
-                                  Co.OldChoice -> CRsCD.BackwardsWrite))
+                                  Co.OldChoice -> CRsCD.BackwardsWriteSlave))
                           task = createPickKeySpace response eId slaveGroupId timestamp choice uid description
                       handlingState .^ (PTM.handleTask task)
                       return ()
@@ -112,7 +112,7 @@ handleInputAction iAction =
                               (CRs.DeleteDatabase (
                                 case choice of
                                   Co.NewChoice -> CRsDD.Success
-                                  Co.OldChoice -> CRsDD.BackwardsWrite))
+                                  Co.OldChoice -> CRsDD.BackwardsWriteSlave))
                           task = createPickKeySpace response eId slaveGroupId timestamp choice uid description
                       handlingState .^ (PTM.handleTask task)
                       return ()
@@ -153,7 +153,7 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
         let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
         if timestamp <= lat
           then do
-            sendResponse CRsCD.BackwardsWrite
+            sendResponse CRsCD.BackwardsWriteMaster
             return $ Right ()
           else do
             let latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
@@ -209,7 +209,7 @@ deleteDatabaseTask eId requestId databaseId tableId timestamp description uid =
         let lat = SGR.staticReadLat $ derivedState ^. DS.slaveGroupRanges
         if timestamp <= lat
           then do
-            sendResponse CRsDD.BackwardsWrite
+            sendResponse CRsDD.BackwardsWriteMaster
             return $ Right ()
           else do
             let latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
