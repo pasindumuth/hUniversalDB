@@ -21,5 +21,5 @@ data Message =
   ClientResponse CRs.ClientResponse |
   SlaveMessage SM.SlaveMessage |
   MasterMessage MM.MasterMessage |
-  TabletMessage Co.KeySpaceRange TM.TabletMessage
+  TabletMessage Co.TabletId TM.TabletMessage
   deriving (Gn.Generic, Bn.Binary, Show)

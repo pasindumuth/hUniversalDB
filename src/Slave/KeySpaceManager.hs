@@ -23,8 +23,8 @@ import Infra.Lens
 
 data KeySpaceManager = KeySpaceManager {
   _i'lat :: Int,
-  _i'versions :: [(Co.Timestamp, Co.RequestId, [Co.KeySpaceRange])],
-  _i'allRanges :: St.Set Co.KeySpaceRange
+  _i'versions :: [(Co.Timestamp, Co.RequestId, [(Co.KeySpaceRange, Co.TabletId)])],
+  _i'allRanges :: St.Set Co.TabletId
 } deriving (Gn.Generic, Df.Default, Show)
 
 makeLenses ''KeySpaceManager
@@ -34,7 +34,7 @@ makeLenses ''KeySpaceManager
 read
   :: Int
   -> KeySpaceManager
-  -> (Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange]), KeySpaceManager)
+  -> (Maybe (Co.Timestamp, Co.RequestId, [(Co.KeySpaceRange, Co.TabletId)]), KeySpaceManager)
 read timestamp keySpaceManager =
   let version = case dropWhile (\v -> (v ^. _1) > timestamp) (keySpaceManager ^. i'versions) of
                   [] -> Nothing
@@ -47,7 +47,7 @@ staticReadLat keySpaceManager = keySpaceManager ^. i'lat
 staticRead
   :: Int
   -> KeySpaceManager
-  -> Maybe (Co.Timestamp, Co.RequestId, [Co.KeySpaceRange])
+  -> Maybe (Co.Timestamp, Co.RequestId, [(Co.KeySpaceRange, Co.TabletId)])
 staticRead timestamp keySpaceManager =
   Ex.assert (timestamp <= (keySpaceManager ^. i'lat)) $
   case dropWhile (\v -> (v ^. _1) > timestamp) (keySpaceManager ^. i'versions) of
@@ -57,15 +57,15 @@ staticRead timestamp keySpaceManager =
 write
   :: Co.Timestamp
   -> Co.RequestId
-  -> [Co.KeySpaceRange]
+  -> [(Co.KeySpaceRange, Co.TabletId)]
   -> KeySpaceManager
   -> ((), KeySpaceManager)
 write timestamp requestId ranges keySpaceManager =
   Ex.assert (timestamp > (keySpaceManager ^. i'lat)) $
   ((), keySpaceManager & i'lat .~ timestamp
                        & i'versions %~ ((timestamp, requestId, ranges):)
-                       & (U.s13 foldl ranges $ \keySpaceManager range ->
-                           keySpaceManager & i'allRanges %~ (St.insert range)))
+                       & (U.s13 foldl ranges $ \keySpaceManager (_, tabletId) ->
+                           keySpaceManager & i'allRanges %~ (St.insert tabletId)))
 
-allRanges :: KeySpaceManager -> St.Set Co.KeySpaceRange
+allRanges :: KeySpaceManager -> St.Set Co.TabletId
 allRanges = (^. i'allRanges)

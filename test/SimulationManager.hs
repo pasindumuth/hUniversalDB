@@ -155,37 +155,36 @@ runSlaveIAction eId iAction = do
         currentTime <- getT $ Tt.clocks . ix eId
         Tt.slaveAsyncQueues . ix eId .^^.* U.push (SAc.RetryInput counterValue, currentTime + delay)
         return ()
-      SAc.Slave_CreateTablet requestId ranges' -> do
-        ranges <- getT $ Tt.tabletStates . ix eId
-        Mo.forM_ ranges' $ \range -> do
-          if Mp.member range ranges
+      SAc.Slave_CreateTablet requestId rangeTIds -> do
+        tabletMap <- getT $ Tt.tabletStates . ix eId
+        Mo.forM_ rangeTIds $ \(_, tabletId) -> do
+          if Mp.member tabletId tabletMap
             then return ()
             else do
               r <- Tt.slaveState . ix eId . SS.env . En.rand .^^* Rn.random
               slaveGroupId <- getT $ Tt.slaveState . ix eId . SS.slaveGroupId
               slaveEIds <- getT $ Tt.slaveGroupEIds . ix slaveGroupId
-              let paxosId = requestId ++ (show range)
-              let tabletState = TS.constructor paxosId (Rn.mkStdGen r) slaveEIds range
-              Tt.tabletStates . ix eId .^^.* Mp.insert range tabletState
-              Tt.tabletAsyncQueues . ix eId .^^.* Mp.insert range Sq.empty
+              let tabletState = TS.constructor tabletId (Rn.mkStdGen r) slaveEIds
+              Tt.tabletStates . ix eId .^^.* Mp.insert tabletId tabletState
+              Tt.tabletAsyncQueues . ix eId .^^.* Mp.insert tabletId Sq.empty
               return ()
-      SAc.TabletForward range clientEId tabletMsg -> do
-        runTabletIAction eId range (TAc.Receive clientEId tabletMsg)
+      SAc.TabletForward tabletId clientEId tabletMsg -> do
+        runTabletIAction eId tabletId (TAc.Receive clientEId tabletMsg)
       SAc.Print _ -> return ()
 
 runTabletIAction
   :: Co.EndpointId
-  -> Co.KeySpaceRange
+  -> Co.TabletId
   -> TAc.InputAction
   -> STS Tt.TestState ()
-runTabletIAction eId range iAction = do
-  (_, msgsO) <- runT (Tt.tabletStates . ix eId . ix range) (TIH.handleInputAction iAction)
+runTabletIAction eId tabletId iAction = do
+  (_, msgsO) <- runT (Tt.tabletStates . ix eId . ix tabletId) (TIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
     case msgO of
       TAc.Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
       TAc.RetryOutput counterValue delay -> do
         currentTime <- getT $ Tt.clocks . ix eId
-        Tt.tabletAsyncQueues . ix eId . ix range .^^.* U.push (TAc.RetryInput counterValue, currentTime + delay)
+        Tt.tabletAsyncQueues . ix eId . ix tabletId .^^.* U.push (TAc.RetryInput counterValue, currentTime + delay)
         return ()
       TAc.Print _ -> return ()
 

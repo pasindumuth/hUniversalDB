@@ -28,10 +28,10 @@ startMasterThread
   -> IO ()
 startMasterThread rg iActionChan connM = do
   let g = MS.constructor "master" rg masterEIds slaveEIds
-  handlePaxosMessage g
+  handleMessage g
   where
-    handlePaxosMessage :: MS.MasterState -> IO ()
-    handlePaxosMessage g = do
+    handleMessage :: MS.MasterState -> IO ()
+    handleMessage g = do
       iAction <- Ct.readChan iActionChan
       let (_, (oActions, _, g')) = runST (MIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
@@ -51,4 +51,4 @@ startMasterThread rg iActionChan connM = do
               Ct.threadDelay (delay * 1000)
               Ct.writeChan iActionChan $ MAc.PerformInput uid
             return ()
-      handlePaxosMessage g'
+      handleMessage g'

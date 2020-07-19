@@ -42,12 +42,12 @@ data TestState = TestState {
   -- The following are all server state objects.
   _masterState :: Mp.Map Co.EndpointId MS.MasterState,
   _slaveState :: Mp.Map Co.EndpointId SS.SlaveState,
-  _tabletStates :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange TS.TabletState),
+  _tabletStates :: Mp.Map Co.EndpointId (Mp.Map Co.TabletId TS.TabletState),
   -- The following are everything related to asynchronous computation
   -- done at a node.
   _masterAsyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (MAc.InputAction, Int)),
   _slaveAsyncQueues :: Mp.Map Co.EndpointId (Sq.Seq (SAc.InputAction, Int)),
-  _tabletAsyncQueues :: Mp.Map Co.EndpointId (Mp.Map Co.KeySpaceRange (Sq.Seq (TAc.InputAction, Int))),
+  _tabletAsyncQueues :: Mp.Map Co.EndpointId (Mp.Map Co.TabletId (Sq.Seq (TAc.InputAction, Int))),
   _clocks :: Mp.Map Co.EndpointId Int,
   -- Client field
   _clientState :: Mp.Map Co.EndpointId CS.ClientState,

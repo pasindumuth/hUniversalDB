@@ -30,7 +30,7 @@ data Slave_Entry =
   RangeWrite {
     requestId :: Co.RequestId,
     timestamp :: Int,
-    ranges :: [Co.KeySpaceRange] }
+    rangeTIds :: [(Co.KeySpaceRange, Co.TabletId)] }
   deriving (Gn.Generic, Bn.Binary, Show, Eq)
 
 data Master_Entry =

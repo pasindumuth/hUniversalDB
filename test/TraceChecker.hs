@@ -32,8 +32,8 @@ import Infra.State
 
 data CheckState = CheckState {
   _i'requestMap :: Mp.Map Co.RequestId CRq.Payload,
-  _i'rangeMap :: Mp.Map Co.PaxosId Co.KeySpaceRange,
-  _i'tables :: Mp.Map Co.KeySpaceRange MVS.MultiVersionKVStore,
+  _i'rangeMap :: Mp.Map Co.TabletId Co.KeySpaceRange,
+  _i'tables :: Mp.Map Co.TabletId MVS.MultiVersionKVStore,
   _i'keySpaceManager :: KSM.KeySpaceManager
 } deriving (Gn.Generic, Df.Default)
 
@@ -160,7 +160,7 @@ checkMsg msg = do
                       | (Co.KeySpaceRange databaseId' tableId') == range &&
                         key' == key &&
                         timestamp' == timestamp -> do
-                      i'tables . ix range .^^* MVS.read key timestamp
+                      i'tables . ix paxosId .^^* MVS.read key timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
             PM.Write requestId key value timestamp -> do
@@ -174,7 +174,7 @@ checkMsg msg = do
                         key' == key &&
                         value' == value &&
                         timestamp' == timestamp -> do
-                      i'tables . ix range .^^* MVS.write key value requestId timestamp
+                      i'tables . ix paxosId .^^* MVS.write key value requestId timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
         PM.Slave entry ->
@@ -198,25 +198,27 @@ checkMsg msg = do
                       i'keySpaceManager .^^ KSM.read timestamp
                       return $ Right ()
                     else return $ entryIncorrectE paxosLogEntry payload
-            PM.RangeWrite requestId timestamp ranges -> do
+            PM.RangeWrite requestId timestamp rangeTIds -> do
+              let ranges = map fst rangeTIds
               payloadM <- getL $ i'requestMap . at requestId
               case payloadM of
                 Nothing -> return $ entryUnfamiliarE paxosLogEntry
                 Just payload -> do
                   case payload of
+                    -- TODO: make sure that the UIDs of the KeySpaceRanges common to the
+                    -- new ranges as well as the old are still the same.
                     CRq.RangeWrite ranges' timestamp'
-                      | ranges' == ranges &&
+                      | (St.fromList ranges') == (St.fromList ranges) &&
                         timestamp' == timestamp -> do
-                      i'keySpaceManager .^^ KSM.write timestamp requestId ranges
+                      i'keySpaceManager .^^ KSM.write timestamp requestId rangeTIds
                       -- Update the Checkstate with the new ranges
-                      Mo.forM ranges $ \range -> do
-                        let paxosId = requestId ++ (show range)
-                        hasRange <- i'rangeMap .^^^ Mp.member paxosId
+                      Mo.forM rangeTIds $ \(range, tabletId) -> do
+                        hasRange <- i'rangeMap .^^^ Mp.member tabletId
                         if hasRange
                           then return ()
                           else do
-                            i'rangeMap .^^. Mp.insert paxosId range
-                            i'tables .^^. Mp.insert range Df.def
+                            i'rangeMap .^^. Mp.insert tabletId range
+                            i'tables .^^. Mp.insert tabletId Df.def
                             return ()
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
@@ -238,10 +240,10 @@ checkMsg msg = do
                 CRq.RangeRead timestamp -> do
                   -- staticRead ensure the `lat` is beyond `timestamp`
                   res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
-                  let ranges = case res of
+                  let rangeTIds = case res of
                                  Nothing -> []
-                                 Just (_, _, ranges) -> ranges
-                  if (CRsRR.Success ranges) == responsePayload
+                                 Just (_, _, rangeTIds) -> rangeTIds
+                  if (CRsRR.Success (map fst rangeTIds)) == responsePayload
                     then return $ Right ()
                     else return $ responseValueIncorrectE response requestPayload
                 _ -> return $ responseTypeIncorrectE response requestPayload
@@ -251,11 +253,11 @@ checkMsg msg = do
                   -- staticRead ensure the `lat` is beyond `timestamp`
                   res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
                   case res of
-                    Just (timestamp', requestId', ranges')
+                    Just (timestamp', requestId', rangeTIds')
                       | requestId' == requestId -> do
                       case responsePayload of
                         CRsRW.Success
-                          | ranges' == ranges &&
+                          | (map fst rangeTIds') == ranges &&
                             timestamp' == timestamp -> do
                           return $ Right ()
                         _ -> return $ derivedStateIncorrectlyWrittenE requestPayload response
@@ -266,12 +268,11 @@ checkMsg msg = do
             CRs.SlaveRead responsePayload -> do
               case requestPayload of
                 CRq.SlaveRead databaseId tableId key timestamp -> do
-                  res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
-                  case res of
-                    Just (_, _, ranges')
-                      | elem (Co.KeySpaceRange databaseId tableId) ranges' -> do
+                  tabletIdM <- tabletIdM databaseId tableId timestamp  
+                  case tabletIdM of
+                    Just tabletId -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
-                      res <- i'tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MVS.staticRead key timestamp
+                      res <- i'tables . ix tabletId .^^^* MVS.staticRead key timestamp
                       let value = case res of
                                     Nothing -> Nothing
                                     Just (value', _, _) -> Just value'
@@ -284,12 +285,11 @@ checkMsg msg = do
             CRs.SlaveWrite responsePayload -> do
               case requestPayload of
                 CRq.SlaveWrite databaseId tableId key value timestamp -> do
-                  res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
-                  case res of
-                    Just (_, _, ranges')
-                      | elem (Co.KeySpaceRange databaseId tableId) ranges' -> do
+                  tabletIdM <- tabletIdM databaseId tableId timestamp  
+                  case tabletIdM of
+                    Just tabletId -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
-                      res <- i'tables . ix (Co.KeySpaceRange databaseId tableId) .^^^* MVS.staticRead key timestamp
+                      res <- i'tables . ix tabletId .^^^* MVS.staticRead key timestamp
                       case res of
                         Just (value', requestId', timestamp')
                           | requestId' == requestId -> do
@@ -308,3 +308,13 @@ checkMsg msg = do
             -- TODO: Don't do this
             _ -> return $ Right()
       return $ Right ()
+  where
+    tabletIdM databaseId tableId timestamp = do
+      res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
+      case res of
+        Just (_, _, rangeTIds') ->
+          let range = Co.KeySpaceRange databaseId tableId
+          in case Li.find (\(range', _) -> range' == range) rangeTIds' of
+            Just (_, tabletId) -> return $ Just tabletId
+            _ -> return $ Nothing
+        _ -> return $ Nothing

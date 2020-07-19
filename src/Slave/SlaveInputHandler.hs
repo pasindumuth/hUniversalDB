@@ -2,6 +2,7 @@ module Slave.SlaveInputHandler where
 
 import qualified Data.List as Li
 import qualified Data.Set as St
+import qualified Data.Map as Mp
 import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
@@ -45,12 +46,12 @@ handlingState =
     SS.env.En.rand,
     SS.env.En.slaveEIds))
 
-getRanges :: Co.Timestamp -> KSM.KeySpaceManager -> [Co.KeySpaceRange]
-getRanges timestamp keySpaceManager =
+getRangeTIds :: Co.Timestamp -> KSM.KeySpaceManager -> [(Co.KeySpaceRange, Co.TabletId)]
+getRangeTIds timestamp keySpaceManager =
   let version = KSM.staticRead timestamp keySpaceManager
   in case version of
     Nothing -> []
-    Just (_, _, ranges) -> ranges
+    Just (_, _, rangeTIds) -> rangeTIds
 
 handleInputAction
   :: SAc.InputAction
@@ -69,7 +70,7 @@ handleInputAction iAction =
               handlingState .^ (PTM.handleTask task)
             CRq.RangeWrite ranges timestamp -> do
               let description = show (eId, request)
-                  task = rangeWriteTask eId requestId ranges timestamp description
+              task <- rangeWriteTask eId requestId ranges timestamp description
               handlingState .^ (PTM.handleTask task)
             CRq.SlaveRead databaseId tableId key timestamp -> do
               let description = show (eId, request)
@@ -95,10 +96,10 @@ handleInputAction iAction =
                   SS.derivedState .^ DSH.handleDerivedState paxosId pl pl'
                   handlingState .^ PTM.handleInsert
                 else return ()
-        Ms.TabletMessage keySpaceRange tabletMsg -> do
-          ranges <- SS.derivedState.DS.keySpaceManager .^^^ KSM.allRanges
-          if St.member keySpaceRange ranges
-            then addA $ SAc.TabletForward keySpaceRange eId tabletMsg
+        Ms.TabletMessage tabletId tabletMsg -> do
+          tabletIds <- SS.derivedState . DS.keySpaceManager .^^^ KSM.allRanges
+          if St.member tabletId tabletIds
+            then addA $ SAc.TabletForward tabletId eId tabletMsg
             else return ()
         _ -> U.caseError
     SAc.RetryInput counterValue ->
@@ -120,12 +121,12 @@ rangeReadTask eId requestId timestamp description =
             done derivedState
             return $ Right ()
       done derivedState = do
-        let ranges = getRanges timestamp $ derivedState ^. DS.keySpaceManager
+        let rangeTIds = getRangeTIds timestamp $ derivedState ^. DS.keySpaceManager
             response =
               CRs.ClientResponse
                 (CRs.Meta requestId)
                 (CRs.RangeRead
-                  (CRsRR.Success ranges))
+                  (CRsRR.Success (map fst rangeTIds)))
         trace $ TrM.ClientResponseSent response
         addA $ SAc.Send [eId] $ Ms.ClientResponse response
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
@@ -137,13 +138,24 @@ rangeWriteTask
   -> [Co.KeySpaceRange]
   -> Co.Timestamp
   -> String
-  -> Ta.Task DS.DerivedState SAc.OutputAction
-rangeWriteTask eId requestId ranges timestamp description =
-  let entry = PM.Slave $ PM.RangeWrite requestId timestamp ranges
+  -> STS SS.SlaveState (Ta.Task DS.DerivedState SAc.OutputAction)
+rangeWriteTask eId requestId ranges timestamp description = do
+  r <- SS.env . En.rand .^^ Rn.random
+  let rand = Rn.mkStdGen r
       tryHandling derivedState = do
         let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
         if lat < timestamp
-          then return $ Left entry
+          then do
+            let oldRangeTIds = getRangeTIds lat $ derivedState ^. DS.keySpaceManager 
+                oldRangeTIdMap = Mp.fromList oldRangeTIds
+                (newRangeTIds, rand') = U.s31 foldl ([], rand) ranges $
+                  \(newRangeTIds, rand) range ->
+                    case Mp.lookup range oldRangeTIdMap of
+                      Just tabletId -> ((range, tabletId):newRangeTIds, rand)
+                      Nothing ->
+                        let (tabletId, rand') = U.mkUID rand
+                        in ((range, tabletId):newRangeTIds, rand')
+            return $ Left $ PM.Slave $ PM.RangeWrite requestId timestamp newRangeTIds
           else do
             let response =
                   case (KSM.staticRead timestamp $ derivedState ^. DS.keySpaceManager) of
@@ -166,7 +178,7 @@ rangeWriteTask eId requestId ranges timestamp description =
         trace $ TrM.ClientResponseSent response
         addA $ SAc.Send [eId] $ Ms.ClientResponse response
       msgWrapper = Ms.SlaveMessage . SM.MultiPaxosMessage
-  in Ta.Task description tryHandling done msgWrapper
+  return $ Ta.Task description tryHandling done msgWrapper
 
 slaveReadTask
   :: Co.EndpointId
@@ -186,14 +198,15 @@ slaveReadTask eId requestId (databaseId, tableId) key timestamp description =
             done derivedState
             return $ Right ()
       done derivedState = do
-        let ranges = getRanges timestamp $ derivedState ^. DS.keySpaceManager
+        let rangeTIds = getRangeTIds timestamp $ derivedState ^. DS.keySpaceManager
             range = Co.KeySpaceRange databaseId tableId
-        if elem range ranges
-          then addA $ SAc.TabletForward range eId $ TM.ForwardedClientRequest $
-                 TM.ClientRequest
-                   (TM.Meta requestId)
-                   (TM.TabletRead key timestamp)
-          else do
+        case Li.find (\(range', _) -> range' == range) rangeTIds of
+          Just (_, tabletId) -> do
+            addA $ SAc.TabletForward tabletId eId $ TM.ForwardedClientRequest $
+              TM.ClientRequest
+                (TM.Meta requestId)
+                (TM.TabletRead key timestamp)
+          Nothing -> do
             let response =
                   CRs.ClientResponse
                     (CRs.Meta requestId)
@@ -222,14 +235,15 @@ slaveWriteTask eId requestId (databaseId, tableId) key value timestamp descripti
             done derivedState
             return $ Right ()
       done derivedState = do
-        let ranges = getRanges timestamp $ derivedState ^. DS.keySpaceManager
+        let rangeTIds = getRangeTIds timestamp $ derivedState ^. DS.keySpaceManager
             range = Co.KeySpaceRange databaseId tableId
-        if elem range ranges
-          then addA $ SAc.TabletForward range eId $ TM.ForwardedClientRequest $
-                 TM.ClientRequest
-                   (TM.Meta requestId)
-                   (TM.TabletWrite key value timestamp)
-          else do
+        case Li.find (\(range', _) -> range' == range) rangeTIds of
+          Just (_, tabletId) -> do
+            addA $ SAc.TabletForward tabletId eId $ TM.ForwardedClientRequest $
+              TM.ClientRequest
+                (TM.Meta requestId)
+                (TM.TabletWrite key value timestamp)
+          Nothing -> do
             let response =
                   CRs.ClientResponse
                     (CRs.Meta requestId)

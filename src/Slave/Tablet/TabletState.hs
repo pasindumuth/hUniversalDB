@@ -20,7 +20,7 @@ import qualified Slave.Tablet.Env as En
 import Infra.Lens
 
 data TabletState = TabletState {
-  _range :: Co.KeySpaceRange,
+  _tabletId :: Co.TabletId,
   _multiPaxosInstance :: MP.MultiPaxosInstance,
   _derivedState :: DS.DerivedState,
   _paxosTaskManager :: PTM.PaxosTaskManager DS.DerivedState TAc.OutputAction,
@@ -33,11 +33,10 @@ constructor
   :: Co.PaxosId
   -> Rn.StdGen
   -> [Co.EndpointId]
-  -> Co.KeySpaceRange
   -> TabletState
-constructor paxosId rand slaveEIds range = TabletState {
-  _range = range,
-  _multiPaxosInstance = MP.constructor paxosId,
+constructor tabletId rand slaveEIds = TabletState {
+  _tabletId = tabletId,
+  _multiPaxosInstance = MP.constructor tabletId,
   _derivedState = Df.def,
   _paxosTaskManager = Df.def,
   _env = En.Env rand slaveEIds

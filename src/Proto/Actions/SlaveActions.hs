@@ -23,8 +23,8 @@ data OutputAction =
   Send { eIds :: [Co.EndpointId], msg :: Ms.Message} |
   RetryOutput { counterValue :: Int, delay :: Int } |
   Print { message :: String } |
-  Slave_CreateTablet { requestId :: Co.RequestId, ranges :: [Co.KeySpaceRange] } |
-  TabletForward { range :: Co.KeySpaceRange, eId :: Co.EndpointId, tabletMsg :: TM.TabletMessage }
+  Slave_CreateTablet { requestId :: Co.RequestId, rangeTIds :: [(Co.KeySpaceRange, Co.TabletId)] } |
+  TabletForward { tabletId :: Co.TabletId, eId :: Co.EndpointId, tabletMsg :: TM.TabletMessage }
   deriving (Gn.Generic, Bn.Binary, Show)
 
 instance Ac.OutputAction OutputAction where

@@ -23,16 +23,15 @@ slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7
 startTabletThread
   :: Rn.StdGen
   -> Co.PaxosId
-  -> Co.KeySpaceRange
   -> Ct.Chan (TAc.InputAction)
   -> MV.MVar Cn.Connections
   -> IO ()
-startTabletThread rg paxosId keySpaceRange iActionChan connM = do
-  let g = TS.constructor paxosId rg slaveEIds keySpaceRange
-  handlePaxosMessage g
+startTabletThread rg tabletId iActionChan connM = do
+  let g = TS.constructor tabletId rg slaveEIds
+  handleMessage g
   where
-    handlePaxosMessage :: TS.TabletState -> IO ()
-    handlePaxosMessage g = do
+    handleMessage :: TS.TabletState -> IO ()
+    handleMessage g = do
       iAction <- Ct.readChan iActionChan
       let (_, (oActions, _, g')) = runST (TIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
@@ -47,4 +46,4 @@ startTabletThread rg paxosId keySpaceRange iActionChan connM = do
             return ()
           TAc.Print message -> do
             putStrLn message
-      handlePaxosMessage g'
+      handleMessage g'

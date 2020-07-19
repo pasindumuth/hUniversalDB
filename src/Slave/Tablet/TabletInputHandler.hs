@@ -42,17 +42,17 @@ handleInputAction
   :: TAc.InputAction
   -> STT TS.TabletState ()
 handleInputAction iAction = do
-  keySpaceRange <- getL TS.range
+  tabletId <- getL TS.tabletId
   case iAction of
     TAc.Receive eId tabletMsg ->
       case tabletMsg of
         TM.ForwardedClientRequest request -> do
-          handlingState .^ (PTM.handleTask $ clientTask keySpaceRange eId request)
+          handlingState .^ (PTM.handleTask $ clientTask tabletId eId request)
         TM.MultiPaxosMessage multiPaxosMsg -> do
           pl <- getL $ TS.multiPaxosInstance.MP.paxosLog
           slaveEIds <- getL $ TS.env.En.slaveEIds
           lp2 (TS.multiPaxosInstance, TS.env.En.rand)
-            .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage)
+            .^ MP.handleMultiPaxos eId slaveEIds multiPaxosMsg (Ms.TabletMessage tabletId . TM.MultiPaxosMessage)
           pl' <- getL $ TS.multiPaxosInstance.MP.paxosLog
           if (pl /= pl')
             then do
@@ -65,11 +65,11 @@ handleInputAction iAction = do
       handlingState .^ PTM.handleRetry counterValue
 
 clientTask
-  :: Co.KeySpaceRange
+  :: Co.TabletId
   -> Co.EndpointId
   -> TM.ClientRequest
   -> Ta.Task DS.DerivedState TAc.OutputAction
-clientTask keySpaceRange eId request =
+clientTask tabletId eId request =
   let description = show (eId, request)
       requestId = request ^. TM.meta.TM.requestId
   in case request ^. TM.payload of
@@ -92,7 +92,7 @@ clientTask keySpaceRange eId request =
                       (CRsSR.Success value))
             trace $ TrM.ClientResponseSent response
             addA $ TAc.Send [eId] $ Ms.ClientResponse response
-          msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
+          msgWrapper = Ms.TabletMessage tabletId . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done msgWrapper
     TM.TabletWrite key value timestamp ->
       let entry = PM.Tablet $ PM.Write requestId key value timestamp
@@ -120,5 +120,5 @@ clientTask keySpaceRange eId request =
                     (CRs.SlaveWrite CRsSW.Success)
             trace $ TrM.ClientResponseSent response
             addA $ TAc.Send [eId] $ Ms.ClientResponse response
-          msgWrapper = Ms.TabletMessage keySpaceRange . TM.MultiPaxosMessage
+          msgWrapper = Ms.TabletMessage tabletId . TM.MultiPaxosMessage
       in Ta.Task description tryHandling done msgWrapper

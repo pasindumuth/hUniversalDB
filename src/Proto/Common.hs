@@ -14,6 +14,9 @@ import Infra.Lens
 type SlaveGroupId = String
 type EndpointId = String
 type PaxosId = String
+-- Since a Tablet has exactly one MultiPaxos instance,
+-- we can just use the PaxosId to identify the Tablet.
+type TabletId = PaxosId
 
 type RequestId = String
 type DatabaseId = String

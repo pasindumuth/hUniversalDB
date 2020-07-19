@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Thread.SlaveThread where
 
 import qualified Control.Concurrent as Ct
@@ -22,7 +24,7 @@ import Infra.State
 
 slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
 
-type TabletMap = Mp.Map Co.KeySpaceRange (Ct.Chan TAc.InputAction)
+type TabletMap = Mp.Map Co.TabletId (Ct.Chan TAc.InputAction)
 
 startSlaveThread
   :: Rn.StdGen
@@ -32,41 +34,38 @@ startSlaveThread
 startSlaveThread rg iActionChan connM = do
   let g = SS.constructor "slaveGroup1" "" rg slaveEIds
       tabletMap = Mp.empty
-  handlePaxosMessage g tabletMap
+  handleMessage g tabletMap
   where
-    handlePaxosMessage :: SS.SlaveState -> TabletMap -> IO ()
-    handlePaxosMessage g tabletMap = do
+    handleMessage :: SS.SlaveState -> TabletMap -> IO ()
+    handleMessage g tabletMap = do
       iAction <- Ct.readChan iActionChan
       let (_, (oActions, _, g')) = runST (SIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
-      (g'', tabletMap') <- U.s31 Mo.foldM (g', tabletMap) oActions $ \(g', tabletMap) action ->
+      (g'', tabletMap') <- U.s31 Mo.foldM (g', tabletMap) oActions $ \(g, tabletMap) action ->
         case action of
           SAc.Send eIds msg -> do
             Mo.forM_ eIds $ \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-            return (g', tabletMap)
+            return (g, tabletMap)
           SAc.RetryOutput counterValue delay -> do
             Ct.forkIO $ do
               Ct.threadDelay (delay * 1000)
               Ct.writeChan iActionChan $ SAc.RetryInput counterValue
-            return (g', tabletMap)
+            return (g, tabletMap)
           SAc.Print message -> do
             putStrLn message
-            return (g', tabletMap)
-          SAc.Slave_CreateTablet requestId ranges ->
-            U.s31 Mo.foldM (g', tabletMap) ranges $ \(g', tabletMap) range ->
-              if tabletMap & Mp.member range
-                then return (g', tabletMap)
+            return (g, tabletMap)
+          SAc.Slave_CreateTablet requestId rangeTIds ->
+            U.s31 Mo.foldM (g, tabletMap) rangeTIds $ \(g, tabletMap) (_, tabletId) ->
+              if tabletMap & Mp.member tabletId
+                then return (g, tabletMap)
                 else do
-                  let (r, rg) = Rn.random $ g' ^. SS.env.En.rand
-                      g'' = g' & SS.env.En.rand .~ rg
+                  let (r, g') = g %^^ SS.env . En.rand $ Rn.random
                       tabletRand = Rn.mkStdGen r
-                      -- This scheme for generating a requestId works. 
-                      paxosId = requestId ++ (show range)
                   tabletIActionChan <- Ct.newChan
-                  Ct.forkIO $ TT.startTabletThread tabletRand paxosId range tabletIActionChan connM
-                  return (g'', tabletMap & Mp.insert range tabletIActionChan)
-          SAc.TabletForward range eId msg -> do
-            let tabletIActionChan = tabletMap ^?! ix range
+                  Ct.forkIO $ TT.startTabletThread tabletRand tabletId tabletIActionChan connM
+                  return (g', tabletMap & Mp.insert tabletId tabletIActionChan)
+          SAc.TabletForward tabletId eId msg -> do
+            let tabletIActionChan = tabletMap ^?! ix tabletId
             Ct.writeChan tabletIActionChan $ TAc.Receive eId msg
-            return (g', tabletMap)
-      handlePaxosMessage g'' tabletMap'
+            return (g, tabletMap)
+      handleMessage g'' tabletMap'
