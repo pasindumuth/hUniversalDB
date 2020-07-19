@@ -36,7 +36,7 @@ constructor
   -> TabletState
 constructor tabletId rand slaveEIds = TabletState {
   _tabletId = tabletId,
-  _multiPaxosInstance = MP.constructor (Co.getPaxosId tabletId),
+  _multiPaxosInstance = MP.constructor (Co.getTabletId tabletId),
   _derivedState = Df.def,
   _paxosTaskManager = Df.def,
   _env = En.Env rand slaveEIds

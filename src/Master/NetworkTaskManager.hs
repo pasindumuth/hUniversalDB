@@ -59,7 +59,7 @@ performTask uid taskManager slaveGroupRanges slaveGroupEIds = do
           let request =
                 Ms.ClientRequest
                   (CRq.ClientRequest
-                    (CRq.Meta (Co.getUid uid))
+                    (CRq.Meta $ Co.RequestId $ Co.getUID uid)
                     (CRq.RangeWrite (changingKeySpace ^. Co.newKeySpace) timestamp))
               -- TODO: This is so wrong in so many ways. We should be accessing a table indexed by SlaveGroupId,
               -- and then picking a slave that's not dead. Also, we need to know if this master should even

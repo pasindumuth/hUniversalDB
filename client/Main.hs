@@ -26,7 +26,6 @@ import Infra.State
 -- wr d t 1
 -- c d t 1
 -- d d t 1
--- TODO: add randomness here to create UIDs.
 startClient :: String -> String -> IO ()
 startClient mip sip = do
   Lg.infoM Lg.main "Starting client"
@@ -42,46 +41,61 @@ startClient mip sip = do
         putStrLn $ ppShow msg
       let loop ranges count = do
             line <- getLine
-            let uid = "uid" ++ show count
+            let requestId = Co.RequestId $ "requestId" ++ show count
             ranges' <-
               case words line of
                 ["r", databaseId, tableId, key, timestamp] -> do
                   Cn.sendMessage slaveSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
-                        (CRq.Meta uid)
-                        (CRq.SlaveRead databaseId tableId key (read timestamp)))
+                        (CRq.Meta requestId)
+                        (CRq.SlaveRead
+                          (Co.DatabaseId databaseId)
+                          (Co.TableId tableId)
+                          key
+                          (read timestamp)))
                   return ranges
                 ["w", databaseId, tableId, key, value, timestamp] -> do
                   Cn.sendMessage slaveSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
-                        (CRq.Meta uid)
-                        (CRq.SlaveWrite databaseId tableId key value (read timestamp)))
+                        (CRq.Meta requestId)
+                        (CRq.SlaveWrite
+                          (Co.DatabaseId databaseId)
+                          (Co.TableId tableId)
+                          key
+                          value
+                          (read timestamp)))
                   return ranges
                 ["wr", databaseId, tableId, timestamp] -> do
-                  let ranges' = ((Co.KeySpaceRange databaseId tableId):ranges)
+                  let ranges' = ((Co.KeySpaceRange (Co.DatabaseId databaseId) (Co.TableId tableId)):ranges)
                   Cn.sendMessage slaveSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
-                        (CRq.Meta uid)
+                        (CRq.Meta requestId)
                         (CRq.RangeWrite ranges' (read timestamp)))
                   return ranges'
                 ["c", databaseId, tableId, timestamp] -> do
-                  let ranges' = ((Co.KeySpaceRange databaseId tableId):ranges)
+                  let ranges' = ((Co.KeySpaceRange (Co.DatabaseId databaseId) (Co.TableId tableId)):ranges)
                   Cn.sendMessage masterSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
-                        (CRq.Meta uid)
-                        (CRq.CreateDatabase databaseId tableId (read timestamp)))
+                        (CRq.Meta requestId)
+                        (CRq.CreateDatabase
+                          (Co.DatabaseId databaseId)
+                          (Co.TableId tableId)
+                          (read timestamp)))
                   return ranges'
                 ["d", databaseId, tableId, timestamp] -> do
-                  let ranges' = Li.delete (Co.KeySpaceRange databaseId tableId) ranges
+                  let ranges' = Li.delete (Co.KeySpaceRange (Co.DatabaseId databaseId) (Co.TableId tableId)) ranges
                   Cn.sendMessage masterSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
-                        (CRq.Meta uid)
-                        (CRq.DeleteDatabase databaseId tableId (read timestamp)))
+                        (CRq.Meta requestId)
+                        (CRq.DeleteDatabase
+                          (Co.DatabaseId databaseId)
+                          (Co.TableId tableId)
+                          (read timestamp)))
                   return ranges'
                 _ -> do
                   putStrLn $ ppShow "Unrecognized command or number of arguments"

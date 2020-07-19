@@ -41,10 +41,10 @@ import qualified TestState as Tt
 import Infra.Lens
 import Infra.State
 
-mkMasterEId i = "m" ++ show i
-mkSlaveGroupId i = "sg" ++ show i
-mkSlaveEId i j = mkSlaveGroupId i ++ "sl" ++ show j
-mkClientEId i = "c" ++ show i
+mkMasterEId i = Co.EndpointId $ "m" ++ show i
+mkSlaveGroupId i = Co.SlaveGroupId $ "sg" ++ show i
+mkSlaveEId i j = Co.EndpointId $ "sg" ++ show i ++ "sl" ++ show j
+mkClientEId i = Co.EndpointId $ "c" ++ show i
 
 numPerGroup :: Int = 5
 
@@ -107,7 +107,7 @@ createTestState seed numSlaveGroups numClients =
       Tt._tabletAsyncQueues = tabletAsyncQueues,
       Tt._clocks = clocks,
       Tt._clientState = clientState,
-      Tt._nextUid = 0,
+      Tt._nextInt = 0,
       Tt._trueTimestamp = 0,
       Tt._requestStats = Df.def
     }
@@ -327,10 +327,10 @@ addClientMsg
   -> CRq.Payload
   -> STS Tt.TestState ()
 addClientMsg fromEId toEId payload = do
-  uid <- Tt.nextUid .^^. (+1)
+  int <- Tt.nextInt .^^. (+1)
   let msg = Ms.ClientRequest
               (CRq.ClientRequest
-                (CRq.Meta (show uid))
+                (CRq.Meta $ Co.RequestId $ show int)
                 payload)
   addMsg msg (fromEId, toEId)
   Tt.requestStats .^ RS.recordRequest payload

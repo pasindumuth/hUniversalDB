@@ -18,8 +18,20 @@ import qualified Master.MasterState as MS
 import Infra.Lens
 import Infra.State
 
-masterEIds = ["172.18.1.3", "172.18.1.4", "172.18.1.5", "172.18.1.6", "172.18.1.7"]
-slaveEIds  = Mp.fromList [("slaveGroup1", ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"])]
+masterEIds = [
+  Co.EndpointId "172.18.1.3",
+  Co.EndpointId "172.18.1.4",
+  Co.EndpointId "172.18.1.5",
+  Co.EndpointId "172.18.1.6",
+  Co.EndpointId "172.18.1.7"]
+
+slaveEIds  = Mp.fromList [(
+  Co.SlaveGroupId "slaveGroup1", [
+    Co.EndpointId "172.18.0.3",
+    Co.EndpointId "172.18.0.4",
+    Co.EndpointId "172.18.0.5",
+    Co.EndpointId "172.18.0.6",
+    Co.EndpointId "172.18.0.7"])]
 
 startMasterThread
   :: Rn.StdGen

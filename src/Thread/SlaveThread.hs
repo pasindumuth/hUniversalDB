@@ -22,7 +22,12 @@ import qualified Thread.TabletThread as TT
 import Infra.Lens
 import Infra.State
 
-slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
+slaveEIds = [
+  Co.EndpointId "172.18.0.3",
+  Co.EndpointId "172.18.0.4",
+  Co.EndpointId "172.18.0.5",
+  Co.EndpointId "172.18.0.6",
+  Co.EndpointId "172.18.0.7"]
 
 type TabletMap = Mp.Map Co.TabletId (Ct.Chan TAc.InputAction)
 
@@ -33,7 +38,7 @@ startSlaveThread
   -> IO ()
 startSlaveThread rg iActionChan connM = do
   let (paxosId, rg') = U.mkUID rg & _1 %~ Co.PaxosId
-      g = SS.constructor "slaveGroup1" paxosId rg' slaveEIds
+      g = SS.constructor (Co.SlaveGroupId "slaveGroup1") paxosId rg' slaveEIds
       tabletMap = Mp.empty
   handleMessage g tabletMap
   where

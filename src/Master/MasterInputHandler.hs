@@ -83,7 +83,7 @@ handleInputAction iAction =
         Ms.ClientResponse response -> do
           case response ^. CRs.payload of
             CRs.RangeWrite rangeWrite -> do
-              let uid = Co.UID $ response ^. CRs.meta . CRs.requestId
+              let uid = Co.UID $ Co.getRequestId $ response ^. CRs.meta . CRs.requestId
               taskMap <- getL $ MS.derivedState . DS.networkTaskManager . NTM.taskMap
               case Mp.lookup uid taskMap of
                 Just task -> do

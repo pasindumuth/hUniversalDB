@@ -43,8 +43,8 @@ createConnHandlers
   -> (TCP.Socket, TCP.SockAddr)
   -> IO ()
 createConnHandlers connM receiveChan (socket, remoteAddr) = do
-  let eId = U.prefix  ':' $ show remoteAddr
-  Lg.infoM Lg.main $ "Connection established to " ++ eId
+  let eId  = Co.EndpointId $ U.prefix  ':' $ show remoteAddr
+  Lg.infoM Lg.main $ "Connection established to " ++ (Co.getEndpointId eId)
   sendChan <- Cn.addConn connM eId
   Ct.forkFinally (Cn.handleSend sendChan socket) $ \_ -> Cn.delConn connM eId
   Cn.handleReceive eId receiveChan socket
@@ -84,7 +84,7 @@ startSlave seedStr curIP otherIPs = do
   connM <- MV.newMVar Mp.empty
 
   -- Create a single thread to handle the self connection
-  Ct.forkIO $ handleSelfConn connM curIP receiveChan
+  Ct.forkIO $ handleSelfConn connM (Co.EndpointId curIP) receiveChan
 
   -- Start accepting slave connections
   Ct.forkIO $ accept connM receiveChan

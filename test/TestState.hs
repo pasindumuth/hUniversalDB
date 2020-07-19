@@ -51,7 +51,7 @@ data TestState = TestState {
   _clocks :: Mp.Map Co.EndpointId Int,
   -- Client field
   _clientState :: Mp.Map Co.EndpointId CS.ClientState,
-  _nextUid :: Int,
+  _nextInt :: Int,
   _trueTimestamp :: Int,
   _requestStats :: RS.RequestStats
 } deriving (Show)

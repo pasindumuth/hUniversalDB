@@ -157,7 +157,7 @@ genRequest trueTimestamp requestDist = do
       return $ trueTimestamp + noise
     makeRange = do
       i :: Int <- i'rand .^^ Rn.randomR (0, maxTable)
-      return $ Co.KeySpaceRange "d" ("t" ++ show i)
+      return $ Co.KeySpaceRange (Co.DatabaseId "d") (Co.TableId $ "t" ++ show i)
     makeKey = do
       i :: Int <- i'rand .^^ Rn.randomR (0, maxKey)
       return $ "k" ++ show i

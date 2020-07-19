@@ -45,12 +45,12 @@ setupInitialDBs = do
 
 test1 :: STS Tt.TestState ()
 test1 = do
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.RangeWrite [Co.KeySpaceRange "d" "t"] 1); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite "d" "t" "key1" "value1" 2); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveWrite "d" "t" "key2" "value2" 3); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 3) (CRq.SlaveWrite "d" "t" "key3" "value3" 4); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 4) (CRq.SlaveWrite "d" "t" "key4" "value4" 5); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite "d" "t" "key5" "value5" 6); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.RangeWrite [Co.KeySpaceRange (Co.DatabaseId "d") (Co.TableId "t")] 1); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key1" "value1" 2); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key2" "value2" 3); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 3) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key3" "value3" 4); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 4) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key4" "value4" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key5" "value5" 6); SM.simulateAll
 
 -- Tasks 100ms of execution at 1 requests per second, where
 -- the requests that are sent are only slave requests.
@@ -84,13 +84,13 @@ test3 = do
 
 test4 :: STS Tt.TestState ()
 test4 = do
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t" 1); SM.simulateAll
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t" 2); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite "d" "t" "key1" "value1" 3); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite "d" "t" "key2" "value2" 4); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveWrite "d" "t" "key3" "value3" 5); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 3) (CRq.SlaveWrite "d" "t" "key4" "value4" 6); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 4) (CRq.SlaveWrite "d" "t" "key5" "value5" 7); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase (Co.DatabaseId "d") (Co.TableId "t") 1); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase (Co.DatabaseId "d") (Co.TableId "t") 2); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key1" "value1" 3); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key2" "value2" 4); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key3" "value3" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 3) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key4" "value4" 6); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 4) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t") "key5" "value5" 7); SM.simulateAll
 
 -- Tasks 50ms of execution at 5 requests per second, where
 -- the requests that are all possible requests.
@@ -127,13 +127,13 @@ test6 = do
 
 test7 :: STS Tt.TestState ()
 test7 = do
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t1" 1); SM.simulateAll
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t1" 2); SM.simulateAll
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.DeleteDatabase "d" "t1" 3); SM.simulateAll
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase "d" "t2" 4); SM.simulateAll
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite "d" "t2" "key1" "value1" 5); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite "d" "t2" "key1" "value2" 6); SM.simulateNms 2
-  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveRead "d" "t2" "key1" 7); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase (Co.DatabaseId "d") (Co.TableId "t1") 1); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase (Co.DatabaseId "d") (Co.TableId "t1") 2); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.DeleteDatabase (Co.DatabaseId "d") (Co.TableId "t1") 3); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkMasterEId 0) (CRq.CreateDatabase (Co.DatabaseId "d") (Co.TableId "t2") 4); SM.simulateAll
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 0) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t2") "key1" "value1" 5); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 1) (CRq.SlaveWrite (Co.DatabaseId "d") (Co.TableId "t2") "key1" "value2" 6); SM.simulateNms 2
+  SM.addClientMsg (SM.mkClientEId 0) (SM.mkSlaveEId 0 2) (CRq.SlaveRead (Co.DatabaseId "d") (Co.TableId "t2") "key1" 7); SM.simulateAll
 
 -- Stress test with more requests
 test8 :: STS Tt.TestState ()

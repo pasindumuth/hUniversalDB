@@ -18,7 +18,12 @@ import qualified Slave.Tablet.TabletState as TS
 import Infra.Lens
 import Infra.State
 
-slaveEIds = ["172.18.0.3", "172.18.0.4", "172.18.0.5", "172.18.0.6", "172.18.0.7"]
+slaveEIds = [
+  Co.EndpointId "172.18.0.3",
+  Co.EndpointId "172.18.0.4",
+  Co.EndpointId "172.18.0.5",
+  Co.EndpointId "172.18.0.6",
+  Co.EndpointId "172.18.0.7"]
 
 startTabletThread
   :: Rn.StdGen
