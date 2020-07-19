@@ -1,6 +1,7 @@
 module Master.DerivedStateHandler (
   handleDerivedState,
   findFreeGroupM,
+  rangeExistsStrict,
   rangeExists,
   rangeMaybeExists
 ) where
@@ -33,11 +34,11 @@ findFreeGroupM latestValues =
           Nothing -> Just (slaveGroupId, [])
           _ -> Nothing
 
-rangeExists
+rangeExistsStrict
   :: Co.KeySpaceRange
   -> Mp.Map Co.SlaveGroupId (Maybe (Co.Timestamp, SGR.Value))
   -> Maybe (Co.SlaveGroupId, Co.KeySpace)
-rangeExists keySpaceRange latestValues =
+rangeExistsStrict keySpaceRange latestValues =
   U.s31 Mp.foldlWithKey Nothing latestValues $ \exists slaveGroupId value ->
     case exists of
       Just _ -> exists
@@ -45,6 +46,23 @@ rangeExists keySpaceRange latestValues =
         case value of
           Just (_, SGR.Old keySpace) | elem keySpaceRange keySpace ->
             Just (slaveGroupId, keySpace)
+          _ -> Nothing
+
+rangeExists
+  :: Co.KeySpaceRange
+  -> Mp.Map Co.SlaveGroupId (Maybe (Co.Timestamp, SGR.Value))
+  -> Maybe Co.SlaveGroupId
+rangeExists keySpaceRange latestValues =
+  U.s31 Mp.foldlWithKey Nothing latestValues $ \exists slaveGroupId value ->
+    case exists of
+      Just _ -> exists
+      Nothing -> do
+        case value of
+          Just (_, SGR.Old keySpace) | elem keySpaceRange keySpace -> Just slaveGroupId
+          Just (_, SGR.Changing changingKeySpace) |
+            elem keySpaceRange (changingKeySpace ^. Co.oldKeySpace) &&
+            elem keySpaceRange (changingKeySpace ^. Co.newKeySpace)
+           -> Just slaveGroupId
           _ -> Nothing
 
 rangeMaybeExists
@@ -79,9 +97,8 @@ handleDerivedState paxosId pl pl' = do
               latestValues <-  DS.slaveGroupRanges .^^^ SGR.staticReadAll lat
               -- First, we check if the keySpaceRange exists in a
               -- KeySpace in the SlaveGroupRanges.
-              let exists = rangeExists keySpaceRange latestValues
-              case exists of
-                Just (slaveGroupId, _) -> do
+              case rangeExists keySpaceRange latestValues of
+                Just slaveGroupId -> do
                   DS.slaveGroupRanges .^^ SGR.read slaveGroupId timestamp
                   return ()
                 Nothing -> do
@@ -90,8 +107,7 @@ handleDerivedState paxosId pl pl' = do
                   -- (which we know must exist because of the tryHandling of the Task that inserted
                   -- the CreateDatabase PL entry) and then write a NewKeySpace to it. We also set
                   -- up the NetworkTask.
-                  let freeGroupM = findFreeGroupM latestValues
-                  case freeGroupM of
+                  case findFreeGroupM latestValues of
                     Just (slaveGroupId, keySpace) -> do
                       DS.slaveGroupRanges .^^ SGR.write timestamp (Mp.fromList [(slaveGroupId, (keySpaceRange:keySpace))])
                       DS.networkTaskManager . NTM.taskMap .^^. Mp.insert uid (NTM.CreateDatabase eId requestId timestamp slaveGroupId)
@@ -103,8 +119,7 @@ handleDerivedState paxosId pl pl' = do
               latestValues <-  DS.slaveGroupRanges .^^^ SGR.staticReadAll lat
               -- First, we check if the keySpaceRange exists in a
               -- KeySpace in the SlaveGroupRanges.
-              let exists = rangeExists keySpaceRange latestValues
-              case exists of
+              case rangeExistsStrict keySpaceRange latestValues of
                 Just (slaveGroupId, keySpace) -> do
                   DS.slaveGroupRanges .^^ SGR.write timestamp (Mp.fromList [(slaveGroupId, Li.delete keySpaceRange keySpace)])
                   DS.networkTaskManager . NTM.taskMap .^^. Mp.insert uid (NTM.DeleteDatabase eId requestId timestamp slaveGroupId)

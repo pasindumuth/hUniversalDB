@@ -213,7 +213,7 @@ deleteDatabaseTask eId requestId databaseId tableId timestamp description uid =
             return $ Right ()
           else do
             let latestValues = SGR.staticReadAll lat (derivedState ^. DS.slaveGroupRanges)
-                exists = DSH.rangeExists keySpaceRange latestValues
+                exists = DSH.rangeExistsStrict keySpaceRange latestValues
             if Mb.isJust exists
               -- We return False, since this is the only valid case for deleting a KeySpaceRange.
               then return $ Left entry
