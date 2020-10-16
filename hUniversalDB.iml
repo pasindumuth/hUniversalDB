@@ -7,6 +7,7 @@
       <sourceFolder url="file://$MODULE_DIR$/client" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/master" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/slave" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/transact-client" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/transact" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/transact-sim" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/test" isTestSource="true" />

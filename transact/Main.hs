@@ -20,17 +20,17 @@ import Infra.State
 
 partitionConfig :: Mp.Map Co.EndpointId [Co.PartitionShape]
 partitionConfig = Mp.fromList [
-  (Co.EndpointId "172.18.1.3", [
+  (Co.EndpointId "172.18.0.3", [
     Co.PartitionShape (Co.Path "table1") (Co.KeyRange Nothing Nothing)]),
-  (Co.EndpointId "172.18.1.4", [
+  (Co.EndpointId "172.18.0.4", [
     Co.PartitionShape (Co.Path "table2") (Co.KeyRange Nothing (Just "j"))]),
-  (Co.EndpointId "172.18.1.5", [
+  (Co.EndpointId "172.18.0.5", [
     Co.PartitionShape (Co.Path "table2") (Co.KeyRange (Just "j") Nothing),
     Co.PartitionShape (Co.Path "table3") (Co.KeyRange Nothing (Just "d")),
     Co.PartitionShape (Co.Path "table4") (Co.KeyRange Nothing (Just "k"))]),
-  (Co.EndpointId "172.18.1.6", [
+  (Co.EndpointId "172.18.0.6", [
     Co.PartitionShape (Co.Path "table3") (Co.KeyRange (Just "d") (Just "p"))]),
-  (Co.EndpointId "172.18.1.7", [
+  (Co.EndpointId "172.18.0.7", [
     Co.PartitionShape (Co.Path "table3") (Co.KeyRange (Just "p") Nothing),
     Co.PartitionShape (Co.Path "table4") (Co.KeyRange (Just "k") Nothing)])]
 
@@ -63,7 +63,7 @@ startTransact seedStr curIP otherIPs = do
   -- Initialize all tablet threads based on the Partitions that this Transact node should
   -- be managing. This also returns tabletMap, which is how the main Transact Thread forwards
   -- messages to the Transact Tablet Threads.
-  (rg, tabletMap) <- U.foldM (Rn.mkStdGen $ read seedStr, Mp.empty) (partitionConfig ^. ix (Co.EndpointId curIP)) $
+  (rg, tabletMap) <- U.foldM (Rn.mkStdGen $ read seedStr, Mp.empty) (partitionConfig ^?! ix (Co.EndpointId curIP)) $
     \(rg, tabletMap) partitionShape -> do
       let (seed, rg') = Rn.random rg
       chan <- Ct.newChan

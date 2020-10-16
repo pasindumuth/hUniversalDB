@@ -33,6 +33,7 @@ startTransactTabletThread
   -> MV.MVar Cn.Connections
   -> IO ()
 startTransactTabletThread rg partitionShapes iActionChan connM = do
+  print $ "Starting TransactTabletThread with partitionShape: " ++ (show partitionShapes)
   let g = TS.constructor rg
   handleMessage g
   where

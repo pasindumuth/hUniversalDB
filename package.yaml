@@ -89,6 +89,18 @@ executables:
     dependencies:
       - hUniversalDB
 
+  hUniversalDB-transact-client-exe:
+    main:                Main.hs
+    source-dirs:         transact-client
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+      - -O0
+      - -fwarn-incomplete-patterns
+    dependencies:
+      - hUniversalDB
+
   hUniversalDB-transact-sim-exe:
     main:                Main.hs
     source-dirs:         transact-sim
