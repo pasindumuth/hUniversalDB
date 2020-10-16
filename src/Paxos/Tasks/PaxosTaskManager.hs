@@ -43,6 +43,8 @@ data PaxosTaskManager derivedStateT outputActionT = PaxosTaskManager {
 makeLenses ''CurrentInsert
 makeLenses ''PaxosTaskManager
 
+-- This is the ST state that the PaxosTaskManager uses. Each Type in the
+-- Tuple below is necessary for PaxosTaskManager to do its job.
 type HandlingState derivedStateT outputActionT = (
   MP.MultiPaxosInstance,
   derivedStateT,

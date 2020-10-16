@@ -54,15 +54,15 @@ handleInputAction iAction =
           let requestId = request ^. CRq.meta . CRq.requestId
           trace $ TrM.ClientRequestReceived request
           case request ^. CRq.payload of
-            CRq.CreateDatabase databaseId tableId timestamp -> do
+            CRq.CreateDatabase path timestamp -> do
               uid <- MS.env . En.rand .^^ U.mkUID
               let description = show (eId, request)
-                  task = createDatabaseTask eId requestId databaseId tableId timestamp description uid
+                  task = createDatabaseTask eId requestId path timestamp description uid
               handlingState .^ (PTM.handleTask task)
-            CRq.DeleteDatabase databaseId tableId timestamp -> do
+            CRq.DeleteDatabase path timestamp -> do
               uid <- MS.env . En.rand .^^ U.mkUID
               let description = show (eId, request)
-                  task = deleteDatabaseTask eId requestId databaseId tableId timestamp description uid
+                  task = deleteDatabaseTask eId requestId path timestamp description uid
               handlingState .^ (PTM.handleTask task)
             _ -> U.caseError
         Ms.MasterMessage masterMsg ->
@@ -133,15 +133,14 @@ handleInputAction iAction =
 createDatabaseTask
   :: Co.EndpointId
   -> Co.RequestId
-  -> Co.DatabaseId
-  -> Co.TableId
+  -> Co.Path
   -> Co.Timestamp
   -> String
   -> Co.UID
   -> Ta.Task DS.DerivedState MAc.OutputAction
-createDatabaseTask eId requestId databaseId tableId timestamp description uid =
-  let entry = PM.Master $ PM.CreateDatabase requestId databaseId tableId timestamp eId uid
-      keySpaceRange = Co.KeySpaceRange databaseId tableId
+createDatabaseTask eId requestId path timestamp description uid =
+  let entry = PM.Master $ PM.CreateDatabase requestId path timestamp eId uid
+      keySpaceRange = Co.KeySpaceRange path
       sendResponse responseValue = do
         let response =
               CRs.ClientResponse
@@ -189,15 +188,14 @@ createDatabaseTask eId requestId databaseId tableId timestamp description uid =
 deleteDatabaseTask
   :: Co.EndpointId
   -> Co.RequestId
-  -> Co.DatabaseId
-  -> Co.TableId
+  -> Co.Path
   -> Co.Timestamp
   -> String
   -> Co.UID
   -> Ta.Task DS.DerivedState MAc.OutputAction
-deleteDatabaseTask eId requestId databaseId tableId timestamp description uid =
-  let entry = PM.Master $ PM.DeleteDatabase requestId databaseId tableId timestamp eId uid
-      keySpaceRange = Co.KeySpaceRange databaseId tableId
+deleteDatabaseTask eId requestId path timestamp description uid =
+  let entry = PM.Master $ PM.DeleteDatabase requestId path timestamp eId uid
+      keySpaceRange = Co.KeySpaceRange path
       sendResponse responseValue = do
         let response =
               CRs.ClientResponse

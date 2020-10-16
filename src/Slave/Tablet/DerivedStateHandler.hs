@@ -29,5 +29,5 @@ handleDerivedState paxosId pl pl' = do
             DS.kvStore .^^ MVS.read key timestamp
             return ()
           PM.Write requestId key value timestamp -> do
-            DS.kvStore .^^ MVS.write key value requestId timestamp
+            DS.kvStore .^^ MVS.write key (value, requestId) timestamp
       _ -> U.caseError

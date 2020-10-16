@@ -72,13 +72,13 @@ handleInputAction iAction =
               let description = show (eId, request)
               task <- rangeWriteTask eId requestId ranges timestamp description
               handlingState .^ (PTM.handleTask task)
-            CRq.SlaveRead databaseId tableId key timestamp -> do
+            CRq.SlaveRead path key timestamp -> do
               let description = show (eId, request)
-                  task = slaveReadTask eId requestId (databaseId, tableId) key timestamp description
+                  task = slaveReadTask eId requestId path key timestamp description
               handlingState .^ (PTM.handleTask task)
-            CRq.SlaveWrite databaseId tableId key value timestamp -> do
+            CRq.SlaveWrite path key value timestamp -> do
               let description = show (eId, request)
-                  task = slaveWriteTask eId requestId (databaseId, tableId) key value timestamp description
+                  task = slaveWriteTask eId requestId path key value timestamp description
               handlingState .^ (PTM.handleTask task)
             _ -> U.caseError
         Ms.SlaveMessage slaveMsg ->
@@ -183,12 +183,12 @@ rangeWriteTask eId requestId ranges timestamp description = do
 slaveReadTask
   :: Co.EndpointId
   -> Co.RequestId
-  -> (Co.DatabaseId, Co.TableId)
+  -> Co.Path
   -> Co.Key
   -> Co.Timestamp
   -> String
   -> Ta.Task DS.DerivedState SAc.OutputAction
-slaveReadTask eId requestId (databaseId, tableId) key timestamp description =
+slaveReadTask eId requestId path key timestamp description =
   let entry = PM.Slave $ PM.RangeRead requestId timestamp
       tryHandling derivedState = do
         let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
@@ -199,7 +199,7 @@ slaveReadTask eId requestId (databaseId, tableId) key timestamp description =
             return $ Right ()
       done derivedState = do
         let rangeTIds = getRangeTIds timestamp $ derivedState ^. DS.keySpaceManager
-            range = Co.KeySpaceRange databaseId tableId
+            range = Co.KeySpaceRange path
         case Li.find (\(range', _) -> range' == range) rangeTIds of
           Just (_, tabletId) -> do
             addA $ SAc.TabletForward tabletId eId $ TM.ForwardedClientRequest $
@@ -219,13 +219,13 @@ slaveReadTask eId requestId (databaseId, tableId) key timestamp description =
 slaveWriteTask
   :: Co.EndpointId
   -> Co.RequestId
-  -> (Co.DatabaseId, Co.TableId)
+  -> Co.Path
   -> Co.Key
   -> Co.Value
   -> Co.Timestamp
   -> String
   -> Ta.Task DS.DerivedState SAc.OutputAction
-slaveWriteTask eId requestId (databaseId, tableId) key value timestamp description =
+slaveWriteTask eId requestId path key value timestamp description =
   let entry = PM.Slave $ PM.RangeRead requestId timestamp
       tryHandling derivedState = do
         let lat = KSM.staticReadLat $ derivedState ^. DS.keySpaceManager
@@ -236,7 +236,7 @@ slaveWriteTask eId requestId (databaseId, tableId) key value timestamp descripti
             return $ Right ()
       done derivedState = do
         let rangeTIds = getRangeTIds timestamp $ derivedState ^. DS.keySpaceManager
-            range = Co.KeySpaceRange databaseId tableId
+            range = Co.KeySpaceRange path
         case Li.find (\(range', _) -> range' == range) rangeTIds of
           Just (_, tabletId) -> do
             addA $ SAc.TabletForward tabletId eId $ TM.ForwardedClientRequest $

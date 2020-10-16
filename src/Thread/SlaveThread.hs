@@ -47,7 +47,7 @@ startSlaveThread rg iActionChan connM = do
       iAction <- Ct.readChan iActionChan
       let (_, (oActions, _, g')) = runST (SIH.handleInputAction iAction) g
       conn <- MV.readMVar connM
-      (g'', tabletMap') <- U.s31 Mo.foldM (g', tabletMap) oActions $ \(g, tabletMap) action ->
+      (g'', tabletMap') <- U.foldM (g', tabletMap) oActions $ \(g, tabletMap) action ->
         case action of
           SAc.Send eIds msg -> do
             Mo.forM_ eIds $ \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
@@ -61,7 +61,7 @@ startSlaveThread rg iActionChan connM = do
             putStrLn message
             return (g, tabletMap)
           SAc.Slave_CreateTablet requestId rangeTIds ->
-            U.s31 Mo.foldM (g, tabletMap) rangeTIds $ \(g, tabletMap) (_, tabletId) ->
+            U.foldM (g, tabletMap) rangeTIds $ \(g, tabletMap) (_, tabletId) ->
               if tabletMap & Mp.member tabletId
                 then return (g, tabletMap)
                 else do

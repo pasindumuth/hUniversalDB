@@ -15,6 +15,8 @@ import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Actions.MasterActions as MAc
 import qualified Proto.Actions.SlaveActions as SAc
 import qualified Proto.Actions.TabletActions as TAc
+import qualified Proto.Actions.TransactActions as TrAc
+import qualified Proto.Actions.TransactTabletActions as TTAc
 import qualified Proto.Messages.TraceMessages as TrM
 import Infra.Internal_State
 
@@ -22,8 +24,20 @@ import Infra.Internal_State
 type STM s a = ST MAc.OutputAction s a -- For Master
 type STS s a = ST SAc.OutputAction s a -- For Slave
 type STT s a = ST TAc.OutputAction s a -- For Tablet
+type STTr s a = ST TrAc.OutputAction s a -- For Transact
+type STTT s a = ST TTAc.OutputAction s a -- For TransactTablet
 
 -- A General version of ST
+--
+-- `o` is OutputActions, which almost essentially a way for our code
+-- to do side effects (like network requests). The evaluator of the ST will
+-- enumerate through these OutputActions and execute them.
+-- 
+-- `s` is the State that is passed through the ST monad. This is the state that
+-- we would our Do Expressions to be able to have access (read) and manipulate (write)
+-- 
+-- `a` is the return value of the ST execution. Usually, there is a final value
+-- that is returned. If there isn't, it will be ().
 type ST o s a = STI ([o], Int, [TrM.TraceMessage]) s a
 
 -- This function reverses the actions and traceMsgs so that they are

@@ -83,7 +83,7 @@ clientTask tabletId eId request =
               _ -> return $ Left entry
           done derivedState = do
             let value = case (derivedState ^. DS.kvStore) &  MVS.staticRead key timestamp of
-                          Just (value, _, _) -> Just value
+                          Just ((value, _), _) -> Just value
                           Nothing -> Nothing
                 response =
                   CRs.ClientResponse
@@ -101,7 +101,7 @@ clientTask tabletId eId request =
               Just lat | timestamp <= lat -> do
                 let response =
                       case (derivedState ^. DS.kvStore) & MVS.staticRead key timestamp of
-                        Just (_, requestId', _) | requestId' == requestId ->
+                        Just ((_, requestId'), _) | requestId' == requestId ->
                           CRs.ClientResponse
                             (CRs.Meta requestId)
                             (CRs.SlaveWrite CRsSW.Success)

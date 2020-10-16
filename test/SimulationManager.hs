@@ -282,7 +282,7 @@ simulate1ms = do
   -- should have been delivered.
   nonemptyQueues <- getL $ Tt.nonemptyQueues
   lenDist <-
-    U.s31 Mo.foldM [] nonemptyQueues $ \lenDist queueId -> do
+    U.foldM [] nonemptyQueues $ \lenDist queueId -> do
       let (fromEId, toEId) = queueId
       queue <- getT $ Tt.queues . ix fromEId . ix toEId
       return $ (queueId, Sq.length queue):lenDist

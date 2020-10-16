@@ -45,7 +45,7 @@ staticReadLat :: KeySpaceManager -> Int
 staticReadLat keySpaceManager = keySpaceManager ^. i'lat
 
 staticRead
-  :: Int
+  :: Co.Timestamp
   -> KeySpaceManager
   -> Maybe (Co.Timestamp, Co.RequestId, [(Co.KeySpaceRange, Co.TabletId)])
 staticRead timestamp keySpaceManager =

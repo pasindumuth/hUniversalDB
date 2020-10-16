@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
@@ -44,57 +40,53 @@ startClient mip sip = do
             let requestId = Co.RequestId $ "requestId" ++ show count
             ranges' <-
               case words line of
-                ["r", databaseId, tableId, key, timestamp] -> do
+                ["r", path, key, timestamp] -> do
                   Cn.sendMessage slaveSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
                         (CRq.Meta requestId)
                         (CRq.SlaveRead
-                          (Co.DatabaseId databaseId)
-                          (Co.TableId tableId)
+                          (Co.Path path)
                           key
                           (read timestamp)))
                   return ranges
-                ["w", databaseId, tableId, key, value, timestamp] -> do
+                ["w", path, key, value, timestamp] -> do
                   Cn.sendMessage slaveSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
                         (CRq.Meta requestId)
                         (CRq.SlaveWrite
-                          (Co.DatabaseId databaseId)
-                          (Co.TableId tableId)
+                          (Co.Path path)
                           key
                           value
                           (read timestamp)))
                   return ranges
-                ["wr", databaseId, tableId, timestamp] -> do
-                  let ranges' = ((Co.KeySpaceRange (Co.DatabaseId databaseId) (Co.TableId tableId)):ranges)
+                ["wr", path, timestamp] -> do
+                  let ranges' = ((Co.KeySpaceRange (Co.Path path)):ranges)
                   Cn.sendMessage slaveSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
                         (CRq.Meta requestId)
                         (CRq.RangeWrite ranges' (read timestamp)))
                   return ranges'
-                ["c", databaseId, tableId, timestamp] -> do
-                  let ranges' = ((Co.KeySpaceRange (Co.DatabaseId databaseId) (Co.TableId tableId)):ranges)
+                ["c", path, timestamp] -> do
+                  let ranges' = ((Co.KeySpaceRange (Co.Path path)):ranges)
                   Cn.sendMessage masterSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
                         (CRq.Meta requestId)
                         (CRq.CreateDatabase
-                          (Co.DatabaseId databaseId)
-                          (Co.TableId tableId)
+                          (Co.Path path)
                           (read timestamp)))
                   return ranges'
-                ["d", databaseId, tableId, timestamp] -> do
-                  let ranges' = Li.delete (Co.KeySpaceRange (Co.DatabaseId databaseId) (Co.TableId tableId)) ranges
+                ["d", path, timestamp] -> do
+                  let ranges' = Li.delete (Co.KeySpaceRange (Co.Path path)) ranges
                   Cn.sendMessage masterSocket $
                     Ms.ClientRequest
                       (CRq.ClientRequest
                         (CRq.Meta requestId)
                         (CRq.DeleteDatabase
-                          (Co.DatabaseId databaseId)
-                          (Co.TableId tableId)
+                          (Co.Path path)
                           (read timestamp)))
                   return ranges'
                 _ -> do

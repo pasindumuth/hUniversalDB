@@ -16,6 +16,10 @@ infixl 1 .^^*
 infixl 1 .^^.*
 infixl 1 .^^^*
 
+-- This is a generalization of the State monad for where we also want to
+-- pass through some auxiliary data (like trace data, logging data, and
+-- even other data that will be used for side-effectful purposes later on)
+-- along with the main state.
 type STI aux s a = St.State (aux, s) a
 
 makeST :: a -> STI aux s a

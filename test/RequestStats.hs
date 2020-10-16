@@ -104,11 +104,11 @@ recordResponse payload = do
 recordRequest :: CRq.Payload -> STS RequestStats ()
 recordRequest payload = do
   case payload of
-    CRq.CreateDatabase _ _ _ -> createDatabaseStats . numCreateDatabaseRqs .^^. (+1)
-    CRq.DeleteDatabase _ _ _ -> deleteDatabaseStats . numDeleteDatabaseRqs .^^. (+1)
+    CRq.CreateDatabase _ _ -> createDatabaseStats . numCreateDatabaseRqs .^^. (+1)
+    CRq.DeleteDatabase _ _ -> deleteDatabaseStats . numDeleteDatabaseRqs .^^. (+1)
     CRq.RangeRead _ -> rangeReadStats . numRangeReadRqs .^^. (+1)
     CRq.RangeWrite _ _ -> rangeWriteStats . numRangeWriteRqs .^^. (+1)
-    CRq.SlaveRead _ _ _ _ -> slaveReadStats . numSlaveReadRqs .^^. (+1)
-    CRq.SlaveWrite _ _ _ _ _ -> slaveWriteStats . numSlaveWriteRqs .^^. (+1)
+    CRq.SlaveRead _ _ _ -> slaveReadStats . numSlaveReadRqs .^^. (+1)
+    CRq.SlaveWrite _ _ _ _ -> slaveWriteStats . numSlaveWriteRqs .^^. (+1)
   return ()
 

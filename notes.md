@@ -60,8 +60,22 @@ docker run -it --name=master4 --ip 172.18.1.7 --network=huniversal-net huniversa
 
 docker run -it --name=client --network=huniversal-net huniversal stack run hUniversalDB-client-exe 172.18.1.3 172.18.0.3
 
-# Heyay
-open -na "IntelliJ IDEA.app"
+# Transact
+docker kill universal0; docker container rm universal0;
+docker kill universal1; docker container rm universal1;
+docker kill universal2; docker container rm universal2;
+docker kill universal3; docker container rm universal3;
+docker kill universal4; docker container rm universal4;
+docker kill client; docker container rm client;
+
+docker run -it --name=universal0 --ip 172.18.0.3 --network=huniversal-net huniversal stack run hUniversalDB-transact-exe 0 172.18.0.3
+docker run -it --name=universal1 --ip 172.18.0.4 --network=huniversal-net huniversal stack run hUniversalDB-transact-exe 1 172.18.0.4 172.18.0.3
+docker run -it --name=universal2 --ip 172.18.0.5 --network=huniversal-net huniversal stack run hUniversalDB-transact-exe 2 172.18.0.5 172.18.0.3 172.18.0.4
+docker run -it --name=universal3 --ip 172.18.0.6 --network=huniversal-net huniversal stack run hUniversalDB-transact-exe 3 172.18.0.6 172.18.0.3 172.18.0.4 172.18.0.5
+docker run -it --name=universal4 --ip 172.18.0.7 --network=huniversal-net huniversal stack run hUniversalDB-transact-exe 4 172.18.0.7 172.18.0.3 172.18.0.4 172.18.0.5 172.18.0.6
+
+docker run -it --name=client --network=huniversal-net huniversal stack run hUniversalDB-client-exe 172.18.0.3
+
 
 # Testing
 c d t 1

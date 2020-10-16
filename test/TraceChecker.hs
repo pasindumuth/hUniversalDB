@@ -62,7 +62,7 @@ addMsgs paxosId i m msgs =
 -- at a given PaxosId and Index are the same).
 refineTrace :: [TrM.TraceMessage] -> Either Co.ErrorMsg [TrM.TraceMessage]
 refineTrace msgs =
-  let paxosLogsE = U.s31 Mo.foldM (Mp.empty, []) msgs $
+  let paxosLogsE = U.foldM (Mp.empty, []) msgs $
         \(paxosLogs, modMsgs) msg ->
           case msg of
             TrM.PaxosInsertion paxosId index entry ->
@@ -94,7 +94,7 @@ refineTrace msgs =
 
 checkMsgs :: [TrM.TraceMessage] -> Either Co.ErrorMsg ()
 checkMsgs msgs =
-  let ret = U.s31 Mo.foldM (Df.def :: CheckState) msgs $ \state msg ->
+  let ret = U.foldM (Df.def :: CheckState) msgs $ \state msg ->
               let (ret, (_, _, state')) = runST (checkMsg msg) state
               in case ret of
                 Left message -> Left message
@@ -157,8 +157,8 @@ checkMsg msg = do
                 Nothing -> return $ entryUnfamiliarE paxosLogEntry
                 Just payload ->
                   case payload of
-                    CRq.SlaveRead databaseId' tableId' key' timestamp'
-                      | (Co.KeySpaceRange databaseId' tableId') == range &&
+                    CRq.SlaveRead path' key' timestamp'
+                      | (Co.KeySpaceRange path') == range &&
                         key' == key &&
                         timestamp' == timestamp -> do
                       i'tables . ix tabletId .^^* MVS.read key timestamp
@@ -170,12 +170,12 @@ checkMsg msg = do
                 Nothing -> return $ entryUnfamiliarE paxosLogEntry
                 Just payload ->
                   case payload of
-                    CRq.SlaveWrite databaseId' tableId' key' value' timestamp'
-                      | (Co.KeySpaceRange databaseId' tableId') == range &&
+                    CRq.SlaveWrite path' key' value' timestamp'
+                      | (Co.KeySpaceRange path') == range &&
                         key' == key &&
                         value' == value &&
                         timestamp' == timestamp -> do
-                      i'tables . ix tabletId .^^* MVS.write key value requestId timestamp
+                      i'tables . ix tabletId .^^* MVS.write key (value, requestId) timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
         PM.Slave entry ->
@@ -189,9 +189,9 @@ checkMsg msg = do
                         case payload of
                         CRq.RangeRead timestamp'
                           | timestamp' == timestamp -> True
-                        CRq.SlaveRead _ _ _ timestamp'
+                        CRq.SlaveRead _ _ timestamp'
                           | timestamp' == timestamp -> True
-                        CRq.SlaveWrite _ _ _ _ timestamp'
+                        CRq.SlaveWrite _ _ _ timestamp'
                           | timestamp' == timestamp -> True
                         _ -> False
                   if entryCorrect
@@ -268,15 +268,15 @@ checkMsg msg = do
                 _ -> return $ responseTypeIncorrectE response requestPayload
             CRs.SlaveRead responsePayload -> do
               case requestPayload of
-                CRq.SlaveRead databaseId tableId key timestamp -> do
-                  tabletIdM <- tabletIdM databaseId tableId timestamp
+                CRq.SlaveRead path key timestamp -> do
+                  tabletIdM <- tabletIdM path timestamp
                   case tabletIdM of
                     Just tabletId -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
                       res <- i'tables . ix tabletId .^^^* MVS.staticRead key timestamp
                       let value = case res of
                                     Nothing -> Nothing
-                                    Just (value', _, _) -> Just value'
+                                    Just ((value', _), _) -> Just value'
                       if (CRsSR.Success value) == responsePayload
                         then return $ Right ()
                         else return $ responseValueIncorrectE response requestPayload
@@ -285,14 +285,14 @@ checkMsg msg = do
                 _ -> return $ responseTypeIncorrectE response requestPayload
             CRs.SlaveWrite responsePayload -> do
               case requestPayload of
-                CRq.SlaveWrite databaseId tableId key value timestamp -> do
-                  tabletIdM <- tabletIdM databaseId tableId timestamp
+                CRq.SlaveWrite path key value timestamp -> do
+                  tabletIdM <- tabletIdM path timestamp
                   case tabletIdM of
                     Just tabletId -> do
                       -- staticRead ensure the `lat` is beyond `timestamp`
                       res <- i'tables . ix tabletId .^^^* MVS.staticRead key timestamp
                       case res of
-                        Just (value', requestId', timestamp')
+                        Just ((value', requestId'), timestamp')
                           | requestId' == requestId -> do
                           case responsePayload of
                             CRsSW.Success
@@ -310,11 +310,11 @@ checkMsg msg = do
             _ -> return $ Right()
       return $ Right ()
   where
-    tabletIdM databaseId tableId timestamp = do
+    tabletIdM path timestamp = do
       res <- i'keySpaceManager .^^^ KSM.staticRead timestamp
       case res of
         Just (_, _, rangeTIds') ->
-          let range = Co.KeySpaceRange databaseId tableId
+          let range = Co.KeySpaceRange path
           in case Li.find (\(range', _) -> range' == range) rangeTIds' of
             Just (_, tabletId) -> return $ Just tabletId
             _ -> return $ Nothing

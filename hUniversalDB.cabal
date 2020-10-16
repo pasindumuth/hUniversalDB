@@ -4,16 +4,16 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: e3bb526b3df70a2c6b83df54c1d15e5e2b4bfdb6b915ce099d0efe489efcf45e
+-- hash: e43e5abdcb41beed4706ff04464733b0e79d1a5368ea9632dd1a108f58c73352
 
 name:           hUniversalDB
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/hUniversalDB#readme>
+description:    Please see the README on GitHub at <https://github.com/pasindumuth/hUniversalDB#readme>
 homepage:       https://github.com/githubuser/hUniversalDB#readme
 bug-reports:    https://github.com/githubuser/hUniversalDB/issues
 author:         Author name here
-maintainer:     example@example.com
-copyright:      2020 Author name here
+maintainer:     pasindumuth@gmail.com
+copyright:      2020 Pasindu Muthukuda
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      Common.MultiVersionMap
       Infra.Assert
       Infra.Internal_State
       Infra.Lens
@@ -50,6 +51,8 @@ library
       Proto.Actions.MasterActions
       Proto.Actions.SlaveActions
       Proto.Actions.TabletActions
+      Proto.Actions.TransactActions
+      Proto.Actions.TransactTabletActions
       Proto.Common
       Proto.Messages
       Proto.Messages.ClientRequests
@@ -65,6 +68,7 @@ library
       Proto.Messages.SlaveMessages
       Proto.Messages.TabletMessages
       Proto.Messages.TraceMessages
+      Proto.Messages.TransactTabletMessages
       Slave.DerivedState
       Slave.DerivedStateHandler
       Slave.Env
@@ -80,6 +84,14 @@ library
       Thread.MasterThread
       Thread.SlaveThread
       Thread.TabletThread
+      Thread.TransactTabletThread
+      Thread.TransactThread
+      Transact.Env
+      Transact.Tablet.Env
+      Transact.Tablet.TabletInputHandler
+      Transact.Tablet.TabletState
+      Transact.TransactInputHandler
+      Transact.TransactState
   other-modules:
       Paths_hUniversalDB
   hs-source-dirs:
@@ -158,6 +170,56 @@ executable hUniversalDB-slave-exe
       Paths_hUniversalDB
   hs-source-dirs:
       slave
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
+  build-depends:
+      MissingH
+    , async
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , containers
+    , data-default
+    , hUniversalDB
+    , hslogger
+    , lens
+    , mtl
+    , network-simple
+    , pretty-show
+    , random
+    , stm
+  default-language: Haskell2010
+
+executable hUniversalDB-transact-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_hUniversalDB
+  hs-source-dirs:
+      transact
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
+  build-depends:
+      MissingH
+    , async
+    , base >=4.7 && <5
+    , binary
+    , bytestring
+    , containers
+    , data-default
+    , hUniversalDB
+    , hslogger
+    , lens
+    , mtl
+    , network-simple
+    , pretty-show
+    , random
+    , stm
+  default-language: Haskell2010
+
+executable hUniversalDB-transact-sim-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_hUniversalDB
+  hs-source-dirs:
+      transact-sim
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH

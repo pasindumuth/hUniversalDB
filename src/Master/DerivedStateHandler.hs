@@ -91,8 +91,8 @@ handleDerivedState paxosId pl pl' = do
       case plEntry of
         PM.Master entry ->
           case entry of
-            PM.CreateDatabase requestId databaseId tableId timestamp eId uid -> do
-              let keySpaceRange = Co.KeySpaceRange databaseId tableId
+            PM.CreateDatabase requestId path timestamp eId uid -> do
+              let keySpaceRange = Co.KeySpaceRange path
               lat <- DS.slaveGroupRanges .^^^ SGR.staticReadLat
               latestValues <-  DS.slaveGroupRanges .^^^ SGR.staticReadAll lat
               -- First, we check if the keySpaceRange exists in a
@@ -113,8 +113,8 @@ handleDerivedState paxosId pl pl' = do
                       DS.networkTaskManager . NTM.taskMap .^^. Mp.insert uid (NTM.CreateDatabase eId requestId timestamp slaveGroupId)
                       return ()
                     Nothing -> U.caseError
-            PM.DeleteDatabase requestId databaseId tableId timestamp eId uid -> do
-              let keySpaceRange = Co.KeySpaceRange databaseId tableId
+            PM.DeleteDatabase requestId path timestamp eId uid -> do
+              let keySpaceRange = Co.KeySpaceRange path
               lat <- DS.slaveGroupRanges .^^^ SGR.staticReadLat
               latestValues <-  DS.slaveGroupRanges .^^^ SGR.staticReadAll lat
               -- First, we check if the keySpaceRange exists in a

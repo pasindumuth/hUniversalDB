@@ -15,11 +15,13 @@ import qualified Proto.Messages.MasterMessages as MM
 import qualified Proto.Messages.PaxosMessages as PM
 import qualified Proto.Messages.SlaveMessages as SM
 import qualified Proto.Messages.TabletMessages as TM
+import qualified Proto.Messages.TransactTabletMessages as TTM
 
 data Message =
   ClientRequest CRq.ClientRequest |
   ClientResponse CRs.ClientResponse |
   SlaveMessage SM.SlaveMessage |
   MasterMessage MM.MasterMessage |
-  TabletMessage Co.TabletId TM.TabletMessage
+  TabletMessage Co.TabletId TM.TabletMessage |
+  TransactTabletMessage Co.TabletId TTM.TransactTabletMessage
   deriving (Gn.Generic, Bn.Binary, Show)

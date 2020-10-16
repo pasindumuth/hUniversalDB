@@ -23,23 +23,19 @@ data Payload =
     ranges :: [Co.KeySpaceRange],
     timestamp :: Int } |
   SlaveRead {
-    databaseId :: Co.DatabaseId,
-    tableId :: Co.TableId,
+    path :: Co.Path,
     key :: String,
     timestamp :: Int } |
   SlaveWrite {
-    databaseId :: Co.DatabaseId,
-    tableId :: Co.TableId,
+    path :: Co.Path,
     key :: String,
     value :: String,
     timestamp :: Int } |
   CreateDatabase {
-    databaseId :: Co.DatabaseId,
-    tableId :: Co.TableId,
+    path :: Co.Path,
     timestamp :: Co.Timestamp } |
   DeleteDatabase {
-    databaseId :: Co.DatabaseId,
-    tableId :: Co.TableId,
+    path :: Co.Path,
     timestamp :: Co.Timestamp }
   deriving (Gn.Generic, Bn.Binary, Show)
 

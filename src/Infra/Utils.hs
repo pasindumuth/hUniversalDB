@@ -1,6 +1,7 @@
 module Infra.Utils where
 
 import qualified Control.Exception as Ex
+import qualified Control.Monad as Mo
 import qualified Data.Sequence as Sq
 import qualified Data.Map as Mp
 import qualified Data.Set as St
@@ -67,3 +68,6 @@ mkUID rg =
           let (r, rg') = Rn.random rg
           in (r:uid, rg')
   in (Co.UID uid, rg')
+
+foldM :: (Foldable t, Monad m) => b -> t a -> (b -> a -> m b) -> m b
+foldM = s31 Mo.foldM
