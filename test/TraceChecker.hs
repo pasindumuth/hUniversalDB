@@ -175,7 +175,7 @@ checkMsg msg = do
                         key' == key &&
                         value' == value &&
                         timestamp' == timestamp -> do
-                      i'tables . ix tabletId .^^* MVS.write key (value, requestId) timestamp
+                      i'tables . ix tabletId .^^* MVS.write key (Just (value, requestId)) timestamp
                       return $ Right ()
                     _ -> return $ entryIncorrectE paxosLogEntry payload
         PM.Slave entry ->

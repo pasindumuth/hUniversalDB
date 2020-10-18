@@ -14,8 +14,8 @@ import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import Infra.State
 
-startClient :: String -> String -> IO ()
-startClient mip sip = do
+startClient :: String -> IO ()
+startClient sip = do
   Lg.infoM Lg.main "Starting client"
   TCP.connect sip "8000" $ \(slaveSocket, remoteAddr) -> do
     Lg.infoM Lg.main $ "Connection established to " ++ show remoteAddr
@@ -28,5 +28,5 @@ main :: IO ()
 main = do
   Lg.setupLogging
   args <- SE.getArgs
-  let (mip:sip:_) = args
-  startClient mip sip
+  let (sip:_) = args
+  startClient sip
