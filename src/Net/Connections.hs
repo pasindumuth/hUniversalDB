@@ -25,7 +25,6 @@ import qualified Network.Simple.TCP as TCP
 
 import qualified Infra.Logging as Lg
 import qualified Proto.Common as Co
-import qualified Proto.Messages as Ms
 
 -- The value of Connections is function whose return value is an IO Operator
 -- that will add the input message to some Chan somewhere in the Real World.
@@ -33,14 +32,15 @@ import qualified Proto.Messages as Ms
 -- that does Ct.readChan from the Output Chans of the Endpoints (of a
 -- Connections) and then actually sends the data over the network (it
 -- will have the appropriate network socket in its scope).
-type Connections = Mp.Map Co.EndpointId (Ms.Message -> IO ())
+type Connections m = Mp.Map Co.EndpointId (m -> IO ())
 
 -- Adds an Output Chan to the Real World, updating Connections accordingly,
 -- and returns the Output Chan (for the Sending Thread to start forwarding from).
 addConn
-  :: MV.MVar Connections
+  :: Bn.Binary m
+  => MV.MVar (Connections m)
   -> Co.EndpointId
-  -> IO (Ct.Chan Ms.Message)
+  -> IO (Ct.Chan m)
 addConn connM endpointId = do
    sendChan <- Ct.newChan
    conn <- MV.takeMVar connM
@@ -48,7 +48,8 @@ addConn connM endpointId = do
    return sendChan
 
 delConn
-  :: MV.MVar Connections
+  :: Bn.Binary m
+  => MV.MVar (Connections m)
   -> Co.EndpointId
   -> IO ()
 delConn connM endpointId = do
@@ -108,9 +109,10 @@ handleSend chan socket = do
 -- Output Channel and pass it into receiveChan (which is read by the Input
 -- Thread and handled by the main server code).
 selfConnect
-  :: String
-  -> MV.MVar Connections
-  -> Ct.Chan (Co.EndpointId, Ms.Message)
+  :: Bn.Binary m
+  => String
+  -> MV.MVar (Connections m)
+  -> Ct.Chan (Co.EndpointId, m)
   -> IO ()
 selfConnect ip connM receiveChan = do
   let eId = Co.EndpointId ip
@@ -121,8 +123,9 @@ selfConnect ip connM receiveChan = do
     Ct.writeChan receiveChan (eId, msg)
 
 createConnHandlers
-  :: MV.MVar Connections
-  -> Ct.Chan (Co.EndpointId, Ms.Message)
+  :: Bn.Binary m
+  => MV.MVar (Connections m)
+  -> Ct.Chan (Co.EndpointId, m)
   -> (TCP.Socket, TCP.SockAddr)
   -> IO ()
 createConnHandlers connM receiveChan (socket, remoteAddr) = do
@@ -138,8 +141,9 @@ createConnHandlers connM receiveChan (socket, remoteAddr) = do
 -- and creates a Receiving Thread that reads from the
 -- socket and passes the data into the receiveChan, the Input Channel.
 accept
-  :: MV.MVar Connections
-  -> Ct.Chan (Co.EndpointId, Ms.Message)
+  :: Bn.Binary m
+  => MV.MVar (Connections m)
+  -> Ct.Chan (Co.EndpointId, m)
   -> IO ()
 accept connM receiveChan =
   TCP.serve TCP.HostAny "8000" $ createConnHandlers connM receiveChan
@@ -150,9 +154,10 @@ accept connM receiveChan =
 -- Chan, and creates a Receiving Thread that reads from the socket
 -- and passes the data into the receiveChan, the Input Channel.
 connect
-  :: String
-  -> MV.MVar Connections
-  -> Ct.Chan (Co.EndpointId, Ms.Message)
+  :: Bn.Binary m
+  => String
+  -> MV.MVar (Connections m)
+  -> Ct.Chan (Co.EndpointId, m)
   -> IO ()
 connect ip connM receiveChan =
   TCP.connect ip "8000" $ createConnHandlers connM receiveChan

@@ -1,4 +1,4 @@
-module Thread.TransactTabletThread where
+module Transact.Thread.TabletThread where
 
 import qualified Control.Concurrent as Ct
 import qualified Control.Concurrent.MVar as MV
@@ -9,13 +9,14 @@ import qualified Data.Maybe as Mb
 import qualified System.Random as Rn
 
 import qualified Net.Connections as Cn
-import qualified Proto.Actions.TransactTabletActions as TTAc
-import qualified Proto.Common as Co
+import qualified Transact.Container.Common as Co
+import qualified Transact.Container.Message as Ms
+import qualified Transact.Container.TabletActions as TA
 import qualified Transact.Tablet.Env as En
 import qualified Transact.Tablet.TabletInputHandler as TIH
 import qualified Transact.Tablet.TabletState as TS
+import Transact.Infra.State
 import Infra.Lens
-import Infra.State
 
 transactEIds = [
   Co.EndpointId "172.18.0.3",
@@ -26,13 +27,13 @@ transactEIds = [
 
 -- A TransactTabletThread manages a Tablet The Path and
 -- KeyRange of the Tablet is specified by PartitionShape.
-startTransactTabletThread
+startTabletThread
   :: Rn.StdGen
-  -> Co.PartitionShape
-  -> Ct.Chan (TTAc.InputAction)
-  -> MV.MVar Cn.Connections
+  -> Co.TabletShape
+  -> Ct.Chan (TA.InputAction)
+  -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
-startTransactTabletThread rg partitionShapes iActionChan connM = do
+startTabletThread rg partitionShapes iActionChan connM = do
   print $ "Starting TransactTabletThread with partitionShape: " ++ (show partitionShapes)
   let g = TS.constructor rg
   handleMessage g
@@ -44,13 +45,8 @@ startTransactTabletThread rg partitionShapes iActionChan connM = do
       conn <- MV.readMVar connM
       Mo.forM_ oActions $ \action ->
         case action of
-          TTAc.Send eIds msg -> Mo.forM_ eIds $
+          TA.Send eIds msg -> Mo.forM_ eIds $
             \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-          TTAc.RetryOutput counterValue delay -> do
-            Ct.forkIO $ do
-              Ct.threadDelay (delay * 1000)
-              Ct.writeChan iActionChan $ TTAc.RetryInput counterValue
-            return ()
-          TTAc.Print message -> do
+          TA.Print message -> do
             putStrLn message
       handleMessage g'

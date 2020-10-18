@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
-module Infra.Internal_State where
+module Infra.StateCore where
 
 import qualified Control.Monad.State as St
 

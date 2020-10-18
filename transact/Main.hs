@@ -10,38 +10,37 @@ import qualified System.Random as Rn
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
-import qualified Proto.Actions.TransactActions as TrAc
-import qualified Proto.Common as Co
-import qualified Proto.Messages as Ms
-import qualified Thread.TransactThread as TrT
-import qualified Thread.TransactTabletThread as TTT
+import qualified Transact.Container.ServerActions as TA
+import qualified Transact.Container.Common as Co
+import qualified Transact.Container.Message as Ms
+import qualified Transact.Thread.ServerThread as ST
+import qualified Transact.Thread.TabletThread as TT
 import Infra.Lens
-import Infra.State
 
-partitionConfig :: Mp.Map Co.EndpointId [Co.PartitionShape]
+partitionConfig :: Mp.Map Co.EndpointId [Co.TabletShape]
 partitionConfig = Mp.fromList [
   (Co.EndpointId "172.18.0.3", [
-    Co.PartitionShape (Co.Path "table1") (Co.KeyRange Nothing Nothing)]),
+    Co.TabletShape (Co.TabletPath "table1") (Co.TabletKeyRange Nothing Nothing)]),
   (Co.EndpointId "172.18.0.4", [
-    Co.PartitionShape (Co.Path "table2") (Co.KeyRange Nothing (Just "j"))]),
+    Co.TabletShape (Co.TabletPath "table2") (Co.TabletKeyRange Nothing (Just "j"))]),
   (Co.EndpointId "172.18.0.5", [
-    Co.PartitionShape (Co.Path "table2") (Co.KeyRange (Just "j") Nothing),
-    Co.PartitionShape (Co.Path "table3") (Co.KeyRange Nothing (Just "d")),
-    Co.PartitionShape (Co.Path "table4") (Co.KeyRange Nothing (Just "k"))]),
+    Co.TabletShape (Co.TabletPath "table2") (Co.TabletKeyRange (Just "j") Nothing),
+    Co.TabletShape (Co.TabletPath "table3") (Co.TabletKeyRange Nothing (Just "d")),
+    Co.TabletShape (Co.TabletPath "table4") (Co.TabletKeyRange Nothing (Just "k"))]),
   (Co.EndpointId "172.18.0.6", [
-    Co.PartitionShape (Co.Path "table3") (Co.KeyRange (Just "d") (Just "p"))]),
+    Co.TabletShape (Co.TabletPath "table3") (Co.TabletKeyRange (Just "d") (Just "p"))]),
   (Co.EndpointId "172.18.0.7", [
-    Co.PartitionShape (Co.Path "table3") (Co.KeyRange (Just "p") Nothing),
-    Co.PartitionShape (Co.Path "table4") (Co.KeyRange (Just "k") Nothing)])]
+    Co.TabletShape (Co.TabletPath "table3") (Co.TabletKeyRange (Just "p") Nothing),
+    Co.TabletShape (Co.TabletPath "table4") (Co.TabletKeyRange (Just "k") Nothing)])]
 
 handleReceive
   :: Ct.Chan (Co.EndpointId, Ms.Message)
-  -> Ct.Chan (TrAc.InputAction)
+  -> Ct.Chan (TA.InputAction)
   -> IO ()
 handleReceive receiveChan iActionChan = do
   Mo.forever $ do
     (eId, msg) <- Ct.readChan receiveChan
-    Ct.writeChan iActionChan $ TrAc.Receive eId msg
+    Ct.writeChan iActionChan $ TA.Receive eId msg
 
 startTransact :: String -> String -> [String] -> IO ()
 startTransact seedStr curIP otherIPs = do
@@ -69,11 +68,11 @@ startTransact seedStr curIP otherIPs = do
       chan <- Ct.newChan
       let tabletMap' = Mp.insert partitionShape chan tabletMap
       -- Create the Transact Tablet Thread
-      Ct.forkIO $ TTT.startTransactTabletThread (Rn.mkStdGen seed) partitionShape chan connM
+      Ct.forkIO $ TT.startTabletThread (Rn.mkStdGen seed) partitionShape chan connM
       return (rg', tabletMap')
 
   -- Start Paxos handling thread
-  TrT.startTransactThread rg tabletMap iActionChan connM
+  ST.startServerThread rg tabletMap iActionChan connM
 
 main :: IO ()
 main = do

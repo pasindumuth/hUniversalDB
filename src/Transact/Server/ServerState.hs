@@ -3,15 +3,21 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Transact.Env where
+module Transact.Server.ServerState where
 
 import qualified GHC.Generics as Gn
 import qualified System.Random as Rn
 
+import qualified Transact.Server.Env as En
 import Infra.Lens
 
-data Env = Env {
-  _rand :: Rn.StdGen
+data ServerState = ServerState {
+  _env :: En.Env
 } deriving (Gn.Generic, Show)
 
-makeLenses ''Env
+makeLenses ''ServerState
+
+constructor :: Rn.StdGen -> ServerState
+constructor rand = ServerState {
+  _env = En.Env rand
+}

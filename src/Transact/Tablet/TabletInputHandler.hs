@@ -1,11 +1,11 @@
 module Transact.Tablet.TabletInputHandler where
 
-import Proto.Actions.TransactTabletActions as TTA
-import Transact.Tablet.TabletState as TTS
+import qualified Transact.Container.TabletActions as TA
+import qualified Transact.Tablet.TabletState as TS
+import Transact.Infra.State
 import Infra.Lens
-import Infra.State
 
 handleInputAction
-  :: TTA.InputAction
-  -> STTT TTS.TabletState ()
+  :: TA.InputAction
+  -> STT TS.TabletState ()
 handleInputAction input = return ()

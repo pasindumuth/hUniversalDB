@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 68b7ea222db68380628bb6ce4ac2079b0b5a2bb535c7d05a5c29b4c573665cfa
+-- hash: 4068033c22732871acd3aa719babf09c80fc822958006405d195e0385a3e407b
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -29,10 +29,11 @@ library
   exposed-modules:
       Common.MultiVersionMap
       Infra.Assert
-      Infra.Internal_State
       Infra.Lens
       Infra.Logging
       Infra.State
+      Infra.StateCore
+      Infra.StateWithTrace
       Infra.Utils
       Master.DerivedState
       Master.DerivedStateHandler
@@ -51,8 +52,6 @@ library
       Proto.Actions.MasterActions
       Proto.Actions.SlaveActions
       Proto.Actions.TabletActions
-      Proto.Actions.TransactActions
-      Proto.Actions.TransactTabletActions
       Proto.Common
       Proto.Messages
       Proto.Messages.ClientRequests
@@ -84,14 +83,19 @@ library
       Thread.MasterThread
       Thread.SlaveThread
       Thread.TabletThread
-      Thread.TransactTabletThread
-      Thread.TransactThread
-      Transact.Env
+      Transact.Container.Common
+      Transact.Container.Message
+      Transact.Container.ServerActions
+      Transact.Container.TabletActions
+      Transact.Infra.State
+      Transact.Server.Env
+      Transact.Server.ServerInputHandler
+      Transact.Server.ServerState
       Transact.Tablet.Env
       Transact.Tablet.TabletInputHandler
       Transact.Tablet.TabletState
-      Transact.TransactInputHandler
-      Transact.TransactState
+      Transact.Thread.ServerThread
+      Transact.Thread.TabletThread
   other-modules:
       Paths_hUniversalDB
   hs-source-dirs:

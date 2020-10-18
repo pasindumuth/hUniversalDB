@@ -12,6 +12,7 @@ import qualified Net.Connections as Cn
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Proto.Actions.TabletActions as TAc
 import qualified Proto.Common as Co
+import qualified Proto.Messages as Ms
 import qualified Slave.Tablet.TabletInputHandler as TIH
 import qualified Slave.Tablet.Env as En
 import qualified Slave.Tablet.TabletState as TS
@@ -29,7 +30,7 @@ startTabletThread
   :: Rn.StdGen
   -> Co.TabletId
   -> Ct.Chan (TAc.InputAction)
-  -> MV.MVar Cn.Connections
+  -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
 startTabletThread rg tabletId iActionChan connM = do
   let g = TS.constructor tabletId rg slaveEIds

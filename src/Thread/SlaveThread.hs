@@ -15,6 +15,7 @@ import qualified Net.Connections as Cn
 import qualified Proto.Actions.SlaveActions as SAc
 import qualified Proto.Actions.TabletActions as TAc
 import qualified Proto.Common as Co
+import qualified Proto.Messages as Ms
 import qualified Slave.SlaveInputHandler as SIH
 import qualified Slave.Env as En
 import qualified Slave.SlaveState as SS
@@ -34,7 +35,7 @@ type TabletMap = Mp.Map Co.TabletId (Ct.Chan TAc.InputAction)
 startSlaveThread
   :: Rn.StdGen
   -> Ct.Chan (SAc.InputAction)
-  -> MV.MVar Cn.Connections
+  -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
 startSlaveThread rg iActionChan connM = do
   let (paxosId, rg') = U.mkUID rg & _1 %~ Co.PaxosId

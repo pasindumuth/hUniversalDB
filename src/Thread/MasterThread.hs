@@ -12,6 +12,7 @@ import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
 import qualified Proto.Actions.MasterActions as MAc
 import qualified Proto.Common as Co
+import qualified Proto.Messages as Ms
 import qualified Master.MasterInputHandler as MIH
 import qualified Master.Env as En
 import qualified Master.MasterState as MS
@@ -36,7 +37,7 @@ slaveEIds  = Mp.fromList [(
 startMasterThread
   :: Rn.StdGen
   -> Ct.Chan (MAc.InputAction)
-  -> MV.MVar Cn.Connections
+  -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
 startMasterThread rg iActionChan connM = do
   let (paxosId, rg') = U.mkUID rg & _1 %~ Co.PaxosId

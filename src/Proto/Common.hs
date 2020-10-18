@@ -24,21 +24,6 @@ newtype RequestId = RequestId { getRequestId :: String } deriving (Gn.Generic, D
 -- Note that this means that Path encompasses both the table name and the database name.
 newtype Path = Path { getPath :: String } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
 
--- This represents a subset of keys: [startKey, endKey). If startKey/endKey
--- are Nothing, there is no lower/upper bound.
-data KeyRange = KeyRange {
-  _startKey :: Maybe String,
-  _endKey :: Maybe String
-} deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
-
--- This globally identifies a partition of a table of a database at a given
--- moment in time in a whole deployment of hUniversalDB. Recall that a
--- deployment is a database cluster.
-data PartitionShape = PartitionShape {
-  _path :: Path,
-  _range :: KeyRange
-} deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
-
 type Timestamp = Int
 type Lat = Timestamp
 type Key = String
