@@ -5,7 +5,8 @@
 
 module Transact.Container.Common (
   module Transact.Container.Common,
-  Co.EndpointId (Co.EndpointId)
+  Co.EndpointId (Co.EndpointId),
+  Co.RequestId (Co.RequestId)
 ) where
 
 import qualified Data.Binary as Bn
@@ -15,9 +16,6 @@ import qualified GHC.Generics as Gn
 import qualified Proto.Common as Co
 
 import Infra.Lens
-
--- Client messages have annontated with them a RequestId to identify them throughout.
-newtype RequestId = RequestId { getRequestId :: String } deriving (Gn.Generic, Df.Default, Bn.Binary, Show, Eq, Ord)
 
 -- This globally identifies a table of a database in a whole deployment of hUniversalDB.
 -- Note that this means that TabletPath encompasses both the table name and the database name.

@@ -83,10 +83,9 @@ library
       Thread.MasterThread
       Thread.SlaveThread
       Thread.TabletThread
+      Transact.Container.Actions
       Transact.Container.Common
       Transact.Container.Message
-      Transact.Container.ServerActions
-      Transact.Container.TabletActions
       Transact.Infra.State
       Transact.Server.Env
       Transact.Server.ServerInputHandler

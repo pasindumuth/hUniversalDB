@@ -9,9 +9,9 @@ import qualified Data.Maybe as Mb
 import qualified System.Random as Rn
 
 import qualified Net.Connections as Cn
+import qualified Transact.Container.Actions as Ac
 import qualified Transact.Container.Common as Co
 import qualified Transact.Container.Message as Ms
-import qualified Transact.Container.TabletActions as TA
 import qualified Transact.Tablet.Env as En
 import qualified Transact.Tablet.TabletInputHandler as TIH
 import qualified Transact.Tablet.TabletState as TS
@@ -30,7 +30,7 @@ transactEIds = [
 startTabletThread
   :: Rn.StdGen
   -> Co.TabletShape
-  -> Ct.Chan (TA.InputAction)
+  -> Ct.Chan (Ac.T'InputAction)
   -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
 startTabletThread rg partitionShapes iActionChan connM = do
@@ -45,8 +45,8 @@ startTabletThread rg partitionShapes iActionChan connM = do
       conn <- MV.readMVar connM
       Mo.forM_ oActions $ \action ->
         case action of
-          TA.Send eIds msg -> Mo.forM_ eIds $
+          Ac.T'Send eIds msg -> Mo.forM_ eIds $
             \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-          TA.Print message -> do
+          Ac.T'Print message -> do
             putStrLn message
       handleMessage g'

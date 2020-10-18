@@ -10,10 +10,9 @@ import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
+import qualified Transact.Container.Actions as Ac
 import qualified Transact.Container.Common as Co
 import qualified Transact.Container.Message as Ms
-import qualified Transact.Container.ServerActions as SA
-import qualified Transact.Container.TabletActions as TA
 import qualified Transact.Server.ServerInputHandler as TIH
 import qualified Transact.Server.ServerState as TS
 import Transact.Infra.State
@@ -27,12 +26,12 @@ transactEIds = [
   Co.EndpointId "172.18.1.7"]
 
 -- The keys are the chans used to forward messages to the Transact Tablets.
-type TabletMap = Mp.Map Co.TabletShape (Ct.Chan TA.InputAction)
+type TabletMap = Mp.Map Co.TabletShape (Ct.Chan Ac.T'InputAction)
 
 startServerThread
   :: Rn.StdGen
   -> TabletMap
-  -> Ct.Chan (SA.InputAction)
+  -> Ct.Chan (Ac.S'InputAction)
   -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
 startServerThread rg tabletMap iActionChan connM = do
@@ -46,13 +45,13 @@ startServerThread rg tabletMap iActionChan connM = do
       conn <- MV.readMVar connM
       Mo.forM_ oActions $ \action ->
         case action of
-          SA.Send eIds msg -> do
+          Ac.S'Send eIds msg -> do
             Mo.forM_ eIds $ \eId -> Mp.lookup eId conn & Mb.fromJust $ msg
-          SA.Print message -> do
+          Ac.S'Print message -> do
             putStrLn message
             return ()
-          SA.TabletForward tabletId eId msg -> do
+          Ac.S'TabletForward tabletId eId msg -> do
             let tabletIActionChan = tabletMap ^?! ix tabletId
-            Ct.writeChan tabletIActionChan $ TA.Receive eId msg
+            Ct.writeChan tabletIActionChan $ Ac.T'Receive eId msg
             return ()
       handleMessage g'

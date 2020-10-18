@@ -10,7 +10,7 @@ import qualified System.Random as Rn
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
-import qualified Transact.Container.ServerActions as TA
+import qualified Transact.Container.Actions as Ac
 import qualified Transact.Container.Common as Co
 import qualified Transact.Container.Message as Ms
 import qualified Transact.Thread.ServerThread as ST
@@ -35,12 +35,12 @@ partitionConfig = Mp.fromList [
 
 handleReceive
   :: Ct.Chan (Co.EndpointId, Ms.Message)
-  -> Ct.Chan (TA.InputAction)
+  -> Ct.Chan (Ac.S'InputAction)
   -> IO ()
 handleReceive receiveChan iActionChan = do
   Mo.forever $ do
     (eId, msg) <- Ct.readChan receiveChan
-    Ct.writeChan iActionChan $ TA.Receive eId msg
+    Ct.writeChan iActionChan $ Ac.S'Receive eId msg
 
 startTransact :: String -> String -> [String] -> IO ()
 startTransact seedStr curIP otherIPs = do

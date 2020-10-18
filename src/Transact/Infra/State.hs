@@ -5,10 +5,9 @@ module Transact.Infra.State (
   module Infra.StateWithTrace
 ) where
 
-import Transact.Container.ServerActions as SA
-import Transact.Container.TabletActions as TA
+import Transact.Container.Actions as Ac
 import Infra.StateWithTrace
 
 -- Specific versions of ST
-type STS s a = ST SA.OutputAction s a -- For Transact Server
-type STT s a = ST TA.OutputAction s a -- For Transact Tablet
+type STS s a = ST Ac.S'OutputAction s a -- For Transact Server
+type STT s a = ST Ac.T'OutputAction s a -- For Transact Tablet
