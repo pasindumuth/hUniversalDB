@@ -71,3 +71,6 @@ mkUID rg =
 
 foldM :: (Foldable t, Monad m) => b -> t a -> (b -> a -> m b) -> m b
 foldM = s31 Mo.foldM
+
+fold :: Foldable t => b -> t a -> (b -> a -> b) -> b
+fold = s31 Prelude.foldl

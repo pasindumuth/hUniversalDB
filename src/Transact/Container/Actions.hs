@@ -12,9 +12,9 @@ import qualified GHC.Generics as Gn
 import qualified Transact.Container.Common as Co
 import qualified Transact.Container.Message as Ms
 
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 -- Server Actions
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 data S'InputAction =
   S'Receive { eId :: Co.EndpointId, msg :: Ms.Message }
   deriving (Gn.Generic, Bn.Binary, Show)
@@ -25,9 +25,9 @@ data S'OutputAction =
   S'TabletForward { tabletId :: Co.TabletShape, eId :: Co.EndpointId, msg :: Ms.Message }
   deriving (Gn.Generic, Bn.Binary, Show)
 
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 -- Tablet Actions
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 data T'InputAction =
   T'Receive { eId :: Co.EndpointId, msg :: Ms.Message }
   deriving (Gn.Generic, Bn.Binary, Show)

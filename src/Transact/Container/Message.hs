@@ -14,9 +14,9 @@ import qualified Transact.Container.Common as Co
 -- union of other Types T. The Value Constructor name is T'. We don't
 -- need ' when the Value Constructors are complex, like Fw'Metadata.
 
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 -- Client Messages
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 data Cl'Request = Cl'Request deriving (Gn.Generic, Bn.Binary, Show)
 data Cl'Response = Cl'Response deriving (Gn.Generic, Bn.Binary, Show)
 
@@ -27,9 +27,9 @@ data Cl'Payload =
 
 data Cl'Message = Cl'Message Cl'Payload deriving (Gn.Generic, Bn.Binary, Show)
 
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 -- Forwarded Messages
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 data Fw'Metadata =
   Fw'OriginEndpoint Co.EndpointId |
   Fw'OriginRequest Co.RequestId Cl'Request
@@ -45,9 +45,9 @@ data Fw'Payload =
 
 data Fw'Message = Fw'Message Fw'Metadata Fw'Payload deriving (Gn.Generic, Bn.Binary, Show)
 
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 -- Top Level Message
---------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------------------
 data Message =
   Client' Cl'Message |
   Forwarded' Fw'Message
