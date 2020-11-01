@@ -5,10 +5,7 @@
 
 module Common.RelationalTablet where
 
-import qualified Data.Binary as Bn
-import qualified Data.Default as Df
-import qualified GHC.Generics as Gn
-
+import qualified Common.Model.RelationalTablet as RT
 import qualified Common.MultiVersionMap as MVM
 import qualified Infra.Utils as U
 import qualified Proto.Common as Co
@@ -30,29 +27,10 @@ import Infra.Lens
 -- SQL terms).
 
 ------------------------------------------------------------------------------------------------------------------------
--- Column Description Types
-------------------------------------------------------------------------------------------------------------------------
-data ColumnType =
-  CT'String |
-  CT'Int |
-  CT'Double |
-  CT'Bool |
-  CT'Empty
-  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
-
-data ColumnValue =
-  CV'String String |
-  CV'Int Int |
-  CV'Double Double |
-  CV'Bool Bool |
-  CV'Empty ()
-  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
-
-------------------------------------------------------------------------------------------------------------------------
 -- Relational Tablet
 ------------------------------------------------------------------------------------------------------------------------
-type TabletStorage = MVM.MultiVersionMap ([ColumnValue], Maybe String) ColumnValue
-type Schema = [(String, ColumnType, Bool)]
+type TabletStorage = MVM.MultiVersionMap ([RT.ColumnValue], Maybe String) RT.ColumnValue
+type Schema = [(String, RT.ColumnType, Bool)]
 
 -- In this schema definition, the bool at the end indicates if the
 -- if the column is a primary key column.
@@ -63,15 +41,15 @@ data RelationalTablet = RelationalTablet {
 
 makeLenses ''RelationalTablet
 
--- Checks if the ColumnValue has the type that's indicated by the ColumnType.
-checkTypeMatch :: ColumnType -> ColumnValue -> Bool
+-- Checks if the RT.ColumnValue has the type that's indicated by the RT.ColumnType.
+checkTypeMatch :: RT.ColumnType -> RT.ColumnValue -> Bool
 checkTypeMatch columnType columnValue =
   case (columnType, columnValue) of
-    (CT'String, CV'String _) -> True
-    (CT'Int, CV'Int _) -> True
-    (CT'Double, CV'Double _) -> True
-    (CT'Bool, CV'Bool _) -> True
-    (CT'Empty, CV'Empty _) -> True
+    (RT.CT'String, RT.CV'String _) -> True
+    (RT.CT'Int, RT.CV'Int _) -> True
+    (RT.CT'Double, RT.CV'Double _) -> True
+    (RT.CT'Bool, RT.CV'Bool _) -> True
+    (RT.CT'Empty, RT.CV'Empty _) -> True
     _ -> False
 
 ------------------------------------------------------------------------------------------------------------------------
@@ -85,8 +63,8 @@ checkTypeMatch columnType columnValue =
 -- conforms to the schema.
 checkPrimaryKey
   :: Schema
-  -> [ColumnValue]
-  -> Either String [ColumnValue]
+  -> [RT.ColumnValue]
+  -> Either String [RT.ColumnValue]
 checkPrimaryKey schema primaryKey =
   case schema of
     ((columnName, columnType, isPrimary):r'schema) ->
@@ -110,14 +88,14 @@ checkPrimaryKey schema primaryKey =
 insertRow
   :: RelationalTablet -- ^ The RelationalTablet to be modified.
   -> Co.Timestamp -- ^ The timestamp to insert.
-  -> [ColumnValue] -- ^ The full row, with an element for every column, in the
+  -> RT.Row -- ^ The full row, with an element for every column, in the
                    -- order corresponding to the tablet schema (otherwise an
                    -- error is returned).
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
-insertRow tablet timestamp row = do
+insertRow tablet timestamp (RT.Row row) = do
   (primaryKeyRev, nonPrimaryKeys) <- extractPrimary (tablet ^. i'schema) row [] []
   let primaryKey = reverse primaryKeyRev
-      (_, storage') = MVM.write (primaryKey, Nothing) (Just $ CV'Empty ()) timestamp (tablet ^. i'storage)
+      (_, storage') = MVM.write (primaryKey, Nothing) (Just $ RT.CV'Empty ()) timestamp (tablet ^. i'storage)
       storage'' = insertColumns storage' primaryKey nonPrimaryKeys
   return $ tablet & i'storage .~ storage''
   where
@@ -148,11 +126,11 @@ insertRow tablet timestamp row = do
 deleteRow
   :: RelationalTablet -- ^ The RelationalTablet to be modified.
   -> Co.Timestamp -- ^ The timestamp to insert.
-  -> [ColumnValue] -- ^ The primary key to delete. The elements must be sorted in the
+  -> RT.PrimaryKey -- ^ The primary key to delete. The elements must be sorted in the
                    -- same order that they appear in the table schema. (otherwise an
                    -- error is returned).
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
-deleteRow tablet timestamp primaryKey = do
+deleteRow tablet timestamp (RT.PrimaryKey primaryKey) = do
   primaryKey <- checkPrimaryKey (tablet ^. i'schema) primaryKey
   let nonPrimaryKeys = getNonPrimaryKeyNames (tablet ^. i'schema) []
       (_, storage') = MVM.write (primaryKey, Nothing) Nothing timestamp (tablet ^. i'storage)
@@ -174,14 +152,14 @@ deleteRow tablet timestamp primaryKey = do
 updateColumn
   :: RelationalTablet -- ^ The RelationalTablet to be modified.
   -> Co.Timestamp -- ^ The timestamp to insert.
-  -> [ColumnValue] -- ^ The primary key to update. The elements must be sorted in the
+  -> RT.PrimaryKey -- ^ The primary key to update. The elements must be sorted in the
                    -- same order that they appear in the table schema. (otherwise an
                    -- error is returned).
   -> String -- ^ The name of the column to update
-  -> Maybe ColumnValue -- ^ The value to update to. Recall that a Nothing value
+  -> Maybe RT.ColumnValue -- ^ The value to update to. Recall that a Nothing value
                        -- means NULL (in SQL terms).
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
-updateColumn tablet timestamp primaryKey columnName columnValueM = do
+updateColumn tablet timestamp (RT.PrimaryKey primaryKey) columnName columnValueM = do
   primaryKey <- checkPrimaryKey (tablet ^. i'schema) primaryKey
   let (_, storage') = MVM.write (primaryKey, Just columnName) columnValueM timestamp (tablet ^. i'storage)
   return $ tablet & i'storage .~ storage'

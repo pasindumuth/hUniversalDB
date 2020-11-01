@@ -8,47 +8,82 @@ module Transact.Container.Message where
 import qualified Data.Binary as Bn
 import qualified GHC.Generics as Gn
 
+import qualified Common.Model.RelationalTablet as RT
 import qualified Transact.Container.Common as Co
--- Conventions: Forwarded Messages is the best example. Notice the use of
--- ' for the Value Constructors of Types that are supposed to be a simple
--- union of other Types T. The Value Constructor name is T'. We don't
--- need ' when the Value Constructors are complex, like Fw'Metadata.
+
+-- Conventions: Forwarded Messages is the best example. The main rule here
+-- is that if we have a Type Constructor like T T in a type S, then we should
+-- change it to T' T. This is because generally, Type Constructor T might
+-- be used as in the definition of Type T. For consistency, we always leave
+-- the Type Constructor T for this purpose. The second, more obvious rules
+-- is that we should qualify every symbol with it's namespace.
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Client Messages
 ------------------------------------------------------------------------------------------------------------------------
-data Cl'Request = Cl'Request deriving (Gn.Generic, Bn.Binary, Show)
-data Cl'Response = Cl'Response deriving (Gn.Generic, Bn.Binary, Show)
+-- These are the messages that are sent by the client.
 
-data Cl'Payload =
-  Cl'Request' Cl'Request |
-  Cl'Response' Cl'Response
-  deriving (Gn.Generic, Bn.Binary, Show)
+data Cl'Request = Cl'Request deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+data Cl'Response = Cl'Response deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
-data Cl'Message = Cl'Message Cl'Payload deriving (Gn.Generic, Bn.Binary, Show)
+data Cl'Payload
+  = Cl'Request' Cl'Request
+  | Cl'Response' Cl'Response
+  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+data Cl'Message = Cl'Message Cl'Payload deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Forwarded Messages
 ------------------------------------------------------------------------------------------------------------------------
-data Fw'Metadata =
-  Fw'OriginEndpoint Co.EndpointId |
-  Fw'OriginRequest Co.RequestId Cl'Request
-  deriving (Gn.Generic, Bn.Binary, Show)
+-- These are client messages that were forwarded from the node
+-- that received the message to some other node that can actually
+-- handle the client message.
 
-data Fw'Request = Fw'Request deriving (Gn.Generic, Bn.Binary, Show)
-data Fw'Response = Fw'Response deriving (Gn.Generic, Bn.Binary, Show)
+data Fw'Metadata
+  = Fw'OriginEndpoint Co.EndpointId
+  | Fw'OriginRequest Co.RequestId Cl'Request
+  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
-data Fw'Payload =
-  Fw'Request' Fw'Request |
-  Fw'Response' Fw'Response
-  deriving (Gn.Generic, Bn.Binary, Show)
+data Fw'Request = Fw'Request deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+data Fw'Response = Fw'Response deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
-data Fw'Message = Fw'Message Fw'Metadata Fw'Payload deriving (Gn.Generic, Bn.Binary, Show)
+data Fw'Payload
+  = Fw'Request' Fw'Request
+  | Fw'Response' Fw'Response
+  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+data Fw'Message = Fw'Message Fw'Metadata Fw'Payload deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+------------------------------------------------------------------------------------------------------------------------
+-- Admin Messages
+------------------------------------------------------------------------------------------------------------------------
+-- These are messages sent by the administrators of the system.
+-- This is a back door for forcefully modifying the system. These
+-- messages give the power for admins to add/delete data non-transactionally,
+-- among other things. Integration tests can conveniently use these messages
+-- to setup the system to a desirable state.
+
+data Ad'Request
+  = Ad'Insert RT.Row -- ^ Contains the row to insert.
+  | Ad'Update RT.PrimaryKey String RT.ColumnValue -- ^ Contains the the primaryKey, column
+                                                  -- to update and value to update it to.
+  | Ad'Delete RT.PrimaryKey -- ^ Contains the primaryKey of the row to delete.
+  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+data Ad'Response = Ad'Response deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+data Ad'Payload
+  = Ad'Request' Ad'Request
+  | Ad'Response' Ad'Response
+  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+data Ad'Message = Ad'Message Ad'Payload deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Top Level Message
 ------------------------------------------------------------------------------------------------------------------------
-data Message =
-  Client' Cl'Message |
-  Forwarded' Fw'Message
-  deriving (Gn.Generic, Bn.Binary, Show)
+data Message
+  = Client Cl'Message
+  | Forwarded Fw'Message
+  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
