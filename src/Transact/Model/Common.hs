@@ -6,7 +6,8 @@
 module Transact.Model.Common (
   module Transact.Model.Common,
   Co.EndpointId (Co.EndpointId),
-  Co.RequestId (Co.RequestId)
+  Co.RequestId (Co.RequestId),
+  Co.Timestamp
 ) where
 
 import qualified Data.Binary as Bn

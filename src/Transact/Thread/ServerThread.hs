@@ -30,14 +30,15 @@ transactEIds = [
 type TabletMap = Mp.Map Co.TabletShape (Ct.Chan Ac.T'InputAction)
 
 startServerThread
-  :: [(RT.Schema, Co.TabletShape)]
-  -> Rn.StdGen
+  :: Rn.StdGen
+  -> [(RT.Schema, Co.TabletShape)]
   -> TabletMap
   -> Ct.Chan (Ac.S'InputAction)
   -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
-startServerThread shapesWithSchema rg tabletMap iActionChan connM = do
-  let g = TS.constructor shapesWithSchema rg
+startServerThread rg shapesWithSchema tabletMap iActionChan connM = do
+  print $ "Starting TransactServerThread with partitionShape: " ++ (show shapesWithSchema)
+  let g = TS.constructor rg shapesWithSchema
   handleMessage g
   where
     handleMessage :: TS.ServerState -> IO ()

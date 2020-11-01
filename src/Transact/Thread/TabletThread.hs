@@ -8,6 +8,7 @@ import qualified Data.Map as Mp
 import qualified Data.Maybe as Mb
 import qualified System.Random as Rn
 
+import qualified Common.Model.RelationalTablet as RTT
 import qualified Net.Connections as Cn
 import qualified Transact.Model.Actions as Ac
 import qualified Transact.Model.Common as Co
@@ -29,13 +30,14 @@ transactEIds = [
 -- KeyRange of the Tablet is specified by PartitionShape.
 startTabletThread
   :: Rn.StdGen
+  -> RTT.Schema
   -> Co.TabletShape
   -> Ct.Chan (Ac.T'InputAction)
   -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
-startTabletThread rg partitionShapes iActionChan connM = do
+startTabletThread rg schema partitionShapes iActionChan connM = do
   print $ "Starting TransactTabletThread with partitionShape: " ++ (show partitionShapes)
-  let g = TS.constructor rg
+  let g = TS.constructor rg schema
   handleMessage g
   where
     handleMessage :: TS.TabletState -> IO ()

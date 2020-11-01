@@ -14,17 +14,17 @@ import qualified Transact.Server.Env as En
 import Infra.Lens
 
 data ServerState = ServerState {
-  _shapesWithSchema :: [(RT.Schema, Co.TabletShape)],
-  _env :: En.Env
+  _env :: En.Env,
+  _shapesWithSchema :: [(RT.Schema, Co.TabletShape)]
 } deriving (Gn.Generic, Show)
 
 makeLenses ''ServerState
 
 constructor
-  :: [(RT.Schema, Co.TabletShape)]
-  -> Rn.StdGen
+  :: Rn.StdGen
+  -> [(RT.Schema, Co.TabletShape)]
   -> ServerState
-constructor shapesWithSchema rand = ServerState {
-  _shapesWithSchema = shapesWithSchema,
-  _env = En.Env rand
+constructor rand shapesWithSchema = ServerState {
+  _env = En.Env rand,
+  _shapesWithSchema = shapesWithSchema
 }

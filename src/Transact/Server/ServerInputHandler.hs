@@ -26,9 +26,12 @@ handleInputAction input =
           case payload of
             Ms.Ad'Request' request -> do
               res <- case request of
-                Ms.Ad'Insert path row -> SS.shapesWithSchema .^^^ findTabletShape path row
-                Ms.Ad'Update path primaryKey _ _ -> SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
-                Ms.Ad'Delete path primaryKey ->  SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
+                Ms.Ad'Insert path row _ ->
+                  SS.shapesWithSchema .^^^ findTabletShape path row
+                Ms.Ad'Update path primaryKey _ _ _ ->
+                  SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
+                Ms.Ad'Delete path primaryKey _ ->
+                  SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
               case res of
                 Right tabletShape -> addA $ Ac.S'TabletForward tabletShape eId msg
                 Left _ -> error "Admin shouldn't sent a message that a slave can't handle."

@@ -5,6 +5,8 @@
 
 module Common.RelationalTablet where
 
+import qualified GHC.Generics as Gn
+
 import qualified Common.Model.RelationalTablet as RT
 import qualified Common.MultiVersionMap as MVM
 import qualified Infra.Utils as U
@@ -36,7 +38,7 @@ type TabletStorage = MVM.MultiVersionMap ([RT.ColumnValue], Maybe String) RT.Col
 data RelationalTablet = RelationalTablet {
   _i'schema :: RT.Schema,
   _i'storage :: TabletStorage
-}
+}  deriving (Gn.Generic, Show)
 
 makeLenses ''RelationalTablet
 
