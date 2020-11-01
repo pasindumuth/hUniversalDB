@@ -76,7 +76,8 @@ startTransact seedStr curIP otherIPs = do
   -- Initialize all tablet threads based on the Partitions that this Transact node should
   -- be managing. This also returns tabletMap, which is how the main Transact Thread forwards
   -- messages to the Transact Tablet Threads.
-  (rg, tabletMap) <- U.foldM (Rn.mkStdGen $ read seedStr, Mp.empty) (partitionConfig ^?! ix (Co.EndpointId curIP)) $
+  let tabletShapes = partitionConfig ^?! ix (Co.EndpointId curIP)
+  (rg, tabletMap) <- U.foldM (Rn.mkStdGen $ read seedStr, Mp.empty) tabletShapes $
     \(rg, tabletMap) partitionShape -> do
       let (seed, rg') = Rn.random rg
       chan <- Ct.newChan
@@ -86,7 +87,8 @@ startTransact seedStr curIP otherIPs = do
       return (rg', tabletMap')
 
   -- Start Paxos handling thread
-  ST.startServerThread rg tabletMap iActionChan connM
+  let shapesWithSchema = U.map tabletShapes $ \s -> (schema, s)
+  ST.startServerThread shapesWithSchema rg tabletMap iActionChan connM
 
 main :: IO ()
 main = do

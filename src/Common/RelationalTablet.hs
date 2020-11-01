@@ -57,27 +57,51 @@ checkTypeMatch columnType columnValue =
     (RT.CT'Empty, RT.CV'Empty _) -> True
     _ -> False
 
+-- | Split the row into it's primary key and remaining column values
+-- according to the schema passed in.
+extractPrimary
+  :: RT.Row
+  -> RT.Schema
+  -> Either String (RT.PrimaryKey, [(String, RT.ColumnValue)])
+extractPrimary (RT.Row row) (RT.Schema originalSchema) = do
+  (primaryKey, nonPrimaryKeys) <- extractPrimaryR row originalSchema [] []
+  return (RT.PrimaryKey primaryKey, nonPrimaryKeys)
+  where
+    extractPrimaryR row schema primaryKey nonPrimaryKeys =
+      case (schema, row) of
+        (((columnName, columnType, isPrimary):r'schema), (columnValue:r'row)) ->
+          if checkTypeMatch columnType columnValue
+            then
+              if isPrimary
+                then extractPrimaryR r'row r'schema (columnValue:primaryKey) nonPrimaryKeys
+                else extractPrimaryR r'row r'schema primaryKey ((columnName, columnValue):nonPrimaryKeys)
+            else Left $ "columnValue " ++ (show columnValue)
+                     ++ " does not match columnType " ++ (show columnType)
+        ([], []) -> Right (primaryKey, nonPrimaryKeys)
+        _ -> Left $ "Number of entries in row " ++ (show row)
+                 ++ " does not match the schema " ++ (show originalSchema)
+
 -- | A helper function that makes sure the primary key actually
 -- conforms to the schema.
 checkPrimaryKey
-  :: RT.Schema
-  -> RT.PrimaryKey
+  :: RT.PrimaryKey
+  -> RT.Schema
   -> Either String RT.PrimaryKey
-checkPrimaryKey (RT.Schema schema) (RT.PrimaryKey primaryKey) = do
-  primaryKey <- checkPrimaryKeyR schema primaryKey
+checkPrimaryKey (RT.PrimaryKey primaryKey) (RT.Schema schema) = do
+  primaryKey <- checkPrimaryKeyR primaryKey schema
   return $ RT.PrimaryKey primaryKey
   where
-    checkPrimaryKeyR schema primaryKey =
+    checkPrimaryKeyR primaryKey schema =
       case schema of
         ((columnName, columnType, isPrimary):r'schema) ->
           case (isPrimary, primaryKey) of
             (True, []) -> Left $ "Not enough elements the primaryKey."
             (True, (columnValue:r'primaryKey)) ->
               if checkTypeMatch columnType columnValue
-                then checkPrimaryKeyR r'schema r'primaryKey
+                then checkPrimaryKeyR r'primaryKey r'schema
                 else Left $ "columnValue " ++ (show columnValue)
                          ++ " does not match columnType " ++ (show columnType)
-            (False, _) -> checkPrimaryKeyR r'schema primaryKey
+            (False, _) -> checkPrimaryKeyR primaryKey r'schema
         [] ->
           case primaryKey of
             (_:_) -> Left $ "Too many elements in the primaryKey."
@@ -95,32 +119,19 @@ checkPrimaryKey (RT.Schema schema) (RT.PrimaryKey primaryKey) = do
 -- Lats for the given primary key, and a row with the given primary key doesn't
 -- already exist.
 insertRow
-  :: RelationalTablet -- ^ The RelationalTablet to be modified.
-  -> Co.Timestamp -- ^ The timestamp to insert.
+  :: Co.Timestamp -- ^ The timestamp to insert.
   -> RT.Row -- ^ The full row, with an element for every column, in the
-                   -- order corresponding to the tablet schema (otherwise an
-                   -- error is returned).
+            -- order corresponding to the tablet schema (otherwise an
+            -- error is returned).
+  -> RelationalTablet -- ^ The RelationalTablet to be modified.
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
-insertRow tablet timestamp (RT.Row row) = do
-  (primaryKeyRev, nonPrimaryKeys) <- extractPrimary (RT.getSchema $ tablet ^. i'schema) row [] []
+insertRow timestamp row tablet = do
+  (RT.PrimaryKey primaryKeyRev, nonPrimaryKeys) <- extractPrimary row (tablet ^. i'schema)
   let primaryKey = reverse primaryKeyRev
       (_, storage') = MVM.write (primaryKey, Nothing) (Just $ RT.CV'Empty ()) timestamp (tablet ^. i'storage)
       storage'' = insertColumns storage' primaryKey nonPrimaryKeys
   return $ tablet & i'storage .~ storage''
   where
-    extractPrimary schema row primaryKey nonPrimaryKeys =
-      case (schema, row) of
-        (((columnName, columnType, isPrimary):r'schema), (columnValue:r'row)) ->
-          if checkTypeMatch columnType columnValue
-            then
-              if isPrimary
-                then extractPrimary r'schema r'row (columnValue:primaryKey) nonPrimaryKeys
-                else extractPrimary r'schema r'row primaryKey ((columnName, columnValue):nonPrimaryKeys)
-            else Left $ "columnValue " ++ (show columnValue)
-                     ++ " does not match columnType " ++ (show columnType)
-        ([], []) -> Right (primaryKey, nonPrimaryKeys)
-        _ -> Left $ "Number of entries in row " ++ (show row)
-                 ++ " does not match the schema " ++ (show $ tablet ^. i'schema)
     insertColumns storage primaryKey nonPrimaryKeys =
       case nonPrimaryKeys of
         ((columnName, columnValue):r'nonPrimaryKeys) ->
@@ -133,14 +144,14 @@ insertRow tablet timestamp (RT.Row row) = do
 -- Lats for the given primary key, and a row with the given primary key
 -- already exists.
 deleteRow
-  :: RelationalTablet -- ^ The RelationalTablet to be modified.
-  -> Co.Timestamp -- ^ The timestamp to insert.
+  :: Co.Timestamp -- ^ The timestamp to insert.
   -> RT.PrimaryKey -- ^ The primary key to delete. The elements must be sorted in the
                    -- same order that they appear in the table schema. (otherwise an
                    -- error is returned).
+  -> RelationalTablet -- ^ The RelationalTablet to be modified.
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
-deleteRow tablet timestamp primaryKey = do
-  (RT.PrimaryKey primaryKey) <- checkPrimaryKey (tablet ^. i'schema) primaryKey
+deleteRow timestamp primaryKey tablet = do
+  (RT.PrimaryKey primaryKey) <- checkPrimaryKey primaryKey (tablet ^. i'schema)
   let nonPrimaryKeys = getNonPrimaryKeyNames (RT.getSchema $ tablet ^. i'schema) []
       (_, storage') = MVM.write (primaryKey, Nothing) Nothing timestamp (tablet ^. i'storage)
       storage'' = U.fold storage' nonPrimaryKeys $ \storage' nonPrimaryKey ->
@@ -159,16 +170,16 @@ deleteRow tablet timestamp primaryKey = do
 -- a valid operation; the timestamp is greater than the timestamps of all column
 -- Lats for the given primary key.
 updateColumn
-  :: RelationalTablet -- ^ The RelationalTablet to be modified.
-  -> Co.Timestamp -- ^ The timestamp to insert.
+  :: Co.Timestamp -- ^ The timestamp to insert.
   -> RT.PrimaryKey -- ^ The primary key to update. The elements must be sorted in the
                    -- same order that they appear in the table schema. (otherwise an
                    -- error is returned).
   -> String -- ^ The name of the column to update
   -> Maybe RT.ColumnValue -- ^ The value to update to. Recall that a Nothing value
-                       -- means NULL (in SQL terms).
+                          -- means NULL (in SQL terms).
+  -> RelationalTablet -- ^ The RelationalTablet to be modified.
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
-updateColumn tablet timestamp primaryKey columnName columnValueM = do
-  (RT.PrimaryKey primaryKey) <- checkPrimaryKey (tablet ^. i'schema) primaryKey
+updateColumn timestamp primaryKey columnName columnValueM tablet = do
+  (RT.PrimaryKey primaryKey) <- checkPrimaryKey primaryKey (tablet ^. i'schema)
   let (_, storage') = MVM.write (primaryKey, Just columnName) columnValueM timestamp (tablet ^. i'storage)
   return $ tablet & i'storage .~ storage'

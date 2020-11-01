@@ -8,6 +8,7 @@ import qualified Data.Map as Mp
 import qualified Data.Maybe as Mb
 import qualified System.Random as Rn
 
+import qualified Common.Model.RelationalTablet as RT
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
 import qualified Transact.Model.Actions as Ac
@@ -29,13 +30,14 @@ transactEIds = [
 type TabletMap = Mp.Map Co.TabletShape (Ct.Chan Ac.T'InputAction)
 
 startServerThread
-  :: Rn.StdGen
+  :: [(RT.Schema, Co.TabletShape)]
+  -> Rn.StdGen
   -> TabletMap
   -> Ct.Chan (Ac.S'InputAction)
   -> MV.MVar (Cn.Connections Ms.Message)
   -> IO ()
-startServerThread rg tabletMap iActionChan connM = do
-  let g = TS.constructor rg
+startServerThread shapesWithSchema rg tabletMap iActionChan connM = do
+  let g = TS.constructor shapesWithSchema rg
   handleMessage g
   where
     handleMessage :: TS.ServerState -> IO ()

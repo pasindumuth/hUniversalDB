@@ -55,7 +55,7 @@ newlyAddedEntries :: PaxosLog -> PaxosLog -> [(M.IndexT, M.PaxosLogEntry)]
 newlyAddedEntries pl pl' =
   let index = pl & nextAvailableIndex
       index' = pl' & nextAvailableIndex
-  in U.for [index .. index' - 1] $ \i -> (i, pl' ^. i'plog . at i & Mb.fromJust)
+  in U.map [index .. index' - 1] $ \i -> (i, pl' ^. i'plog . at i & Mb.fromJust)
 
 plog :: PaxosLog -> Mp.Map M.IndexT M.PaxosLogEntry
 plog pl = pl ^. i'plog

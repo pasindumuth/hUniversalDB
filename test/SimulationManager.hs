@@ -50,17 +50,17 @@ numPerGroup :: Int = 5
 
 createTestState :: Int -> Int -> Int -> Tt.TestState
 createTestState seed numSlaveGroups numClients =
-  let masterEIds = U.for
+  let masterEIds = U.map
         [0..(numPerGroup - 1)] $ mkMasterEId
-      slaveGroupEIds = Mp.fromList $ U.for
-        [0..(numSlaveGroups - 1)] $ \i -> (mkSlaveGroupId i, U.for
+      slaveGroupEIds = Mp.fromList $ U.map
+        [0..(numSlaveGroups - 1)] $ \i -> (mkSlaveGroupId i, U.map
         [0..(numPerGroup - 1)] $ \j -> mkSlaveEId i j)
       allSlaveEIds = Mp.foldl (\slaveEIds eIds -> slaveEIds ++ eIds) [] slaveGroupEIds
-      clientEIds = U.for
+      clientEIds = U.map
         [0..(numClients - 1)] $ mkClientEId
       eIds = masterEIds ++ allSlaveEIds ++ clientEIds
-      queues = Mp.fromList $ U.for eIds $ \eId1 ->
-        (eId1, Mp.fromList $ U.for eIds $ \eId2 ->
+      queues = Mp.fromList $ U.map eIds $ \eId1 ->
+        (eId1, Mp.fromList $ U.map eIds $ \eId2 ->
         (eId2, Sq.empty))
       nonemptyQueues = St.empty
       rand = Rn.mkStdGen seed
@@ -80,11 +80,11 @@ createTestState seed numSlaveGroups numClients =
                   g = SS.constructor slaveGroupId slavePId (Rn.mkStdGen r) slaveEIds
               in ((eId, g):slaves, rand')
       slaveState = Mp.fromList slaves
-      tabletStates = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Mp.empty)
-      masterAsyncQueues = Mp.fromList $ U.for masterEIds $ \eId -> (eId, Sq.empty)
-      slaveAsyncQueues = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Sq.empty)
-      tabletAsyncQueues = Mp.fromList $ U.for allSlaveEIds $ \eId -> (eId, Mp.empty)
-      clocks = Mp.fromList $ U.for (masterEIds ++ allSlaveEIds) $ \eId -> (eId, 0)
+      tabletStates = Mp.fromList $ U.map allSlaveEIds $ \eId -> (eId, Mp.empty)
+      masterAsyncQueues = Mp.fromList $ U.map masterEIds $ \eId -> (eId, Sq.empty)
+      slaveAsyncQueues = Mp.fromList $ U.map allSlaveEIds $ \eId -> (eId, Sq.empty)
+      tabletAsyncQueues = Mp.fromList $ U.map allSlaveEIds $ \eId -> (eId, Mp.empty)
+      clocks = Mp.fromList $ U.map (masterEIds ++ allSlaveEIds) $ \eId -> (eId, 0)
       (clients, rand'''') = U.s31 foldl ([], rand''') clientEIds $
         \(clients, rand) eId ->
           let (r, rand')  = Rn.random rand
