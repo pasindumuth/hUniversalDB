@@ -10,9 +10,9 @@ import qualified System.Random as Rn
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
-import qualified Transact.Container.Actions as Ac
-import qualified Transact.Container.Common as Co
-import qualified Transact.Container.Message as Ms
+import qualified Transact.Model.Actions as Ac
+import qualified Transact.Model.Common as Co
+import qualified Transact.Model.Message as Ms
 import qualified Transact.Thread.ServerThread as ST
 import qualified Transact.Thread.TabletThread as TT
 import Infra.Lens

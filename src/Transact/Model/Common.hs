@@ -3,8 +3,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Transact.Container.Common (
-  module Transact.Container.Common,
+module Transact.Model.Common (
+  module Transact.Model.Common,
   Co.EndpointId (Co.EndpointId),
   Co.RequestId (Co.RequestId)
 ) where

@@ -5,7 +5,7 @@ module Transact.Infra.State (
   module Infra.StateWithTrace
 ) where
 
-import Transact.Container.Actions as Ac
+import Transact.Model.Actions as Ac
 import Infra.StateWithTrace
 
 -- Specific versions of ST

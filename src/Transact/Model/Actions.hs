@@ -3,14 +3,14 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Transact.Container.Actions where
+module Transact.Model.Actions where
 
 import qualified Data.Binary as Bn
 import qualified Data.Default as Df
 import qualified GHC.Generics as Gn
 
-import qualified Transact.Container.Common as Co
-import qualified Transact.Container.Message as Ms
+import qualified Transact.Model.Common as Co
+import qualified Transact.Model.Message as Ms
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Server Actions

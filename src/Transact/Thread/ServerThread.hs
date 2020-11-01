@@ -10,9 +10,9 @@ import qualified System.Random as Rn
 
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
-import qualified Transact.Container.Actions as Ac
-import qualified Transact.Container.Common as Co
-import qualified Transact.Container.Message as Ms
+import qualified Transact.Model.Actions as Ac
+import qualified Transact.Model.Common as Co
+import qualified Transact.Model.Message as Ms
 import qualified Transact.Server.ServerInputHandler as TIH
 import qualified Transact.Server.ServerState as TS
 import Transact.Infra.State

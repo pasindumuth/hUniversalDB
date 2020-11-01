@@ -3,13 +3,13 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Transact.Container.Message where
+module Transact.Model.Message where
 
 import qualified Data.Binary as Bn
 import qualified GHC.Generics as Gn
 
 import qualified Common.Model.RelationalTablet as RT
-import qualified Transact.Container.Common as Co
+import qualified Transact.Model.Common as Co
 
 -- Conventions: Forwarded Messages is the best example. The main rule here
 -- is that if we have a Type Constructor like T T in a type S, then we should

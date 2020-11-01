@@ -1,6 +1,6 @@
 module Transact.Server.ServerInputHandler where
 
-import qualified Transact.Container.Actions as Ac
+import qualified Transact.Model.Actions as Ac
 import qualified Transact.Server.ServerState as TS
 
 import Transact.Infra.State

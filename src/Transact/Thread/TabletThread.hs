@@ -9,9 +9,9 @@ import qualified Data.Maybe as Mb
 import qualified System.Random as Rn
 
 import qualified Net.Connections as Cn
-import qualified Transact.Container.Actions as Ac
-import qualified Transact.Container.Common as Co
-import qualified Transact.Container.Message as Ms
+import qualified Transact.Model.Actions as Ac
+import qualified Transact.Model.Common as Co
+import qualified Transact.Model.Message as Ms
 import qualified Transact.Tablet.Env as En
 import qualified Transact.Tablet.TabletInputHandler as TIH
 import qualified Transact.Tablet.TabletState as TS
