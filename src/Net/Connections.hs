@@ -14,7 +14,6 @@ module Net.Connections (
 
 import qualified Data.Binary as Bn
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Map as Mp
 import qualified Control.Concurrent as C
 import qualified Control.Concurrent.Chan as Ct
@@ -24,6 +23,7 @@ import qualified Infra.Utils as U
 import qualified Network.Simple.TCP as TCP
 
 import qualified Infra.Logging as Lg
+import qualified Infra.Utils as U
 import qualified Proto.Common as Co
 
 -- The value of Connections is function whose return value is an IO Operator
@@ -56,26 +56,20 @@ delConn connM endpointId = do
   conn <- MV.takeMVar connM
   MV.putMVar connM (Mp.delete endpointId conn)
 
-encode :: Bn.Binary a => a -> BS.ByteString
-encode b = BSL.toStrict $ Bn.encode b
-
-decode :: Bn.Binary a => BS.ByteString -> a
-decode d = Bn.decode $ BSL.fromStrict d
-
 -- Primitive function for receiving a message
 receiveMessage :: Bn.Binary a => TCP.Socket -> IO a
 receiveMessage socket = do
   -- TODO handle socket closure properly
   Just headerB <- TCP.recv socket 8 -- receive fixed-size, 8 byte header
-  let msgLen = decode headerB :: Int -- Bn.decode takes 8 byte ByteStrings and decodes them as Int
+  let msgLen = U.decode headerB :: Int -- Bn.decode takes 8 byte ByteStrings and decodes them as Int
   Just bodyB <- TCP.recv socket msgLen
-  return $ decode bodyB
+  return $ U.decode bodyB
 
 -- Primitive function for sending a message
 sendMessage :: Bn.Binary a => TCP.Socket -> a -> IO ()
 sendMessage socket msg = do
-  let bodyB = encode msg
-      headerB = encode $ BS.length bodyB
+  let bodyB = U.encode msg
+      headerB = U.encode $ BS.length bodyB
   TCP.send socket headerB
   TCP.send socket bodyB
 

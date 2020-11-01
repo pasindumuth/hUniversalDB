@@ -7,6 +7,7 @@ import qualified Data.Map as Mp
 import qualified System.Environment as SE
 import qualified System.Random as Rn
 
+import qualified Common.Model.RelationalTablet as RT
 import qualified Infra.Logging as Lg
 import qualified Infra.Utils as U
 import qualified Net.Connections as Cn
@@ -17,21 +18,34 @@ import qualified Transact.Thread.ServerThread as ST
 import qualified Transact.Thread.TabletThread as TT
 import Infra.Lens
 
+-- | Hard simple coded table schema we will use for all tables.
+schema :: RT.Schema
+schema = RT.Schema [("key", RT.CT'String, True), ("value", RT.CT'Int, False)]
+
+-- | A simpe utility for making Co.TabletKeyRanges for the specific schema above
+mkKeyRange :: Maybe String -> Maybe String -> Co.TabletKeyRange
+mkKeyRange startKeyM endKeyM =
+  Co.TabletKeyRange (fmap toPrimary startKeyM) (fmap toPrimary endKeyM)
+  where
+    toPrimary key = RT.PrimaryKey [RT.CV'String key]
+
+-- | Hard coded table partitioning configurations. We only handle 5 servers and
+-- only a handful of tables. We don't support SQL DDL yet.
 partitionConfig :: Mp.Map Co.EndpointId [Co.TabletShape]
 partitionConfig = Mp.fromList [
   (Co.EndpointId "172.18.0.3", [
-    Co.TabletShape (Co.TabletPath "table1") (Co.TabletKeyRange Nothing Nothing)]),
+    Co.TabletShape (Co.TabletPath "table1") (mkKeyRange Nothing Nothing)]),
   (Co.EndpointId "172.18.0.4", [
-    Co.TabletShape (Co.TabletPath "table2") (Co.TabletKeyRange Nothing (Just "j"))]),
+    Co.TabletShape (Co.TabletPath "table2") (mkKeyRange Nothing (Just "j"))]),
   (Co.EndpointId "172.18.0.5", [
-    Co.TabletShape (Co.TabletPath "table2") (Co.TabletKeyRange (Just "j") Nothing),
-    Co.TabletShape (Co.TabletPath "table3") (Co.TabletKeyRange Nothing (Just "d")),
-    Co.TabletShape (Co.TabletPath "table4") (Co.TabletKeyRange Nothing (Just "k"))]),
+    Co.TabletShape (Co.TabletPath "table2") (mkKeyRange (Just "j") Nothing),
+    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange Nothing (Just "d")),
+    Co.TabletShape (Co.TabletPath "table4") (mkKeyRange Nothing (Just "k"))]),
   (Co.EndpointId "172.18.0.6", [
-    Co.TabletShape (Co.TabletPath "table3") (Co.TabletKeyRange (Just "d") (Just "p"))]),
+    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange (Just "d") (Just "p"))]),
   (Co.EndpointId "172.18.0.7", [
-    Co.TabletShape (Co.TabletPath "table3") (Co.TabletKeyRange (Just "p") Nothing),
-    Co.TabletShape (Co.TabletPath "table4") (Co.TabletKeyRange (Just "k") Nothing)])]
+    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange (Just "p") Nothing),
+    Co.TabletShape (Co.TabletPath "table4") (mkKeyRange (Just "k") Nothing)])]
 
 handleReceive
   :: Ct.Chan (Co.EndpointId, Ms.Message)

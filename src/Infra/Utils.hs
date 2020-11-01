@@ -1,5 +1,9 @@
 module Infra.Utils where
 
+import qualified Data.Binary as Bn
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
+
 import qualified Control.Exception as Ex
 import qualified Control.Monad as Mo
 import qualified Data.Sequence as Sq
@@ -74,3 +78,9 @@ foldM = s31 Mo.foldM
 
 fold :: Foldable t => b -> t a -> (b -> a -> b) -> b
 fold = s31 Prelude.foldl
+
+encode :: Bn.Binary a => a -> BS.ByteString
+encode b = BSL.toStrict $ Bn.encode b
+
+decode :: Bn.Binary a => BS.ByteString -> a
+decode d = Bn.decode $ BSL.fromStrict d

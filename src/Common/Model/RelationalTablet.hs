@@ -31,5 +31,6 @@ data ColumnValue
 -- General Tablet Types
 ------------------------------------------------------------------------------------------------------------------------
 
-newtype PrimaryKey = PrimaryKey [ColumnValue] deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
-newtype Row = Row [ColumnValue] deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+newtype PrimaryKey = PrimaryKey { getPrimaryKey :: [ColumnValue] } deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+newtype Row = Row { getRow :: [ColumnValue] } deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+newtype Schema = Schema { getSchema :: [(String, ColumnType, Bool)] }  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)

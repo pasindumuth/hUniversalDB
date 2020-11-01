@@ -30,18 +30,23 @@ import Infra.Lens
 -- Relational Tablet
 ------------------------------------------------------------------------------------------------------------------------
 type TabletStorage = MVM.MultiVersionMap ([RT.ColumnValue], Maybe String) RT.ColumnValue
-type Schema = [(String, RT.ColumnType, Bool)]
 
 -- In this schema definition, the bool at the end indicates if the
 -- if the column is a primary key column.
 data RelationalTablet = RelationalTablet {
-  _i'schema :: Schema,
+  _i'schema :: RT.Schema,
   _i'storage :: TabletStorage
 }
 
 makeLenses ''RelationalTablet
 
--- Checks if the RT.ColumnValue has the type that's indicated by the RT.ColumnType.
+------------------------------------------------------------------------------------------------------------------------
+-- Utilities Operations
+------------------------------------------------------------------------------------------------------------------------
+-- These are basic operations that don't necessarily manipulate a Tablet,
+-- but are used while doing so.
+
+-- | Checks if the RT.ColumnValue has the type that's indicated by the RT.ColumnType.
 checkTypeMatch :: RT.ColumnType -> RT.ColumnValue -> Bool
 checkTypeMatch columnType columnValue =
   case (columnType, columnValue) of
@@ -52,34 +57,38 @@ checkTypeMatch columnType columnValue =
     (RT.CT'Empty, RT.CV'Empty _) -> True
     _ -> False
 
+-- | A helper function that makes sure the primary key actually
+-- conforms to the schema.
+checkPrimaryKey
+  :: RT.Schema
+  -> RT.PrimaryKey
+  -> Either String RT.PrimaryKey
+checkPrimaryKey (RT.Schema schema) (RT.PrimaryKey primaryKey) = do
+  primaryKey <- checkPrimaryKeyR schema primaryKey
+  return $ RT.PrimaryKey primaryKey
+  where
+    checkPrimaryKeyR schema primaryKey =
+      case schema of
+        ((columnName, columnType, isPrimary):r'schema) ->
+          case (isPrimary, primaryKey) of
+            (True, []) -> Left $ "Not enough elements the primaryKey."
+            (True, (columnValue:r'primaryKey)) ->
+              if checkTypeMatch columnType columnValue
+                then checkPrimaryKeyR r'schema r'primaryKey
+                else Left $ "columnValue " ++ (show columnValue)
+                         ++ " does not match columnType " ++ (show columnType)
+            (False, _) -> checkPrimaryKeyR r'schema primaryKey
+        [] ->
+          case primaryKey of
+            (_:_) -> Left $ "Too many elements in the primaryKey."
+            _ -> Right primaryKey
+
 ------------------------------------------------------------------------------------------------------------------------
 -- Backdoor Operations
 ------------------------------------------------------------------------------------------------------------------------
 -- These operations are primarily meant for testing purposes to populate the tables
 -- with test data. They aren't meant to be used in production, where careful
 -- transaction processing takes place.
-
--- | A helper function that makes sure the primary key actually
--- conforms to the schema.
-checkPrimaryKey
-  :: Schema
-  -> [RT.ColumnValue]
-  -> Either String [RT.ColumnValue]
-checkPrimaryKey schema primaryKey =
-  case schema of
-    ((columnName, columnType, isPrimary):r'schema) ->
-      case (isPrimary, primaryKey) of
-        (True, []) -> Left $ "Not enough elements the primaryKey."
-        (True, (columnValue:r'primaryKey)) ->
-          if checkTypeMatch columnType columnValue
-            then checkPrimaryKey r'schema r'primaryKey
-            else Left $ "columnValue " ++ (show columnValue)
-                     ++ " does not match columnType " ++ (show columnType)
-        (False, _) -> checkPrimaryKey r'schema primaryKey
-    [] ->
-      case primaryKey of
-        (_:_) -> Left $ "Too many elements in the primaryKey."
-        _ -> Right primaryKey
 
 -- | Inserts the row into the RelationalTablet. This method assumes that this is
 -- a valid operation; the timestamp is greater than the timestamps of all column
@@ -93,7 +102,7 @@ insertRow
                    -- error is returned).
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
 insertRow tablet timestamp (RT.Row row) = do
-  (primaryKeyRev, nonPrimaryKeys) <- extractPrimary (tablet ^. i'schema) row [] []
+  (primaryKeyRev, nonPrimaryKeys) <- extractPrimary (RT.getSchema $ tablet ^. i'schema) row [] []
   let primaryKey = reverse primaryKeyRev
       (_, storage') = MVM.write (primaryKey, Nothing) (Just $ RT.CV'Empty ()) timestamp (tablet ^. i'storage)
       storage'' = insertColumns storage' primaryKey nonPrimaryKeys
@@ -130,9 +139,9 @@ deleteRow
                    -- same order that they appear in the table schema. (otherwise an
                    -- error is returned).
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
-deleteRow tablet timestamp (RT.PrimaryKey primaryKey) = do
-  primaryKey <- checkPrimaryKey (tablet ^. i'schema) primaryKey
-  let nonPrimaryKeys = getNonPrimaryKeyNames (tablet ^. i'schema) []
+deleteRow tablet timestamp primaryKey = do
+  (RT.PrimaryKey primaryKey) <- checkPrimaryKey (tablet ^. i'schema) primaryKey
+  let nonPrimaryKeys = getNonPrimaryKeyNames (RT.getSchema $ tablet ^. i'schema) []
       (_, storage') = MVM.write (primaryKey, Nothing) Nothing timestamp (tablet ^. i'storage)
       storage'' = U.fold storage' nonPrimaryKeys $ \storage' nonPrimaryKey ->
                     snd $ MVM.write (primaryKey, Just nonPrimaryKey) Nothing timestamp storage'
@@ -159,7 +168,7 @@ updateColumn
   -> Maybe RT.ColumnValue -- ^ The value to update to. Recall that a Nothing value
                        -- means NULL (in SQL terms).
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
-updateColumn tablet timestamp (RT.PrimaryKey primaryKey) columnName columnValueM = do
-  primaryKey <- checkPrimaryKey (tablet ^. i'schema) primaryKey
+updateColumn tablet timestamp primaryKey columnName columnValueM = do
+  (RT.PrimaryKey primaryKey) <- checkPrimaryKey (tablet ^. i'schema) primaryKey
   let (_, storage') = MVM.write (primaryKey, Just columnName) columnValueM timestamp (tablet ^. i'storage)
   return $ tablet & i'storage .~ storage'
