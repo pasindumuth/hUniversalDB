@@ -32,7 +32,7 @@ import Infra.State
 handlingState :: Lens' MS.MasterState (
   MP.MultiPaxosInstance,
   DS.DerivedState,
-  PTM.PaxosTaskManager DS.DerivedState MAc.OutputAction,
+  PTM.PaxosTaskManager DS.DerivedState MAc.OutputAction TrM.TraceMessage,
   Rn.StdGen,
   [Co.EndpointId])
 handlingState =
@@ -137,7 +137,7 @@ createDatabaseTask
   -> Co.Timestamp
   -> String
   -> Co.UID
-  -> Ta.Task DS.DerivedState MAc.OutputAction
+  -> Ta.Task DS.DerivedState MAc.OutputAction TrM.TraceMessage
 createDatabaseTask eId requestId path timestamp description uid =
   let entry = PM.Master $ PM.CreateDatabase requestId path timestamp eId uid
       keySpaceRange = Co.KeySpaceRange path
@@ -192,7 +192,7 @@ deleteDatabaseTask
   -> Co.Timestamp
   -> String
   -> Co.UID
-  -> Ta.Task DS.DerivedState MAc.OutputAction
+  -> Ta.Task DS.DerivedState MAc.OutputAction TrM.TraceMessage
 deleteDatabaseTask eId requestId path timestamp description uid =
   let entry = PM.Master $ PM.DeleteDatabase requestId path timestamp eId uid
       keySpaceRange = Co.KeySpaceRange path
@@ -251,7 +251,7 @@ createPickKeySpace
   -> Co.Choice
   -> Co.UID
   -> String
-  -> Ta.Task DS.DerivedState MAc.OutputAction
+  -> Ta.Task DS.DerivedState MAc.OutputAction TrM.TraceMessage
 createPickKeySpace response eId slaveGroupId timestamp choice uid description =
   let entry = PM.Master $ PM.PickKeySpace slaveGroupId choice uid
       tryHandling derivedState = do

@@ -35,7 +35,7 @@ import Infra.State
 handlingState :: Lens' SS.SlaveState (
   MP.MultiPaxosInstance,
   DS.DerivedState,
-  PTM.PaxosTaskManager DS.DerivedState SAc.OutputAction,
+  PTM.PaxosTaskManager DS.DerivedState SAc.OutputAction TrM.TraceMessage,
   Rn.StdGen,
   [Co.EndpointId])
 handlingState =
@@ -110,7 +110,7 @@ rangeReadTask
   -> Co.RequestId
   -> Co.Timestamp
   -> String
-  -> Ta.Task DS.DerivedState SAc.OutputAction
+  -> Ta.Task DS.DerivedState SAc.OutputAction TrM.TraceMessage
 rangeReadTask eId requestId timestamp description =
   let entry = PM.Slave $ PM.RangeRead requestId timestamp
       tryHandling derivedState = do
@@ -138,7 +138,7 @@ rangeWriteTask
   -> [Co.KeySpaceRange]
   -> Co.Timestamp
   -> String
-  -> STS SS.SlaveState (Ta.Task DS.DerivedState SAc.OutputAction)
+  -> STS SS.SlaveState (Ta.Task DS.DerivedState SAc.OutputAction TrM.TraceMessage)
 rangeWriteTask eId requestId ranges timestamp description = do
   r <- SS.env . En.rand .^^ Rn.random
   let rand = Rn.mkStdGen r
@@ -187,7 +187,7 @@ slaveReadTask
   -> Co.Key
   -> Co.Timestamp
   -> String
-  -> Ta.Task DS.DerivedState SAc.OutputAction
+  -> Ta.Task DS.DerivedState SAc.OutputAction TrM.TraceMessage
 slaveReadTask eId requestId path key timestamp description =
   let entry = PM.Slave $ PM.RangeRead requestId timestamp
       tryHandling derivedState = do
@@ -224,7 +224,7 @@ slaveWriteTask
   -> Co.Value
   -> Co.Timestamp
   -> String
-  -> Ta.Task DS.DerivedState SAc.OutputAction
+  -> Ta.Task DS.DerivedState SAc.OutputAction TrM.TraceMessage
 slaveWriteTask eId requestId path key value timestamp description =
   let entry = PM.Slave $ PM.RangeRead requestId timestamp
       tryHandling derivedState = do

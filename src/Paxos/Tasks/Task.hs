@@ -8,10 +8,9 @@ module Paxos.Tasks.Task where
 
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Proto.Messages.TraceMessages as TrM
 import Infra.State
 
-data Task derivedStateT outputActionT = Task {
+data Task derivedStateT outputActionT traceMessageT = Task {
   -- Used primarily for logging.
   description :: String,
   -- This is a stateless function that uses the derivedState to determine if the task
@@ -21,15 +20,15 @@ data Task derivedStateT outputActionT = Task {
   -- continue, then we should return Left with the PaxosLogEntry it wants to insert.
   -- Otherwise, it should return Right (), at which point the Task stops running
   -- (done won't be called).
-  tryHandling :: derivedStateT -> ST outputActionT TrM.TraceMessage () (Either PM.PaxosLogEntry ()),
+  tryHandling :: derivedStateT -> ST outputActionT traceMessageT () (Either PM.PaxosLogEntry ()),
   -- This called after a tryHandling returns a Left, the PLEntry is proposed at index i,
   -- and then a PL insertion happens at i with an equal PLEntry. These callbacks usually
   -- send a network request or something related
-  done :: derivedStateT -> ST outputActionT TrM.TraceMessage () (),
+  done :: derivedStateT -> ST outputActionT traceMessageT () (),
   -- This is used to wrap the PaxosLogEntry into a Ms.Message so that it's routed
   -- correctly to the right Paxos instances on the receiving end.
   msgWrapper :: (PM.MultiPaxosMessage -> Ms.Message)
 }
 
-instance Show (Task derivedStateT outputActionT) where
+instance Show (Task derivedStateT outputActionT traceMessageT) where
   show (Task description _ _ _) = description

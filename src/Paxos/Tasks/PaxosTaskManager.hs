@@ -25,19 +25,18 @@ import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
-import qualified Proto.Messages.TraceMessages as TrM
 import Infra.Lens
 import Infra.State
 
-data CurrentInsert derivedStateT outputActionT = CurrentInsert {
+data CurrentInsert derivedStateT outputActionT traceMessageT = CurrentInsert {
   _i'index :: Int,
   _i'entry :: PM.PaxosLogEntry,
-  _i'task :: Ta.Task derivedStateT outputActionT
+  _i'task :: Ta.Task derivedStateT outputActionT traceMessageT
 } deriving (Show)
 
-data PaxosTaskManager derivedStateT outputActionT = PaxosTaskManager {
-  _i'currentInsert :: Maybe (CurrentInsert derivedStateT outputActionT),
-  _i'taskQueue :: Sq.Seq (Ta.Task derivedStateT outputActionT),
+data PaxosTaskManager derivedStateT outputActionT traceMessageT = PaxosTaskManager {
+  _i'currentInsert :: Maybe (CurrentInsert derivedStateT outputActionT traceMessageT),
+  _i'taskQueue :: Sq.Seq (Ta.Task derivedStateT outputActionT traceMessageT),
   _i'counter :: Int
 } deriving (Gn.Generic, Df.Default, Show)
 
@@ -46,17 +45,17 @@ makeLenses ''PaxosTaskManager
 
 -- This is the ST state that the PaxosTaskManager uses. Each Type in the
 -- Tuple below is necessary for PaxosTaskManager to do its job.
-type HandlingState derivedStateT outputActionT = (
+type HandlingState derivedStateT outputActionT traceMessageT = (
   MP.MultiPaxosInstance,
   derivedStateT,
-  PaxosTaskManager derivedStateT outputActionT,
+  PaxosTaskManager derivedStateT outputActionT traceMessageT,
   Rn.StdGen,
   [Co.EndpointId])
 
 handleTask
   :: (Ac.OutputAction outputActionT)
-  => Ta.Task derivedStateT outputActionT
-  -> ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
+  => Ta.Task derivedStateT outputActionT traceMessageT
+  -> ST outputActionT traceMessageT (HandlingState derivedStateT outputActionT traceMessageT) ()
 handleTask task = do
   derivedState <- getL $ _2
   requestHandled <- lp0 .^ Ta.tryHandling task derivedState
@@ -71,7 +70,7 @@ handleTask task = do
 
 handleNextTask
   :: (Ac.OutputAction outputActionT)
-  => ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
+  => ST outputActionT traceMessageT (HandlingState derivedStateT outputActionT traceMessageT) ()
 handleNextTask = do
   taskQueue <- getL $ _3.i'taskQueue
   if Sq.length taskQueue > 0
@@ -82,15 +81,15 @@ handleNextTask = do
 
 pollAndNext
   :: (Ac.OutputAction outputActionT)
-  => ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
+  => ST outputActionT traceMessageT (HandlingState derivedStateT outputActionT traceMessageT) ()
 pollAndNext = do
   _3 . i'taskQueue .^^ U.poll
   handleNextTask
 
 handleNextTask'
   :: (Ac.OutputAction outputActionT)
-  => Ta.Task derivedStateT outputActionT
-  -> ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
+  => Ta.Task derivedStateT outputActionT traceMessageT
+  -> ST outputActionT traceMessageT (HandlingState derivedStateT outputActionT traceMessageT) ()
 handleNextTask' task = do
   _3.i'currentInsert .^^. \_ -> Nothing
   derivedState <- getL $ _2
@@ -109,7 +108,7 @@ handleNextTask' task = do
 handleRetry
   :: (Ac.OutputAction outputActionT)
   => Int
-  -> ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
+  -> ST outputActionT traceMessageT (HandlingState derivedStateT outputActionT traceMessageT) ()
 handleRetry counterValue = do
   currentInsertM <- getL $ _3.i'currentInsert
   counter <- getL $ _3.i'counter
@@ -120,7 +119,7 @@ handleRetry counterValue = do
 
 handleInsert
   :: (Ac.OutputAction outputActionT)
-  => ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
+  => ST outputActionT traceMessageT (HandlingState derivedStateT outputActionT traceMessageT) ()
 handleInsert = do
   currentInsertM <- getL $ _3.i'currentInsert
   case currentInsertM of

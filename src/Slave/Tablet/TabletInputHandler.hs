@@ -27,7 +27,7 @@ import Infra.State
 handlingState :: Lens' TS.TabletState (
   MP.MultiPaxosInstance,
   DS.DerivedState,
-  PTM.PaxosTaskManager DS.DerivedState TAc.OutputAction,
+  PTM.PaxosTaskManager DS.DerivedState TAc.OutputAction TrM.TraceMessage,
   Rn.StdGen,
   [Co.EndpointId])
 handlingState =
@@ -68,7 +68,7 @@ clientTask
   :: Co.TabletId
   -> Co.EndpointId
   -> TM.ClientRequest
-  -> Ta.Task DS.DerivedState TAc.OutputAction
+  -> Ta.Task DS.DerivedState TAc.OutputAction TrM.TraceMessage
 clientTask tabletId eId request =
   let description = show (eId, request)
       requestId = request ^. TM.meta.TM.requestId

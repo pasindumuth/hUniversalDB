@@ -15,6 +15,7 @@ import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.Tasks.PaxosTaskManager as PTM
 import qualified Proto.Actions.TabletActions as TAc
 import qualified Proto.Common as Co
+import qualified Proto.Messages.TraceMessages as TrM
 import qualified Slave.Tablet.DerivedState as DS
 import qualified Slave.Tablet.Env as En
 import Infra.Lens
@@ -23,7 +24,7 @@ data TabletState = TabletState {
   _tabletId :: Co.TabletId,
   _multiPaxosInstance :: MP.MultiPaxosInstance,
   _derivedState :: DS.DerivedState,
-  _paxosTaskManager :: PTM.PaxosTaskManager DS.DerivedState TAc.OutputAction,
+  _paxosTaskManager :: PTM.PaxosTaskManager DS.DerivedState TAc.OutputAction TrM.TraceMessage,
   _env :: En.Env
 } deriving (Gn.Generic, Show)
 
