@@ -90,3 +90,12 @@ data Message
   | Forwarded Fw'Message
   | Admin Ad'Message
   deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+------------------------------------------------------------------------------------------------------------------------
+-- Trace Message
+------------------------------------------------------------------------------------------------------------------------
+-- These are used for tracing the program for testing purposes.
+
+data Tr'TraceMessage
+  = Tr'AdminResponse Ad'Response
+  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)

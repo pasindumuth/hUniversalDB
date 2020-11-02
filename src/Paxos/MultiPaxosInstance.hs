@@ -25,6 +25,7 @@ import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages.TraceMessages as TrM
 import Infra.Lens
 import Infra.State
 
@@ -53,7 +54,7 @@ paxosLog = i'paxosLog
 
 getPaxosInstance
   :: PM.IndexT
-  -> ST outputActionT MultiPaxosInstance PI.PaxosInstance
+  -> ST outputActionT TrM.TraceMessage MultiPaxosInstance PI.PaxosInstance
 getPaxosInstance index = do
   pIM <- getL $ i'paxosInstances . at index
   case pIM of
@@ -68,7 +69,7 @@ insertMultiPaxos
   => [Co.EndpointId]
   -> PM.PaxosLogEntry
   -> (PM.MultiPaxosMessage -> Ms.Message)
-  -> ST outputActionT (MultiPaxosInstance, Rn.StdGen) ()
+  -> ST outputActionT TrM.TraceMessage (MultiPaxosInstance, Rn.StdGen) ()
 insertMultiPaxos slaveEIds entry msgWrapper = do
   r <- _2 .^^ Rn.randomR (1, maxRndIncrease)
   index <- _1.i'paxosLog .^^^ PL.nextAvailableIndex
@@ -87,7 +88,7 @@ handleMultiPaxos
   -> [Co.EndpointId]
   -> PM.MultiPaxosMessage
   -> (PM.MultiPaxosMessage -> Ms.Message)
-  -> ST outputActionT (MultiPaxosInstance, Rn.StdGen) ()
+  -> ST outputActionT TrM.TraceMessage (MultiPaxosInstance, Rn.StdGen) ()
 handleMultiPaxos fromEId slaveEIds (PM.PaxosMessage index pMsg) msgWrapper = do
   _1 .^ getPaxosInstance index
   action <- _1 . i'paxosInstances . ix index .^* (PI.handlePaxos pMsg)

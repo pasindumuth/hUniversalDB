@@ -25,6 +25,7 @@ import qualified Proto.Actions.Actions as Ac
 import qualified Proto.Common as Co
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages.TraceMessages as TrM
 import Infra.Lens
 import Infra.State
 
@@ -55,7 +56,7 @@ type HandlingState derivedStateT outputActionT = (
 handleTask
   :: (Ac.OutputAction outputActionT)
   => Ta.Task derivedStateT outputActionT
-  -> ST outputActionT (HandlingState derivedStateT outputActionT) ()
+  -> ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
 handleTask task = do
   derivedState <- getL $ _2
   requestHandled <- lp0 .^ Ta.tryHandling task derivedState
@@ -70,7 +71,7 @@ handleTask task = do
 
 handleNextTask
   :: (Ac.OutputAction outputActionT)
-  => ST outputActionT (HandlingState derivedStateT outputActionT) ()
+  => ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
 handleNextTask = do
   taskQueue <- getL $ _3.i'taskQueue
   if Sq.length taskQueue > 0
@@ -81,7 +82,7 @@ handleNextTask = do
 
 pollAndNext
   :: (Ac.OutputAction outputActionT)
-  => ST outputActionT (HandlingState derivedStateT outputActionT) ()
+  => ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
 pollAndNext = do
   _3 . i'taskQueue .^^ U.poll
   handleNextTask
@@ -89,7 +90,7 @@ pollAndNext = do
 handleNextTask'
   :: (Ac.OutputAction outputActionT)
   => Ta.Task derivedStateT outputActionT
-  -> ST outputActionT (HandlingState derivedStateT outputActionT) ()
+  -> ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
 handleNextTask' task = do
   _3.i'currentInsert .^^. \_ -> Nothing
   derivedState <- getL $ _2
@@ -108,7 +109,7 @@ handleNextTask' task = do
 handleRetry
   :: (Ac.OutputAction outputActionT)
   => Int
-  -> ST outputActionT (HandlingState derivedStateT outputActionT) ()
+  -> ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
 handleRetry counterValue = do
   currentInsertM <- getL $ _3.i'currentInsert
   counter <- getL $ _3.i'counter
@@ -119,7 +120,7 @@ handleRetry counterValue = do
 
 handleInsert
   :: (Ac.OutputAction outputActionT)
-  => ST outputActionT (HandlingState derivedStateT outputActionT) ()
+  => ST outputActionT TrM.TraceMessage (HandlingState derivedStateT outputActionT) ()
 handleInsert = do
   currentInsertM <- getL $ _3.i'currentInsert
   case currentInsertM of

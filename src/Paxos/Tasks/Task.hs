@@ -8,6 +8,7 @@ module Paxos.Tasks.Task where
 
 import qualified Proto.Messages as Ms
 import qualified Proto.Messages.PaxosMessages as PM
+import qualified Proto.Messages.TraceMessages as TrM
 import Infra.State
 
 data Task derivedStateT outputActionT = Task {
@@ -20,11 +21,11 @@ data Task derivedStateT outputActionT = Task {
   -- continue, then we should return Left with the PaxosLogEntry it wants to insert.
   -- Otherwise, it should return Right (), at which point the Task stops running
   -- (done won't be called).
-  tryHandling :: derivedStateT -> ST outputActionT () (Either PM.PaxosLogEntry ()),
+  tryHandling :: derivedStateT -> ST outputActionT TrM.TraceMessage () (Either PM.PaxosLogEntry ()),
   -- This called after a tryHandling returns a Left, the PLEntry is proposed at index i,
   -- and then a PL insertion happens at i with an equal PLEntry. These callbacks usually
   -- send a network request or something related
-  done :: derivedStateT -> ST outputActionT () (),
+  done :: derivedStateT -> ST outputActionT TrM.TraceMessage () (),
   -- This is used to wrap the PaxosLogEntry into a Ms.Message so that it's routed
   -- correctly to the right Paxos instances on the receiving end.
   msgWrapper :: (PM.MultiPaxosMessage -> Ms.Message)
