@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: accd302e8185c87701350030bae331a993a3b8900e469bb2d366b89eebbe9f14
+-- hash: ade02271159227c868fac5cd81db1a8620cff4e9ce3e04518b7846163ef506d0
 
 name:           hUniversalDB
 version:        0.1.0.0
@@ -247,6 +247,8 @@ executable hUniversalDB-transact-exe
 executable hUniversalDB-transact-sim-exe
   main-is: Main.hs
   other-modules:
+      SimulationManager
+      TestState
       Paths_hUniversalDB
   hs-source-dirs:
       transact-sim

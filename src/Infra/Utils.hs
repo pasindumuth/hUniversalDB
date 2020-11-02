@@ -144,7 +144,7 @@ prefix s (x:xs) =
 mkUID :: Rn.StdGen -> (Co.UID, Rn.StdGen)
 mkUID rg =
   let (uid, rg') =
-        s31 foldl ([], rg) [1..8] $ \(uid, rg) _ ->
+        fold ([], rg) [1..8] $ \(uid, rg) _ ->
           let (r, rg') = Rn.random rg
           in (r:uid, rg')
   in (Co.UID uid, rg')
