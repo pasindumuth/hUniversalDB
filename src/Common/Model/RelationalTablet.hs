@@ -7,6 +7,7 @@ module Common.Model.RelationalTablet where
 
 import qualified Data.Binary as Bn
 import qualified GHC.Generics as Gn
+import Infra.Lens
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Column Description Types
@@ -31,6 +32,20 @@ data ColumnValue
 -- General Tablet Types
 ------------------------------------------------------------------------------------------------------------------------
 
-newtype PrimaryKey = PrimaryKey { getPrimaryKey :: [ColumnValue] } deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
-newtype Row = Row { getRow :: [ColumnValue] } deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
-newtype Schema = Schema { getSchema :: [(String, ColumnType, Bool)] }  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+data Schema = Schema {
+  _schemaKey :: [(String, ColumnType)],
+  _schemaColumns :: [(String, ColumnType)]
+} deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+makeLenses ''Schema
+
+newtype PrimaryKey = PrimaryKey {
+  getPrimaryKey :: [ColumnValue]
+} deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+data Row = Row {
+  _rowKey :: PrimaryKey,
+  _rowColumns :: [Maybe ColumnValue]
+} deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+makeLenses ''Row

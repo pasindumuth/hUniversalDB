@@ -112,7 +112,7 @@ handleDerivedState paxosId pl pl' = do
                       DS.slaveGroupRanges .^^ SGR.write timestamp (Mp.fromList [(slaveGroupId, (keySpaceRange:keySpace))])
                       DS.networkTaskManager . NTM.taskMap .^^. Mp.insert uid (NTM.CreateDatabase eId requestId timestamp slaveGroupId)
                       return ()
-                    Nothing -> U.caseError
+                    Nothing -> error $ "Cannot find free slave group."
             PM.DeleteDatabase requestId path timestamp eId uid -> do
               let keySpaceRange = Co.KeySpaceRange path
               lat <- DS.slaveGroupRanges .^^^ SGR.staticReadLat
@@ -134,4 +134,4 @@ handleDerivedState paxosId pl pl' = do
               DS.networkTaskManager . NTM.taskMap .^^. Mp.delete uid
               DS.slaveGroupRanges .^^ SGR.pick slaveGroupId choice
               return ()
-        _ -> U.caseError
+        _ -> error $ "PaxosLog entry " ++ (show plEntry) ++ "isn't supported in Master's derived state."

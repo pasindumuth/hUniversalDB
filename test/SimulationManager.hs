@@ -195,7 +195,8 @@ deliverMessage (fromEId, toEId) = do
   masterEIds' <- getL $ Tt.masterEIds
   slaveEIds' <- getL $ Tt.allSlaveEIds
   clientEIds' <- getL $ Tt.clientEIds
-  let route
+  let allEIds = masterEIds' ++ slaveEIds' ++ clientEIds'
+      route
         | Li.elem toEId masterEIds' =
             runMasterIAction toEId $ MAc.Receive fromEId msg
         | Li.elem toEId slaveEIds' =
@@ -205,8 +206,9 @@ deliverMessage (fromEId, toEId) = do
               Ms.ClientResponse response -> do
                 Tt.requestStats .^ RS.recordResponse (response ^. CRs.payload)
                 Tt.clientState . ix toEId .^* CS.handleResponse fromEId response
-              _ -> U.caseError -- Any messages coming to a clientEId must be a response.
-        | otherwise = U.caseError
+              _ -> error $ "The message " ++ (show msg) ++ " should never be receieved by a client."
+        | otherwise = error $ "Can't deliver message; " ++ (show toEId) ++
+                              " doesn't present in any existing " ++ " endpoint: " ++ (show allEIds)
   route
 
 dropMessages :: Int -> STS Tt.TestState ()
@@ -293,7 +295,7 @@ simulate1ms = do
     let loop left ((queueId, distVal):xs)
           | distVal <= left = loop (left - distVal) xs
           | otherwise = queueId
-        loop left [] = U.caseError
+        loop left [] = error $ "Shouldn't get here."
         queueId = loop r lenDist
     nonemptyQueues <- getL $ Tt.nonemptyQueues
     if St.member queueId nonemptyQueues

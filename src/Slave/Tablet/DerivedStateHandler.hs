@@ -30,4 +30,4 @@ handleDerivedState paxosId pl pl' = do
             return ()
           PM.Write requestId key value timestamp -> do
             DS.kvStore .^^ MVS.write key (Just (value, requestId)) timestamp
-      _ -> U.caseError
+      _ -> error $ "PaxosLog entry " ++ (show plEntry) ++ "isn't supported in Tablet's derived state."

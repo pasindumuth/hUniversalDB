@@ -79,7 +79,7 @@ insertMultiPaxos slaveEIds entry msgWrapper = do
   action <- _1 . i'paxosInstances . ix index .^* (PI.handlePaxos $ PM.Propose nextRnd entry)
   case action of
     PI.Broadcast paxosMessage -> addA $ Ac.send slaveEIds $ msgWrapper $ PM.PaxosMessage index paxosMessage
-    _ -> U.caseError
+    _ -> error $ "Action " ++ (show action) ++ " is not supported."
 
 handleMultiPaxos
   :: (Ac.OutputAction outputActionT)

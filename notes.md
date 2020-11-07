@@ -1,8 +1,9 @@
 # Build & Run 
 
 stack build
-stack run UniversalDB-exe server
-stack run UniversalDB-exe client
+stack run hUniversalDB-slave-exe
+stack run hUniversalDB-client-exe
+stack run hUniversalDB-transact-sim-exe
 
 stack test --profile
 

@@ -65,22 +65,28 @@ data Fw'Message = Fw'Message Fw'Metadata Fw'Payload deriving (Gn.Generic, Bn.Bin
 -- to setup the system to a desirable state.
 
 data Ad'Request
-  -- | Contains the row to insert.
-  = Ad'Insert Co.TabletPath RT.Row Co.Timestamp
-  -- | Contains the the primaryKey, column to update and value to update it to.
-  | Ad'Update Co.TabletPath RT.PrimaryKey String (Maybe RT.ColumnValue)  Co.Timestamp
-  -- | Contains the primaryKey of the row to delete.
-  | Ad'Delete Co.TabletPath RT.PrimaryKey Co.Timestamp
+  -- | Contains the row & timestamp to insert.
+  = Ad'InsertRq Co.TabletPath RT.Row Co.Timestamp
+  -- | Contains the primaryKey, column to update and value & timestamp to update it to.
+  | Ad'UpdateRq Co.TabletPath RT.PrimaryKey String (Maybe RT.ColumnValue)  Co.Timestamp
+  -- | Contains the primaryKey of the row to delete and the timestamp to delete at.
+  | Ad'DeleteRq Co.TabletPath RT.PrimaryKey Co.Timestamp
+  -- | Contains the primaryKey of the row to read and the timestamp to read at.
+  | Ad'ReadRowRq Co.TabletPath RT.PrimaryKey Co.Timestamp
   deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
-data Ad'Response = Ad'Response deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+data Ad'Response
+  = Ad'ReadRowRs (Maybe RT.Row) Co.Timestamp
+  deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+
+data Ad'Metadata = Ad'Metadata Co.RequestId deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
 data Ad'Payload
   = Ad'Request' Ad'Request
   | Ad'Response' Ad'Response
   deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
-data Ad'Message = Ad'Message Ad'Payload deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
+data Ad'Message = Ad'Message Ad'Metadata Ad'Payload deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Top Level Message

@@ -20,7 +20,7 @@ import Infra.Lens
 
 -- | Hard simple coded table schema we will use for all tables.
 schema :: RT.Schema
-schema = RT.Schema [("key", RT.CT'String, True), ("value", RT.CT'Int, False)]
+schema = RT.Schema [("key", RT.CT'String)] [("value", RT.CT'Int)]
 
 -- | A simpe utility for making Co.TabletKeyRanges for the specific schema above
 mkKeyRange :: Maybe String -> Maybe String -> Co.TabletKeyRange

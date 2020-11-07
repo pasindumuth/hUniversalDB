@@ -24,7 +24,7 @@ import Transact.Infra.State
 
 -- | Hard simple coded table schema we will use for all tables.
 schema :: RT.Schema
-schema = RT.Schema [("key", RT.CT'String, True), ("value", RT.CT'Int, False)]
+schema = RT.Schema [("key", RT.CT'String)] [("value", RT.CT'Int)]
 
 -- | A simpe utility for making Co.TabletKeyRanges for the specific schema above
 mkKeyRange :: Maybe String -> Maybe String -> Co.TabletKeyRange
@@ -54,8 +54,8 @@ partitionConfig = Mp.fromList [
 mkServerEId i = Co.EndpointId $ "s" ++ show i
 mkClientEId i = Co.EndpointId $ "c" ++ show i
 
-constructor :: Int -> Int -> Int -> Tt.TestState
-constructor seed numServers numClients =
+createTestState :: Int -> Int -> Int -> Tt.TestState
+createTestState seed numServers numClients =
   let rand = Rn.mkStdGen seed
       serverEIds = U.map
         [0..(numServers - 1)] $ mkServerEId
@@ -99,10 +99,11 @@ constructor seed numServers numClients =
       Tt._tabletAsyncQueues = tabletAsyncQueues,
       Tt._clocks = clocks,
       Tt._nextInt = 0,
-      Tt._trueTimestamp = 0
+      Tt._trueTimestamp = 0,
+      Tt._clientMsgsReceived = St.empty
     }
 
-addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> STS Tt.TestState ()
+addMsg :: Ms.Message -> (Co.EndpointId, Co.EndpointId) -> STB Tt.TestState ()
 addMsg msg (fromEId, toEId) = do
   queue <- Tt.queues . ix fromEId . ix toEId .^^.* U.push msg
   if Sq.length queue == 1
@@ -110,7 +111,7 @@ addMsg msg (fromEId, toEId) = do
     else Tt.nonemptyQueues .^^. id
   return ()
 
-pollMsg :: (Co.EndpointId, Co.EndpointId) -> STS Tt.TestState Ms.Message
+pollMsg :: (Co.EndpointId, Co.EndpointId) -> STB Tt.TestState Ms.Message
 pollMsg (fromEId, toEId) = do
   msg <- Tt.queues . ix fromEId . ix toEId .^^* U.poll
   queueLength <- Tt.queues . ix fromEId . ix toEId .^^^* Sq.length
@@ -119,7 +120,7 @@ pollMsg (fromEId, toEId) = do
     else Tt.nonemptyQueues .^^. id
   return msg
 
-runServerIAction :: Co.EndpointId -> Ac.S'InputAction -> STS Tt.TestState ()
+runServerIAction :: Co.EndpointId -> Ac.S'InputAction -> STB Tt.TestState ()
 runServerIAction eId iAction = do
   (_, msgsO) <- runT (Tt.serverStates . ix eId) (SIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
@@ -133,7 +134,7 @@ runTabletIAction
   :: Co.EndpointId
   -> Co.TabletShape
   -> Ac.T'InputAction
-  -> STS Tt.TestState ()
+  -> STB Tt.TestState ()
 runTabletIAction eId tabletId iAction = do
   (_, msgsO) <- runT (Tt.tabletStates . ix eId . ix tabletId) (TIH.handleInputAction iAction)
   Mo.forM_ msgsO $ \msgO -> do
@@ -141,18 +142,23 @@ runTabletIAction eId tabletId iAction = do
       Ac.T'Send toEIds msg -> Mo.forM_ toEIds $ \toEId -> addMsg msg (eId, toEId)
       Ac.T'Print _ -> return ()
 
-deliverMessage :: (Co.EndpointId, Co.EndpointId) -> STS Tt.TestState ()
+deliverMessage :: (Co.EndpointId, Co.EndpointId) -> STB Tt.TestState ()
 deliverMessage (fromEId, toEId) = do
   msg <- pollMsg (fromEId, toEId)
   serverEIds' <- getL $ Tt.serverEIds
   clientEIds' <- getL $ Tt.clientEIds
-  let route
+  let allEIds = serverEIds' ++ clientEIds'
+      route
         | Li.elem toEId serverEIds' =
             runServerIAction toEId $ Ac.S'Receive fromEId msg
-        | otherwise = U.caseError
+        | Li.elem toEId clientEIds' = do
+            Tt.clientMsgsReceived .^^. St.insert msg
+            return ()
+        | otherwise = error $ "Can't deliver message; " ++ (show toEId) ++
+                              " doesn't present in any existing " ++ " endpoint: " ++ (show allEIds)
   route
 
-dropMessages :: Int -> STS Tt.TestState ()
+dropMessages :: Int -> STB Tt.TestState ()
 dropMessages numMessages = do
   Mo.forM_ [1..numMessages] $ \_ -> do
     length <- Tt.nonemptyQueues .^^^ St.size
@@ -169,7 +175,7 @@ skewProb = 95
 -- Simulate one millisecond of execution. This involves incrementing the server's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
 -- `numMessages` number of messages.
-simulate1ms :: STS Tt.TestState ()
+simulate1ms :: STB Tt.TestState ()
 simulate1ms = do
   -- increment each server's clocks and run async tasks that are now ready
   randPercent :: Int <- Tt.rand .^^ Rn.randomR (1, 100)
@@ -223,7 +229,7 @@ simulate1ms = do
     let loop left ((queueId, distVal):xs)
           | distVal <= left = loop (left - distVal) xs
           | otherwise = queueId
-        loop left [] = U.caseError
+        loop left [] = error $ "Shouldn't get here."
         queueId = loop r lenDist
     nonemptyQueues <- getL $ Tt.nonemptyQueues
     if St.member queueId nonemptyQueues
@@ -231,13 +237,13 @@ simulate1ms = do
       else return ()
 
 -- Simulate `n` milliseconds of execution
-simulateNms :: Int -> STS Tt.TestState ()
+simulateNms :: Int -> STB Tt.TestState ()
 simulateNms n = do
   Mo.forM_ [1..n] $ \_ -> simulate1ms
 
 -- Simulate execution until there are no more messages in any channel
 -- or any asyncQueue.
-simulateAll :: STS Tt.TestState ()
+simulateAll :: STB Tt.TestState ()
 simulateAll = do
   let simulate =
         do
@@ -255,8 +261,10 @@ addAdminMsg
   :: Co.EndpointId
   -> Co.EndpointId
   -> Ms.Ad'Payload
-  -> STS Tt.TestState ()
+  -> STB Tt.TestState Co.RequestId
 addAdminMsg fromEId toEId payload = do
   int <- Tt.nextInt .^^. (+1)
-  let msg = Ms.Admin (Ms.Ad'Message payload)
+  let requestId = (Co.RequestId (show int))
+      msg = Ms.Admin $ Ms.Ad'Message (Ms.Ad'Metadata requestId) payload
   addMsg msg (fromEId, toEId)
+  return requestId

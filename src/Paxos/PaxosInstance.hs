@@ -56,6 +56,7 @@ data Action =
   Broadcast M.PaxosMessage |
   Choose M.PaxosLogEntry |
   Stall
+  deriving (Gn.Generic, Show)
 
 propose :: M.Rnd -> M.Val -> ST outputActionT traceMessageT ProposerState Action
 propose crnd cval = do

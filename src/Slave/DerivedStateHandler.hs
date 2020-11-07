@@ -33,4 +33,4 @@ handleDerivedState paxosId pl pl' = do
           PM.RangeWrite requestId timestamp rangeTIds -> do
             DS.keySpaceManager .^^ KSM.write timestamp requestId rangeTIds
             addA $ SAc.Slave_CreateTablet requestId rangeTIds
-      _ -> U.caseError
+      _ -> error $ "PaxosLogEntry " ++ (show plEntry) ++ " is not supported by Slave DerivedState."

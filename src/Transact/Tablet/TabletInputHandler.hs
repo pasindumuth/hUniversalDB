@@ -17,27 +17,37 @@ handleInputAction input =
       case msg of
         Ms.Client _ -> error "Client requests not handled yet."
         Ms.Forwarded _ -> error "Forwarding not handled yet."
-        Ms.Admin (Ms.Ad'Message payload) ->
+        Ms.Admin (Ms.Ad'Message (Ms.Ad'Metadata requestId) payload) ->
           case payload of
             Ms.Ad'Request' request -> do
               case request of
-                Ms.Ad'Insert path row timestamp -> do
+                Ms.Ad'InsertRq path row timestamp -> do
                   TS.relationalTablet .^^. \relationalTablet ->
                     case RT.insertRow timestamp row relationalTablet of
                       Right relationalTablet -> relationalTablet
                       Left errMsg -> error errMsg
                   return ()
-                Ms.Ad'Update path primaryKey columnName columnValueM timestamp -> do
+                Ms.Ad'UpdateRq path primaryKey columnName columnValueM timestamp -> do
                   TS.relationalTablet .^^. \relationalTablet ->
                     case RT.updateColumn timestamp primaryKey columnName columnValueM relationalTablet of
                       Right relationalTablet -> relationalTablet
                       Left errMsg -> error errMsg
                   return ()
-                Ms.Ad'Delete path primaryKey timestamp -> do
+                Ms.Ad'DeleteRq path primaryKey timestamp -> do
                   TS.relationalTablet .^^. \relationalTablet ->
                     case RT.deleteRow timestamp primaryKey relationalTablet of
                       Right relationalTablet -> relationalTablet
                       Left errMsg -> error errMsg
+                  return ()
+                Ms.Ad'ReadRowRq path primaryKey timestamp -> do
+                  rowM <- TS.relationalTablet .^^ \relationalTablet ->
+                    case RT.readRow timestamp primaryKey relationalTablet of
+                      Right (rowM, relationalTablet) -> (rowM, relationalTablet)
+                      Left errMsg -> error errMsg
+                  addA $ Ac.T'Send [eId] $ Ms.Admin $
+                    Ms.Ad'Message
+                      (Ms.Ad'Metadata requestId)
+                      (Ms.Ad'Response' $ Ms.Ad'ReadRowRs rowM timestamp)
                   return ()
             Ms.Ad'Response' _ ->
               error "Admin responses shouldn't never be received."

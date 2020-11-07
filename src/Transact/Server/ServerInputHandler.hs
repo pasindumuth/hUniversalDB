@@ -22,19 +22,21 @@ handleInputAction input =
       case msg of
         Ms.Client _ -> error "Client requests not handled yet."
         Ms.Forwarded _ -> error "Forwarding not handled yet."
-        Ms.Admin (Ms.Ad'Message payload) ->
+        Ms.Admin (Ms.Ad'Message _ payload) ->
           case payload of
             Ms.Ad'Request' request -> do
               res <- case request of
-                Ms.Ad'Insert path row _ ->
+                Ms.Ad'InsertRq path row _ ->
                   SS.shapesWithSchema .^^^ findTabletShape path row
-                Ms.Ad'Update path primaryKey _ _ _ ->
+                Ms.Ad'UpdateRq path primaryKey _ _ _ ->
                   SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
-                Ms.Ad'Delete path primaryKey _ ->
+                Ms.Ad'DeleteRq path primaryKey _ ->
+                  SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
+                Ms.Ad'ReadRowRq path primaryKey _ ->
                   SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
               case res of
                 Right tabletShape -> addA $ Ac.S'TabletForward tabletShape eId msg
-                Left _ -> error "Admin shouldn't sent a message that a slave can't handle."
+                Left errMsg -> error $ "Admin shouldn't sent a message that a slave can't handle. Error: " ++ errMsg
             Ms.Ad'Response' _ ->
               error "Admin responses shouldn't never be received."
 
@@ -72,16 +74,16 @@ findTabletShape tabletPath row shapesWithSchema =
               (Co.TabletShape path range) = tabletShape
           in if tabletPath == path
             then
-              case RT.extractPrimary row schema of
-                Right (primaryKey, _) ->
+              case RT.checkRow row schema of
+                Right (RTT.Row primaryKey _) ->
                   if isInRange primaryKey range
                     then U.Break $ Right tabletShape
                     else U.Continue ()
-                Left _ -> U.Break $ Left $ "The row does not conform the schema"
-                                        ++ "of a TabletShape with the given path."
+                Left _ -> U.Break $ Left $ "The row " ++ (show row) ++ " does not conform the schema "
+                                        ++ (show schema) ++ " of a TabletShape with the given path."
            else U.Continue ()
   in case findResult of
-    U.Continue () -> Left "Couldn't find a TabletShape that can hold the given row"
+    U.Continue () -> Left "Couldn't find a TabletShape that can hold the given row."
     U.Break shapeWithSchemaE -> shapeWithSchemaE
 
 -- | This searches for a TabletShape with the given TabletPath. Once it finds
@@ -106,8 +108,8 @@ findTabletShapeWithPrimary tabletPath primaryKey shapesWithSchema =
                     then U.Break $ Right tabletShape
                     else U.Continue ()
                 Left _ -> U.Break $ Left $ "The row does not conform the schema"
-                                        ++ "of a TabletShape with the given path."
+                                        ++ " of a TabletShape with the given path."
            else U.Continue ()
   in case findResult of
-    U.Continue () -> Left "Couldn't find a TabletShape that can hold the given row"
+    U.Continue () -> Left "Couldn't find a TabletShape that has the primary key."
     U.Break shapeWithSchemaE -> shapeWithSchemaE

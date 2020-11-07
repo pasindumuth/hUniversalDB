@@ -80,7 +80,7 @@ handleInputAction iAction =
               let description = show (eId, request)
                   task = slaveWriteTask eId requestId path key value timestamp description
               handlingState .^ (PTM.handleTask task)
-            _ -> U.caseError
+            _ -> error $ "ClientRequest " ++ (show request) ++ " is not supported by Slaves."
         Ms.SlaveMessage slaveMsg ->
           case slaveMsg of
             SM.MultiPaxosMessage multiPaxosMsg -> do
@@ -101,7 +101,7 @@ handleInputAction iAction =
           if St.member tabletId tabletIds
             then addA $ SAc.TabletForward tabletId eId tabletMsg
             else return ()
-        _ -> U.caseError
+        _ -> error $ "Message " ++ (show msg) ++ " is not supported by Slaves."
     SAc.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
 

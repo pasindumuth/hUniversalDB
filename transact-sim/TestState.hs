@@ -41,7 +41,9 @@ data TestState = TestState {
   _clocks :: Mp.Map Co.EndpointId Int,
   -- Meta
   _nextInt :: Int,
-  _trueTimestamp :: Int
+  _trueTimestamp :: Int,
+  -- Accumulated client responses
+  _clientMsgsReceived :: St.Set Ms.Message
 } deriving (Show)
 
 makeLenses ''TestState

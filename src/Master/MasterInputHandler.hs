@@ -64,7 +64,7 @@ handleInputAction iAction =
               let description = show (eId, request)
                   task = deleteDatabaseTask eId requestId path timestamp description uid
               handlingState .^ (PTM.handleTask task)
-            _ -> U.caseError
+            _ -> error $ "ClientRequest " ++ (show request) ++ " is not supported by Masters."
         Ms.MasterMessage masterMsg ->
           case masterMsg of
             MM.MultiPaxosMessage multiPaxosMsg -> do
@@ -117,8 +117,8 @@ handleInputAction iAction =
                       handlingState .^ (PTM.handleTask task)
                       return ()
                 _ -> return ()
-            _ -> U.caseError
-        _ -> U.caseError
+            _ -> error $ "ClientResponse " ++ (show response) ++ " is not supported by Masters."
+        _ ->  error $ "Message " ++ (show msg) ++ " is not supported by Masters."
     MAc.RetryInput counterValue ->
       handlingState .^ PTM.handleRetry counterValue
     MAc.PerformInput uid -> do
