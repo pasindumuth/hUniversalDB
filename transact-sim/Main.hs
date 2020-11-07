@@ -13,32 +13,85 @@ import qualified Transact.Model.Message as Ms
 import Infra.Lens
 import Transact.Infra.State
 
-mkRow :: String -> Int -> RT.Row
-mkRow key value = RT.Row (RT.PrimaryKey [RT.CV'String key]) [Just (RT.CV'Int value)]
+------------------------------------------------------------------------------------------------------------------------
+-- Testing Utilities
+------------------------------------------------------------------------------------------------------------------------
+mkKey :: String -> RT.PrimaryKey
+mkKey key = (RT.PrimaryKey [RT.CV'String key])
 
--- Tests to see if a row that we write is actually written by trying to
+mkRow :: String -> Int -> RT.Row
+mkRow key value = RT.Row (mkKey key) [Just (RT.CV'Int value)]
+
+-- Add an Admin Request message between two nodes, and set a
+-- response that should occur anytime in the future
+addReqRes
+  :: Co.EndpointId -- ^ The node to send from
+  -> Co.EndpointId -- ^ The node to send to
+  -> Ms.Ad'Payload -- ^ The request payload
+  -> Ms.Ad'Payload -- ^ The response payload
+  -> (Mp.Map Co.RequestId Ms.Message) -- ^ All responses that are currently being expected to occur.
+  -> STB Tt.TestState (Mp.Map Co.RequestId Ms.Message) -- ^ The new set of responses to be expected.
+addReqRes fromEId toEId requestPaylod responsePayload expectedResponses = do
+  requestId <- SM.addAdminMsg fromEId toEId requestPaylod
+  let response = Ms.Admin $ Ms.Ad'Message (Ms.Ad'Metadata requestId) responsePayload
+  return $ Mp.insert requestId response expectedResponses
+
+-- Checks to see if the expected responses actually occurred. We
+-- get the actual responses that were received by clients with the
+-- Tt.clientMsgsReceived of Tt.TestState.
+checkResponses
+  :: (Mp.Map Co.RequestId Ms.Message) -- ^ All responses that are currently being expected to occur.
+  -> STB Tt.TestState (Either String String) -- ^ A success message if all responses occurred, or a failure otherwise
+checkResponses expectedResponses = do
+    msgs <- getL $ Tt.clientMsgsReceived
+    let expectedMinusActual = U.fold expectedResponses (Fl.toList msgs) $
+          \expectedMinusActual actualMsg ->
+            let (Ms.Admin (Ms.Ad'Message (Ms.Ad'Metadata requestId) _)) = actualMsg
+            in case Mp.lookup requestId expectedMinusActual of
+              Just msg | msg == actualMsg -> Mp.delete requestId expectedMinusActual
+              _ -> expectedMinusActual
+    if Mp.size expectedMinusActual == 0
+      then return $ Right $ show (Mp.size expectedResponses) ++ " checks made."
+      else return $ Left $ "Expected " ++ show (Mp.size expectedResponses) ++
+                           " responses to be received, but " ++ show (Mp.size expectedMinusActual) ++
+                           " of those still weren't."
+
+------------------------------------------------------------------------------------------------------------------------
+-- Tests
+------------------------------------------------------------------------------------------------------------------------
+-- | Tests to see if a row that we write is actually written by trying to
 -- read it again. The return value is either a failure message, or the number
 -- of checks that succeeded
 test1 :: STB Tt.TestState (Either String String)
 test1 = do
   let expectedResponses = Mp.empty
-  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) (Ms.Ad'Request' $ Ms.Ad'InsertRq (Co.TabletPath "table1") (mkRow "key1" 2) 1); SM.simulateNms 2
-  requestId <- SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) (Ms.Ad'Request' $ Ms.Ad'ReadRowRq (Co.TabletPath "table1") (RT.PrimaryKey [RT.CV'String "key1"]) 1); SM.simulateNms 2
-  expectedResponses <- return $ Mp.insert requestId (Ms.Admin $ Ms.Ad'Message (Ms.Ad'Metadata requestId) (Ms.Ad'Response' $ Ms.Ad'ReadRowRs (Just (mkRow "key1" 2)) 1)) expectedResponses
+  -- Insert a row
+  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) $
+    (Ms.Ad'Request'
+      (Ms.Ad'InsertRq
+        (Co.TabletPath "table1")
+        (mkRow "key1" 2)
+        1))
+  SM.simulateNms 2
+  -- Read the row and expect a response
+  expectedResponses <- addReqRes (SM.mkClientEId 0) (SM.mkServerEId 0)
+    (Ms.Ad'Request' (
+      Ms.Ad'ReadRowRq
+        (Co.TabletPath "table1")
+        (mkKey "key1")
+        1))
+    (Ms.Ad'Response' (
+      Ms.Ad'ReadRowRs
+        (Just (mkRow "key1" 2))
+        1))
+    expectedResponses
   SM.simulateAll
-  msgs <- getL $ Tt.clientMsgsReceived
-  let expectedMinusActual = U.fold expectedResponses (Fl.toList msgs) $
-        \expectedMinusActual actualMsg ->
-          let (Ms.Admin (Ms.Ad'Message (Ms.Ad'Metadata requestId) _)) = actualMsg
-          in case Mp.lookup requestId expectedMinusActual of
-            Just msg | msg == actualMsg -> Mp.delete requestId expectedMinusActual
-            _ -> expectedMinusActual
-  if (Mp.size expectedMinusActual) == 0
-    then return $ Right $ show (Mp.size expectedResponses) ++ " checks made."
-    else return $ Left $ "Expected " ++ show (Mp.size expectedResponses) ++
-                         " responses to be received, but " ++ show (Mp.size expectedMinusActual) ++
-                         " of those still weren't."
+  -- See if we get expected responses
+  checkResponses expectedResponses
 
+------------------------------------------------------------------------------------------------------------------------
+-- Test driver
+------------------------------------------------------------------------------------------------------------------------
 driveTest :: Int -> Int -> STB Tt.TestState (Either String String) -> IO ()
 driveTest seed testNum test = do
   let g = SM.createTestState seed 5 1
