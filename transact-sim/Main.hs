@@ -49,8 +49,8 @@ partitionConfig = Mp.fromList [
 mkKey :: String -> RT.PrimaryKey
 mkKey key = (RT.PrimaryKey [RT.CV'String key])
 
-mkRow :: String -> Int -> RT.Row
-mkRow key value = RT.Row (mkKey key) [Just (RT.CV'Int value)]
+mkRow :: String -> (Maybe Int) -> RT.Row
+mkRow key value = RT.Row (mkKey key) [fmap RT.CV'Int value]
 
 -- Add an Admin Request message between two nodes, and set a
 -- response that should occur anytime in the future
@@ -89,9 +89,7 @@ checkResponses expectedResponses = do
 ------------------------------------------------------------------------------------------------------------------------
 -- Tests
 ------------------------------------------------------------------------------------------------------------------------
--- | Tests to see if a row that we write is actually written by trying to
--- read it again. The return value is either a failure message, or the number
--- of checks that succeeded
+-- | Write a single row and read it again.
 test1 :: STB Tt.TestState (Either String String)
 test1 = do
   let expectedResponses = Mp.empty
@@ -100,7 +98,7 @@ test1 = do
     (Ms.Ad'Request'
       (Ms.Ad'InsertRq
         (Co.TabletPath "table1")
-        (mkRow "key1" 2)
+        (mkRow "key1" (Just 2))
         1))
   SM.simulateNms 2
   -- Read the row and expect a response
@@ -112,16 +110,15 @@ test1 = do
         1))
     (Ms.Ad'Response' (
       Ms.Ad'ReadRowRs
-        (Just (mkRow "key1" 2))
+        (Just (mkRow "key1" (Just 2)))
         1))
     expectedResponses
   SM.simulateAll
   -- See if we get expected responses
   checkResponses expectedResponses
 
--- | Tests to see if a row that we write is actually written by trying to
--- read it again. The return value is either a failure message, or the number
--- of checks that succeeded
+-- | Write a single row, update a column, and read both the first
+-- and second value.
 test2 :: STB Tt.TestState (Either String String)
 test2 = do
   let expectedResponses = Mp.empty
@@ -130,7 +127,7 @@ test2 = do
     (Ms.Ad'Request'
       (Ms.Ad'InsertRq
         (Co.TabletPath "table1")
-        (mkRow "key1" 2)
+        (mkRow "key1" (Just 2))
         1))
   SM.simulateNms 2
   -- Update the row
@@ -152,7 +149,7 @@ test2 = do
         1))
     (Ms.Ad'Response' (
       Ms.Ad'ReadRowRs
-        (Just (mkRow "key1" 2))
+        (Just (mkRow "key1" (Just 2)))
         1))
     expectedResponses
   -- Read the row and expect a response
@@ -164,7 +161,45 @@ test2 = do
         2))
     (Ms.Ad'Response' (
       Ms.Ad'ReadRowRs
-        (Just (mkRow "key1" 3))
+        (Just (mkRow "key1" (Just 3)))
+        2))
+    expectedResponses
+  SM.simulateAll
+  -- See if we get expected responses
+  checkResponses expectedResponses
+
+-- | Write a single row, update a column to be NULL, and read it again.
+test3 :: STB Tt.TestState (Either String String)
+test3 = do
+  let expectedResponses = Mp.empty
+  -- Insert a row
+  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) $
+    (Ms.Ad'Request'
+      (Ms.Ad'InsertRq
+        (Co.TabletPath "table1")
+        (mkRow "key1" (Just 2))
+        1))
+  SM.simulateNms 2
+  -- Update the row
+  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) $
+    (Ms.Ad'Request'
+      (Ms.Ad'UpdateRq
+        (Co.TabletPath "table1")
+        (mkKey "key1")
+        "value"
+        Nothing
+        2))
+  SM.simulateNms 2
+  -- Read the row and expect a response
+  expectedResponses <- addReqRes (SM.mkClientEId 0) (SM.mkServerEId 0)
+    (Ms.Ad'Request' (
+      Ms.Ad'ReadRowRq
+        (Co.TabletPath "table1")
+        (mkKey "key1")
+        2))
+    (Ms.Ad'Response' (
+      Ms.Ad'ReadRowRs
+        (Just (mkRow "key1" Nothing))
         2))
     expectedResponses
   SM.simulateAll
@@ -189,6 +224,7 @@ testDriver :: IO ()
 testDriver = do
   driveTest 0 1 test1
   driveTest 0 2 test2
+  driveTest 0 3 test3
 
 main :: IO ()
 main = testDriver
