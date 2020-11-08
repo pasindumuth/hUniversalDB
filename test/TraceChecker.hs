@@ -103,38 +103,38 @@ checkMsgs msgs =
     Left message -> Left message
     Right state ->
       if (state ^. i'requestMap & Mp.size) > 0
-        then Left $ "The following requests went unanswered: " ++ ppShow (state ^. i'requestMap)
+        then Left $ "The following requests went unanswered: " ++ U.ppShow (state ^. i'requestMap)
         else Right ()
 
 entryUnfamiliarE :: PM.PaxosLogEntry -> Either Co.ErrorMsg a
 entryUnfamiliarE entry =
-  Left $ "PaxosLogEntry (" ++ ppShow entry ++
+  Left $ "PaxosLogEntry (" ++ U.ppShow entry ++
          ") has unfamiliar requestId."
 
 entryIncorrectE :: PM.PaxosLogEntry -> CRq.Payload -> Either Co.ErrorMsg a
 entryIncorrectE entry payload =
-  Left $ "PaxosLogEntry (" ++ ppShow entry ++
-         ") isn't correct. Request payload was (" ++ ppShow payload
+  Left $ "PaxosLogEntry (" ++ U.ppShow entry ++
+         ") isn't correct. Request payload was (" ++ U.ppShow payload
 
 responseNoRequestE :: CRs.ClientResponse -> Either Co.ErrorMsg a
 responseNoRequestE response =
-  Left $ "Response (" ++ ppShow response ++
+  Left $ "Response (" ++ U.ppShow response ++
          ") has no corresponding Request"
 
 responseTypeIncorrectE :: CRs.ClientResponse -> CRq.Payload -> Either Co.ErrorMsg a
 responseTypeIncorrectE response requestPayload =
-  Left $ "Response (" ++ ppShow response ++
-         ") has the wrong type for Request (" ++ ppShow requestPayload
+  Left $ "Response (" ++ U.ppShow response ++
+         ") has the wrong type for Request (" ++ U.ppShow requestPayload
 
 responseValueIncorrectE :: CRs.ClientResponse -> CRq.Payload -> Either Co.ErrorMsg a
 responseValueIncorrectE response requestPayload =
-  Left $ "Response (" ++ ppShow response ++
-         ") has the wrong value for Request (" ++ ppShow requestPayload
+  Left $ "Response (" ++ U.ppShow response ++
+         ") has the wrong value for Request (" ++ U.ppShow requestPayload
 
 derivedStateIncorrectlyWrittenE :: CRq.Payload -> CRs.ClientResponse -> Either Co.ErrorMsg a
 derivedStateIncorrectlyWrittenE requestPayload response =
-  Left $ "Derived State didn't appear to reflect changes in the Request (" ++ ppShow requestPayload ++
-         ") at the time of response (" ++ ppShow response
+  Left $ "Derived State didn't appear to reflect changes in the Request (" ++ U.ppShow requestPayload ++
+         ") at the time of response (" ++ U.ppShow response
 
 -- Notice that we often use fatally failing operations, like ^?!. This is because
 -- if the program is working right, then these operations shouldn't fail.

@@ -2,6 +2,7 @@ module Slave.Tablet.TabletInputHandler where
 
 import qualified System.Random as Rn
 
+import qualified Infra.Utils as U
 import qualified Paxos.MultiPaxosInstance as MP
 import qualified Paxos.PaxosLog as PL
 import qualified Paxos.Tasks.PaxosTaskManager as PTM
@@ -56,7 +57,7 @@ handleInputAction iAction = do
           pl' <- getL $ TS.multiPaxosInstance.MP.paxosLog
           if (pl /= pl')
             then do
-              addA $ TAc.Print $ ppShow pl'
+              addA $ TAc.Print $ U.ppShow pl'
               paxosId <- getL $ TS.multiPaxosInstance . MP.paxosId
               TS.derivedState .^ DSH.handleDerivedState paxosId pl pl'
               handlingState .^ PTM.handleInsert

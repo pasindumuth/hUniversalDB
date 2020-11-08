@@ -22,40 +22,17 @@ import qualified Transact.Tablet.TabletInputHandler as TIH
 import Infra.Lens
 import Transact.Infra.State
 
--- | Hard simple coded table schema we will use for all tables.
-schema :: RT.Schema
-schema = RT.Schema [("key", RT.CT'String)] [("value", RT.CT'Int)]
-
--- | A simpe utility for making Co.TabletKeyRanges for the specific schema above
-mkKeyRange :: Maybe String -> Maybe String -> Co.TabletKeyRange
-mkKeyRange startKeyM endKeyM =
-  Co.TabletKeyRange (fmap toPrimary startKeyM) (fmap toPrimary endKeyM)
-  where
-    toPrimary key = RT.PrimaryKey [RT.CV'String key]
-
--- | Hard coded table partitioning configurations. We only handle 5 servers and
--- only a handful of tables. We don't support SQL DDL yet.
-partitionConfig :: Mp.Map Co.EndpointId [Co.TabletShape]
-partitionConfig = Mp.fromList [
-  (Co.EndpointId "s0", [
-    Co.TabletShape (Co.TabletPath "table1") (mkKeyRange Nothing Nothing)]),
-  (Co.EndpointId "s1", [
-    Co.TabletShape (Co.TabletPath "table2") (mkKeyRange Nothing (Just "j"))]),
-  (Co.EndpointId "s2", [
-    Co.TabletShape (Co.TabletPath "table2") (mkKeyRange (Just "j") Nothing),
-    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange Nothing (Just "d")),
-    Co.TabletShape (Co.TabletPath "table4") (mkKeyRange Nothing (Just "k"))]),
-  (Co.EndpointId "s3", [
-    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange (Just "d") (Just "p"))]),
-  (Co.EndpointId "s4", [
-    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange (Just "p") Nothing),
-    Co.TabletShape (Co.TabletPath "table4") (mkKeyRange (Just "k") Nothing)])]
-
 mkServerEId i = Co.EndpointId $ "s" ++ show i
 mkClientEId i = Co.EndpointId $ "c" ++ show i
 
-createTestState :: Int -> Int -> Int -> Tt.TestState
-createTestState seed numServers numClients =
+createTestState
+  :: Int -- ^ A seed to initialize all random number generators with.
+  -> Int -- ^ Number of server to create.
+  -> Int -- ^ Number of clients to create.
+  -> Mp.Map Co.EndpointId [Co.TabletShape] -- ^ The Tablets that each server manages.
+  -> RT.Schema -- ^ The schema for all tables (we simply have all tables use the same schema for simplicity)
+  -> Tt.TestState -- ^ The test state produced
+createTestState seed numServers numClients partitionConfig schema =
   let rand = Rn.mkStdGen seed
       serverEIds = U.map
         [0..(numServers - 1)] $ mkServerEId

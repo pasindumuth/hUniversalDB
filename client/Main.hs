@@ -29,12 +29,12 @@ startClient mip sip = do
     Lg.infoM Lg.main $ "Connection established to " ++ show remoteAddr
     Ct.forkIO $ Mo.forever $ do
       msg :: Ms.Message <- Cn.receiveMessage masterSocket
-      putStrLn $ ppShow msg
+      putStrLn $ U.ppShow msg
     TCP.connect sip "8000" $ \(slaveSocket, remoteAddr) -> do
       Lg.infoM Lg.main $ "Connection established to " ++ show remoteAddr
       Ct.forkIO $ Mo.forever $ do
         msg :: Ms.Message <- Cn.receiveMessage slaveSocket
-        putStrLn $ ppShow msg
+        putStrLn $ U.ppShow msg
       let loop ranges count = do
             line <- getLine
             let requestId = Co.RequestId $ "requestId" ++ show count
@@ -90,7 +90,7 @@ startClient mip sip = do
                           (read timestamp)))
                   return ranges'
                 _ -> do
-                  putStrLn $ ppShow "Unrecognized command or number of arguments"
+                  putStrLn $ U.ppShow "Unrecognized command or number of arguments"
                   return ranges
             loop ranges' (count + 1)
       loop [] 0

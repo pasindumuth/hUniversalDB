@@ -176,7 +176,7 @@ driveTest seed testNum test = do
         case verifyTrace $ traceMsgs of
           Left errMsg -> "Test " ++ (show testNum) ++ " Failed! Error: " ++ errMsg
           Right _ -> "Test " ++ (show testNum) ++ " Passed! " ++ (show $ length traceMsgs) ++ " trace messages."
-  putStrLn $ ppShow $ g' ^. Tt.requestStats
+  putStrLn $ U.ppShow $ g' ^. Tt.requestStats
   putStrLn testMsg
   putStrLn ""
   return ()

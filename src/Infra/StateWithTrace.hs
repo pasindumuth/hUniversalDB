@@ -2,8 +2,7 @@
 
 module Infra.StateWithTrace (
   module Infra.StateWithTrace,
-  module Infra.StateCore,
-  ppShow
+  module Infra.StateCore
 ) where
 
 import qualified Control.Monad.State as St
@@ -12,8 +11,6 @@ import Control.Lens (Lens', Traversal', (.~), (&), (^?!), has)
 
 import qualified Proto.Messages.TraceMessages as TrM
 import Infra.StateCore
-
-import Text.Show.Pretty (ppShow)
 
 -- A General version of ST
 --

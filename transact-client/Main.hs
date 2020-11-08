@@ -21,7 +21,7 @@ startClient sip = do
     Lg.infoM Lg.main $ "Connection established to " ++ show remoteAddr
     Ct.forkIO $ Mo.forever $ do
       msg :: Ms.Message <- Cn.receiveMessage slaveSocket
-      putStrLn $ ppShow msg
+      putStrLn $ U.ppShow msg
     return ()
 
 main :: IO ()

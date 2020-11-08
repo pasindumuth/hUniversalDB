@@ -16,6 +16,36 @@ import Transact.Infra.State
 ------------------------------------------------------------------------------------------------------------------------
 -- Testing Utilities
 ------------------------------------------------------------------------------------------------------------------------
+
+-- | Hard simple coded table schema we will use for all tables.
+schema :: RT.Schema
+schema = RT.Schema [("key", RT.CT'String)] [("value", RT.CT'Int)]
+
+-- | A simpe utility for making Co.TabletKeyRanges for the specific schema above
+mkKeyRange :: Maybe String -> Maybe String -> Co.TabletKeyRange
+mkKeyRange startKeyM endKeyM =
+  Co.TabletKeyRange (fmap toPrimary startKeyM) (fmap toPrimary endKeyM)
+  where
+    toPrimary key = RT.PrimaryKey [RT.CV'String key]
+
+-- | Hard coded table partitioning configurations. We only handle 5 servers and
+-- only a handful of tables. We don't support SQL DDL yet.
+partitionConfig :: Mp.Map Co.EndpointId [Co.TabletShape]
+partitionConfig = Mp.fromList [
+  (Co.EndpointId "s0", [
+    Co.TabletShape (Co.TabletPath "table1") (mkKeyRange Nothing Nothing)]),
+  (Co.EndpointId "s1", [
+    Co.TabletShape (Co.TabletPath "table2") (mkKeyRange Nothing (Just "j"))]),
+  (Co.EndpointId "s2", [
+    Co.TabletShape (Co.TabletPath "table2") (mkKeyRange (Just "j") Nothing),
+    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange Nothing (Just "d")),
+    Co.TabletShape (Co.TabletPath "table4") (mkKeyRange Nothing (Just "k"))]),
+  (Co.EndpointId "s3", [
+    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange (Just "d") (Just "p"))]),
+  (Co.EndpointId "s4", [
+    Co.TabletShape (Co.TabletPath "table3") (mkKeyRange (Just "p") Nothing),
+    Co.TabletShape (Co.TabletPath "table4") (mkKeyRange (Just "k") Nothing)])]
+
 mkKey :: String -> RT.PrimaryKey
 mkKey key = (RT.PrimaryKey [RT.CV'String key])
 
@@ -89,13 +119,65 @@ test1 = do
   -- See if we get expected responses
   checkResponses expectedResponses
 
+-- | Tests to see if a row that we write is actually written by trying to
+-- read it again. The return value is either a failure message, or the number
+-- of checks that succeeded
+test2 :: STB Tt.TestState (Either String String)
+test2 = do
+  let expectedResponses = Mp.empty
+  -- Insert a row
+  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) $
+    (Ms.Ad'Request'
+      (Ms.Ad'InsertRq
+        (Co.TabletPath "table1")
+        (mkRow "key1" 2)
+        1))
+  SM.simulateNms 2
+  -- Update the row
+  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) $
+    (Ms.Ad'Request'
+      (Ms.Ad'UpdateRq
+        (Co.TabletPath "table1")
+        (mkKey "key1")
+        "value"
+        (Just $ RT.CV'Int 3)
+        2))
+  SM.simulateNms 2
+  -- Read the row and expect a response
+  expectedResponses <- addReqRes (SM.mkClientEId 0) (SM.mkServerEId 0)
+    (Ms.Ad'Request' (
+      Ms.Ad'ReadRowRq
+        (Co.TabletPath "table1")
+        (mkKey "key1")
+        1))
+    (Ms.Ad'Response' (
+      Ms.Ad'ReadRowRs
+        (Just (mkRow "key1" 2))
+        1))
+    expectedResponses
+  -- Read the row and expect a response
+  expectedResponses <- addReqRes (SM.mkClientEId 0) (SM.mkServerEId 0)
+    (Ms.Ad'Request' (
+      Ms.Ad'ReadRowRq
+        (Co.TabletPath "table1")
+        (mkKey "key1")
+        2))
+    (Ms.Ad'Response' (
+      Ms.Ad'ReadRowRs
+        (Just (mkRow "key1" 3))
+        2))
+    expectedResponses
+  SM.simulateAll
+  -- See if we get expected responses
+  checkResponses expectedResponses
+
 ------------------------------------------------------------------------------------------------------------------------
 -- Test driver
 ------------------------------------------------------------------------------------------------------------------------
 driveTest :: Int -> Int -> STB Tt.TestState (Either String String) -> IO ()
 driveTest seed testNum test = do
-  let g = SM.createTestState seed 5 1
-      (result, (_, _, g')) = runST test1 g
+  let g = SM.createTestState seed 5 1 partitionConfig schema
+      (result, (_, _, g')) = runST test g
       testMsg =
         case result of
           Left errMsg -> "Test " ++ (show testNum) ++ " Failed! Error: " ++ errMsg
@@ -106,6 +188,7 @@ driveTest seed testNum test = do
 testDriver :: IO ()
 testDriver = do
   driveTest 0 1 test1
+  driveTest 0 2 test2
 
 main :: IO ()
 main = testDriver

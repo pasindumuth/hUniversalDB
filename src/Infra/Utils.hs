@@ -4,6 +4,10 @@ import qualified Data.Binary as Bn
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 
+import qualified Debug.Trace as Tr
+import qualified System.IO.Unsafe as UF
+import qualified Text.Show.Pretty as Pr
+
 import qualified Control.Exception as Ex
 import qualified Control.Monad as Mo
 import qualified Data.Sequence as Sq
@@ -130,6 +134,24 @@ instance Applicative (Loop e) where
 instance Monad (Loop e) where
     Break l >>= _ = Break l
     Continue r >>= k = k r
+
+------------------------------------------------------------------------------------------------------------------------
+-- Debugging
+------------------------------------------------------------------------------------------------------------------------
+
+-- Forward the definition of Debug.Trace.trace here
+trace :: String -> a -> a
+trace = Tr.trace
+
+-- Similar to Debug.Trace.trace, but prettifies the string
+traceP :: (Show b) => b -> a -> a
+traceP obj expr = UF.unsafePerformIO $ do
+    Tr.traceIO (Pr.ppShow obj)
+    return expr
+
+-- Forward the definition of Text.Show.Pretty.ppShow here
+ppShow :: Show a => a -> String
+ppShow = Pr.ppShow
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Miscellaneous
