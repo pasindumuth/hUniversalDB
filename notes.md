@@ -1,8 +1,10 @@
 # Build & Run 
 
+stack exec happy src/Transact/SQL/Sql.y
 stack build
 stack run hUniversalDB-slave-exe
 stack run hUniversalDB-client-exe
+stack run hUniversalDB-transact-client-exe
 stack run hUniversalDB-transact-sim-exe
 
 stack test --profile

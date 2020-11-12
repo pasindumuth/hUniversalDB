@@ -92,6 +92,8 @@ library
       Transact.Server.Env
       Transact.Server.ServerInputHandler
       Transact.Server.ServerState
+      Transact.SQL.Parse
+      Transact.SQL.Sql
       Transact.Tablet.Env
       Transact.Tablet.TabletInputHandler
       Transact.Tablet.TabletState
@@ -104,6 +106,7 @@ library
   ghc-options: -fwarn-incomplete-patterns
   build-depends:
       MissingH
+    , array
     , async
     , base >=4.7 && <5
     , binary
@@ -128,6 +131,7 @@ executable hUniversalDB-client-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
+    , array
     , async
     , base >=4.7 && <5
     , binary
@@ -153,6 +157,7 @@ executable hUniversalDB-master-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
+    , array
     , async
     , base >=4.7 && <5
     , binary
@@ -178,6 +183,7 @@ executable hUniversalDB-slave-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
+    , array
     , async
     , base >=4.7 && <5
     , binary
@@ -203,6 +209,7 @@ executable hUniversalDB-transact-client-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
+    , array
     , async
     , base >=4.7 && <5
     , binary
@@ -228,6 +235,7 @@ executable hUniversalDB-transact-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
+    , array
     , async
     , base >=4.7 && <5
     , binary
@@ -255,6 +263,7 @@ executable hUniversalDB-transact-sim-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
+    , array
     , async
     , base >=4.7 && <5
     , binary
@@ -286,6 +295,7 @@ test-suite hUniversalDB-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O0 -fwarn-incomplete-patterns
   build-depends:
       MissingH
+    , array
     , async
     , base >=4.7 && <5
     , binary
