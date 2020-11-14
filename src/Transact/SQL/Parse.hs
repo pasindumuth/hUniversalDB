@@ -2,6 +2,8 @@ module Transact.SQL.Parse where
 
 import qualified Data.Char as C
 
+import qualified Transact.Model.SqlAST as AST
+
 parseError :: [Token] -> a
 parseError tokens = error $ "Parse error. Tokens: " ++ (show tokens)
 
@@ -11,10 +13,18 @@ data Token
   | T'Where
   | T'As
   | T'Comma
-  | T'StatementEnd
+  | T'Dot
+  | T'SemiColon
+  | T'LeftParen
+  | T'RightParen
+  | T'AndOp
+  | T'OrOp
+  | T'CompareOp AST.CompareOp
   | T'Identifier String
   | T'QuotedString String
   | T'Bool Bool
+  | T'Int Int
+  | T'Float Float
   deriving Show
 
 lexer :: String -> [Token]
@@ -24,7 +34,7 @@ lexer (c:cs)
       | C.isAlpha c = lexAlphaString (c:cs)
 lexer ('\'':cs) = lexQuotedString cs
 lexer (',':cs) = T'Comma : lexer cs
-lexer (';':cs) = T'StatementEnd : lexer cs
+lexer (';':cs) = T'SemiColon : lexer cs
 lexer _ = error "Cannot lex the input."
 
 -- | This is called whenever an alphabetical character is encountered
