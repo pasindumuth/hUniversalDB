@@ -10,6 +10,8 @@ import qualified SimulationManager as SM
 import qualified TestState as Tt
 import qualified Transact.Model.Common as Co
 import qualified Transact.Model.Message as Ms
+import qualified Transact.SQL.Sql as Sql
+import qualified Transact.SQL.Parse as P
 import Infra.Lens
 import Transact.Infra.State
 
@@ -206,6 +208,52 @@ test3 = do
   -- See if we get expected responses
   checkResponses expectedResponses
 
+-- | Write a single row, update a column to be NULL, and read it again.
+test4 :: STB Tt.TestState (Either String String)
+test4 = do
+  let expectedResponses = Mp.empty
+      sql = unlines [
+                    "SELECT value",
+                    "FROM table1",
+                    "WHERE true;"
+                  ]
+  -- Insert a row
+  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) $
+    (Ms.Ad'Request'
+      (Ms.Ad'InsertRq
+        (Co.TabletPath "table1")
+        (mkRow "key1" (Just 1))
+        1))
+  SM.simulateNms 2
+  -- Insert a row
+  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) $
+    (Ms.Ad'Request'
+      (Ms.Ad'InsertRq
+        (Co.TabletPath "table1")
+        (mkRow "key2" (Just 2))
+        2))
+  SM.simulateNms 2
+  -- Insert a row
+  SM.addAdminMsg (SM.mkClientEId 0) (SM.mkServerEId 0) $
+    (Ms.Ad'Request'
+      (Ms.Ad'InsertRq
+        (Co.TabletPath "table1")
+        (mkRow "key3" (Just 3))
+        3))
+  SM.simulateNms 2
+  -- Read the row and expect a response
+  expectedResponses <- addReqRes (SM.mkClientEId 0) (SM.mkServerEId 0)
+    (Ms.Ad'Request'
+          (Ms.Ad'Select $ Sql.calc $ P.lexer sql))
+    (Ms.Ad'Response' (
+      Ms.Ad'SelectRs [RT.Row (RT.PrimaryKey [RT.CV'String "key1"]) [Just $ RT.CV'Int 1],
+                      RT.Row (RT.PrimaryKey [RT.CV'String "key2"]) [Just $ RT.CV'Int 2],
+                      RT.Row (RT.PrimaryKey [RT.CV'String "key3"]) [Just $ RT.CV'Int 3]]))
+    expectedResponses
+  SM.simulateAll
+  -- See if we get expected responses
+  checkResponses expectedResponses
+
 ------------------------------------------------------------------------------------------------------------------------
 -- Test driver
 ------------------------------------------------------------------------------------------------------------------------
@@ -225,6 +273,7 @@ testDriver = do
   driveTest 0 1 test1
   driveTest 0 2 test2
   driveTest 0 3 test3
+  driveTest 0 4 test4
 
 main :: IO ()
 main = testDriver

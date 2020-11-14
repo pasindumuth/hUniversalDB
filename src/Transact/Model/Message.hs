@@ -10,6 +10,7 @@ import qualified GHC.Generics as Gn
 
 import qualified Common.Model.RelationalTablet as RT
 import qualified Transact.Model.Common as Co
+import qualified Transact.Model.SqlAST as Sql
 
 -- Conventions: Forwarded Messages is the best example. The main rule here
 -- is that if we have a Type Constructor like T T in a type S, then we should
@@ -73,10 +74,13 @@ data Ad'Request
   | Ad'DeleteRq Co.TabletPath RT.PrimaryKey Co.Timestamp
   -- | Contains the primaryKey of the row to read and the timestamp to read at.
   | Ad'ReadRowRq Co.TabletPath RT.PrimaryKey Co.Timestamp
+  -- | A Select Query.
+  | Ad'Select Sql.SqlStatement
   deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
 data Ad'Response
   = Ad'ReadRowRs (Maybe RT.Row) Co.Timestamp
+  | Ad'SelectRs [RT.Row]
   deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 
 data Ad'Metadata = Ad'Metadata Co.RequestId deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)

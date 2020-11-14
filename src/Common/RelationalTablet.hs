@@ -5,6 +5,7 @@
 
 module Common.RelationalTablet where
 
+import qualified Data.Map as Mp
 import qualified GHC.Generics as Gn
 
 import qualified Common.Model.RelationalTablet as RT
@@ -31,7 +32,7 @@ import Infra.Lens
 ------------------------------------------------------------------------------------------------------------------------
 -- Relational Tablet
 ------------------------------------------------------------------------------------------------------------------------
-type TabletStorage = MVM.MultiVersionMap ([RT.ColumnValue], Maybe String) RT.ColumnValue
+type TabletStorage = MVM.MultiVersionMap (RT.PrimaryKey, Maybe String) RT.ColumnValue
 
 -- In this schema definition, the bool at the end indicates if the
 -- if the column is a primary key column.
@@ -121,12 +122,16 @@ insertRow
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
 insertRow timestamp row tablet = do
   let (RT.Schema _ schemaColumns) = (tablet ^. i'schema)
-  (RT.Row (RT.PrimaryKey primaryKey) rowColumns) <- checkRow row (tablet ^. i'schema)
+  (RT.Row primaryKey rowColumns) <- checkRow row (tablet ^. i'schema)
   let (_, storage') = MVM.write (primaryKey, Nothing) (Just $ RT.CV'Empty ()) timestamp (tablet ^. i'storage)
       (_, storage'') = U.fold (rowColumns, storage') schemaColumns $
-        \((rowColumn:r'rowColumns), storage) (columnName, _) ->
-          let (_, storage') = MVM.write (primaryKey, Just columnName) rowColumn timestamp storage
-          in (r'rowColumns, storage')
+        \(rowColumns, storage) (columnName, _) ->
+          case rowColumns of
+            (rowColumn:r'rowColumns) ->
+              let (_, storage') = MVM.write (primaryKey, Just columnName) rowColumn timestamp storage
+              in (r'rowColumns, storage')
+            _ -> error $ "rowColumns " ++ (show rowColumns)
+                      ++ " should match up with the column names " ++ (show schemaColumns) 
   return $ tablet & i'storage .~ storage''
 
 -- | Deletes a row from the RelationalTablet. This method assumes that this is
@@ -142,7 +147,7 @@ deleteRow
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
 deleteRow timestamp primaryKey tablet = do
   let (RT.Schema _ schemaColumns) = (tablet ^. i'schema)
-  (RT.PrimaryKey primaryKey) <- checkPrimaryKey primaryKey (tablet ^. i'schema)
+  primaryKey <- checkPrimaryKey primaryKey (tablet ^. i'schema)
   let (_, storage') = MVM.write (primaryKey, Nothing) Nothing timestamp (tablet ^. i'storage)
       storage'' = U.fold storage' schemaColumns $
         \storage (columnName, _) ->
@@ -164,7 +169,7 @@ updateColumn
   -> RelationalTablet -- ^ The RelationalTablet to be modified.
   -> Either String RelationalTablet -- ^ An error or the modified Tablet.
 updateColumn timestamp primaryKey columnName columnValue tablet = do
-  (RT.PrimaryKey primaryKey) <- checkPrimaryKey primaryKey (tablet ^. i'schema)
+  primaryKey <- checkPrimaryKey primaryKey (tablet ^. i'schema)
   let (_, storage') = MVM.write (primaryKey, Just columnName) columnValue timestamp (tablet ^. i'storage)
   return $ tablet & i'storage .~ storage'
 
@@ -181,7 +186,7 @@ readRow
   -> Either String (Maybe RT.Row, RelationalTablet) -- ^ An error or the modified Tablet.
 readRow timestamp primaryKey tablet = do
   let (RT.Schema _ schemaColumns) = (tablet ^. i'schema)
-  (RT.PrimaryKey primaryKey) <- checkPrimaryKey primaryKey (tablet ^. i'schema)
+  primaryKey <- checkPrimaryKey primaryKey (tablet ^. i'schema)
   let (value, storage') = MVM.read (primaryKey, Nothing) timestamp (tablet ^. i'storage)
   Right $ case value of
     Just _ -> -- A row with the given key actually exists at this timestamp
@@ -190,5 +195,5 @@ readRow timestamp primaryKey tablet = do
               let (value, storage') = MVM.read (primaryKey, Just columnName) timestamp storage
                   value' = fmap fst value
               in ((value':rowColumnsReverse), storage')
-      in (Just $ RT.Row (RT.PrimaryKey primaryKey) (reverse rowColumnsReverse), tablet & i'storage .~ storage'')
+      in (Just $ RT.Row primaryKey (reverse rowColumnsReverse), tablet & i'storage .~ storage'')
     Nothing -> (Nothing, tablet & i'storage .~ storage')

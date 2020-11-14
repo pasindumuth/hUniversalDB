@@ -1,10 +1,14 @@
 module Transact.Server.ServerInputHandler where
 
+import qualified Data.List as Li
+import qualified Data.Maybe as Ma
+
 import qualified Common.Model.RelationalTablet as RTT
 import qualified Common.RelationalTablet as RT
 import qualified Transact.Model.Actions as Ac
 import qualified Transact.Model.Common as Co
 import qualified Transact.Model.Message as Ms
+import qualified Transact.Model.SqlAST as Sql
 import qualified Transact.Server.ServerState as SS
 import qualified Infra.Utils as U
 
@@ -34,11 +38,35 @@ handleInputAction input =
                   SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
                 Ms.Ad'ReadRowRq path primaryKey _ ->
                   SS.shapesWithSchema .^^^ findTabletShapeWithPrimary path primaryKey
+                Ms.Ad'Select sqlStatement ->
+                  SS.shapesWithSchema .^^^ findTabletIfFullTable sqlStatement
               case res of
                 Right tabletShape -> addA $ Ac.S'TabletForward tabletShape eId msg
                 Left errMsg -> error $ "Admin shouldn't sent a message that a slave can't handle. Error: " ++ errMsg
             Ms.Ad'Response' _ ->
               error "Admin responses shouldn't never be received."
+
+-- | Extracts the table name that the SQL statement is referring to.
+getTable :: Sql.SqlStatement -> String
+getTable sqlStatement =
+  case sqlStatement of
+    Sql.SelectStatement _ fromBody _ ->
+      let (Sql.FromBody (Sql.TableNameAlias table _)) = fromBody
+      in table
+
+-- | Analyzes the SQL statement to figure out what table that it needs
+-- to touch, and then checks if this node manages that whole table,
+-- returning true if it does and false otherwise.
+findTabletIfFullTable
+  :: Sql.SqlStatement
+  -> [(RTT.Schema, Co.TabletShape)]
+  -> Either String Co.TabletShape
+findTabletIfFullTable sqlStatement shapesWithSchema =
+  let targetShape = Co.TabletShape (Co.TabletPath $ getTable sqlStatement) (Co.TabletKeyRange Nothing Nothing)
+  in case Li.find (\(_, shape) -> shape == targetShape) shapesWithSchema of
+       Just _ -> Right targetShape
+       Nothing -> Left $ "This node either doesn't have even a single Tablet of the table, "
+                      ++ "or if it does, it doesn't manage the whole keyspace."
 
 -- | Checks if the PrimaryKey is within the bounds of TabletKeyRange
 -- (look at TabletKeyRange's docs). Importantly, note that this function
@@ -107,9 +135,9 @@ findTabletShapeWithPrimary tabletPath primaryKey shapesWithSchema =
                   if isInRange primaryKey range
                     then U.Break $ Right tabletShape
                     else U.Continue ()
-                Left _ -> U.Break $ Left $ "The row does not conform the schema"
-                                        ++ " of a TabletShape with the given path."
-           else U.Continue ()
+                Left _ -> U.Break $ Left $ "The row does not conform the schema "
+                                        ++ "of a TabletShape with the given path."
+            else U.Continue ()
   in case findResult of
     U.Continue () -> Left "Couldn't find a TabletShape that has the primary key."
     U.Break shapeWithSchemaE -> shapeWithSchemaE

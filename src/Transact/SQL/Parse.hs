@@ -3,7 +3,7 @@ module Transact.SQL.Parse where
 import qualified Data.Char as C
 
 parseError :: [Token] -> a
-parseError _ = error "Parse error"
+parseError tokens = error $ "Parse error. Tokens: " ++ (show tokens)
 
 data Token
   = T'Select
@@ -31,7 +31,7 @@ lexer _ = error "Cannot lex the input."
 -- after a white space. Notice that this doesn't find quoted strings
 -- like "Bob" in the SQL code: WHERE Customer.FirstName = "Bob".
 lexAlphaString cs =
-   let (token, rest) = span C.isAlpha cs
+   let (token, rest) = span C.isAlphaNum cs
        tokenLower = (map C.toLower token)
    in case tokenLower of
       "select" -> T'Select : lexer rest
@@ -43,8 +43,8 @@ lexAlphaString cs =
       _        -> T'Identifier token : lexer rest
 
 -- | For now, we don't support quoted strings containing escape characters.
--- For now, we interpret any instances of \ literally. The input string
--- no longer has the first quotation mark present.
+-- That is, we interpret any instances of \ literally. The input string
+-- should no longer has the first quotation mark present.
 lexQuotedString cs =
    let (token, rest) = span (/='\'') cs
    in T'QuotedString token : lexer (safePop rest)

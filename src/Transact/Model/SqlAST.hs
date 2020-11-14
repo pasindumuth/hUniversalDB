@@ -8,7 +8,7 @@ module Transact.Model.SqlAST where
 import qualified Data.Binary as Bn
 import qualified GHC.Generics as Gn
 
-data SelectStatement
+data SqlStatement
   = SelectStatement SelectBody FromBody WhereBody
   deriving (Gn.Generic, Bn.Binary, Show, Eq, Ord)
 

@@ -149,7 +149,7 @@ dropMessages numMessages = do
 
 skewProb = 95
 
--- Simulate one millisecond of execution. This involves incrementing the server's
+-- | Simulate one millisecond of execution. This involves incrementing the server's
 -- clocks, handling any async tasks whose time has come to execute, and exchanging
 -- `numMessages` number of messages.
 simulate1ms :: STB Tt.TestState ()
@@ -213,12 +213,12 @@ simulate1ms = do
       then deliverMessage queueId
       else return ()
 
--- Simulate `n` milliseconds of execution
+-- | Simulate `n` milliseconds of execution
 simulateNms :: Int -> STB Tt.TestState ()
 simulateNms n = do
   Mo.forM_ [1..n] $ \_ -> simulate1ms
 
--- Simulate execution until there are no more messages in any channel
+-- | Simulate execution until there are no more messages in any channel
 -- or any asyncQueue.
 simulateAll :: STB Tt.TestState ()
 simulateAll = do
@@ -234,11 +234,12 @@ simulateAll = do
             else return ()
   simulate
 
+-- | Adds an Admin message to the test state
 addAdminMsg
-  :: Co.EndpointId
-  -> Co.EndpointId
-  -> Ms.Ad'Payload
-  -> STB Tt.TestState Co.RequestId
+  :: Co.EndpointId -- ^ from endpoint
+  -> Co.EndpointId -- ^ to endpoint
+  -> Ms.Ad'Payload -- ^ admin payload
+  -> STB Tt.TestState Co.RequestId -- ^ returns the RequestId assigned to message.
 addAdminMsg fromEId toEId payload = do
   int <- Tt.nextInt .^^. (+1)
   let requestId = (Co.RequestId (show int))

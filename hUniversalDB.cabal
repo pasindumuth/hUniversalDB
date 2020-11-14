@@ -89,6 +89,7 @@ library
       Transact.Model.Actions
       Transact.Model.Common
       Transact.Model.Message
+      Transact.Model.SqlAST
       Transact.Server.Env
       Transact.Server.ServerInputHandler
       Transact.Server.ServerState
